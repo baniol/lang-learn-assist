@@ -1,4 +1,4 @@
-use crate::models::{AppSettings, ChatMessage, ConversationCleanupResult, SuggestedPhrase};
+use crate::models::{get_language_name, AppSettings, ChatMessage, ConversationCleanupResult, SuggestedPhrase};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -238,21 +238,8 @@ async fn call_llm(
 }
 
 fn build_conversation_system_prompt(subject: &str, target_lang: &str, native_lang: &str) -> String {
-    let target_name = match target_lang {
-        "de" => "German",
-        "en" => "English",
-        "fr" => "French",
-        "es" => "Spanish",
-        "it" => "Italian",
-        _ => target_lang,
-    };
-
-    let native_name = match native_lang {
-        "pl" => "Polish",
-        "en" => "English",
-        "de" => "German",
-        _ => native_lang,
-    };
+    let target_name = get_language_name(target_lang);
+    let native_name = get_language_name(native_lang);
 
     format!(
         r#"You are a translator. Translate {} to natural spoken {}.
@@ -326,21 +313,8 @@ pub async fn suggest_conversation_cleanup(
         return Err("LLM API key not configured".to_string());
     }
 
-    let target_name = match target_language.as_str() {
-        "de" => "German",
-        "en" => "English",
-        "fr" => "French",
-        "es" => "Spanish",
-        "it" => "Italian",
-        _ => &target_language,
-    };
-
-    let native_name = match native_language.as_str() {
-        "pl" => "Polish",
-        "en" => "English",
-        "de" => "German",
-        _ => &native_language,
-    };
+    let target_name = get_language_name(&target_language);
+    let native_name = get_language_name(&native_language);
 
     let conversation_text = messages
         .iter()
@@ -440,15 +414,8 @@ pub async fn extract_phrases_from_conversation(
         return Err("LLM API key not configured".to_string());
     }
 
-    let target_name = match target_language.as_str() {
-        "de" => "German",
-        _ => &target_language,
-    };
-
-    let native_name = match native_language.as_str() {
-        "pl" => "Polish",
-        _ => &native_language,
-    };
+    let target_name = get_language_name(&target_language);
+    let native_name = get_language_name(&native_language);
 
     let conversation_text = messages
         .iter()

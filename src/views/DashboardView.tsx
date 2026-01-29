@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Conversation, TopicCategory, ViewType } from "../types";
-import { TOPIC_CATEGORIES } from "../types";
+import type { Conversation, ViewType } from "../types";
 
 interface DashboardViewProps {
   onNavigate: (view: ViewType, data?: unknown) => void;
@@ -11,9 +10,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showNewDialog, setShowNewDialog] = useState(false);
-  const [selectedTopic, setSelectedTopic] = useState<TopicCategory | null>(null);
-  const [customTopic, setCustomTopic] = useState("");
-  const [conversationTitle, setConversationTitle] = useState("");
+  const [newTopic, setNewTopic] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -32,21 +29,14 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   };
 
   const handleCreateConversation = async () => {
-    if (!selectedTopic) return;
-
-    const subject = selectedTopic.id === "custom" ? customTopic : selectedTopic.label;
-    const title = conversationTitle || subject;
-
-    if (!subject.trim()) return;
+    const topic = newTopic.trim() || "General conversation";
 
     try {
       const conversation = await invoke<Conversation>("create_conversation", {
-        request: { title, subject },
+        request: { title: topic, subject: topic },
       });
       setShowNewDialog(false);
-      setSelectedTopic(null);
-      setCustomTopic("");
-      setConversationTitle("");
+      setNewTopic("");
       onNavigate("conversation", { conversationId: conversation.id });
     } catch (err) {
       console.error("Failed to create conversation:", err);
@@ -180,70 +170,26 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
       {/* New Conversation Dialog */}
       {showNewDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-auto">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm mx-4">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
                 New Conversation
               </h2>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">
-                Choose a topic to practice
-              </p>
+              <input
+                type="text"
+                value={newTopic}
+                onChange={(e) => setNewTopic(e.target.value)}
+                placeholder="Topic (e.g. At the restaurant)"
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && handleCreateConversation()}
+                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400"
+              />
             </div>
-
-            <div className="p-6 space-y-4">
-              {/* Topic Selection */}
-              <div className="grid grid-cols-2 gap-3">
-                {TOPIC_CATEGORIES.map((topic) => (
-                  <button
-                    key={topic.id}
-                    onClick={() => setSelectedTopic(topic)}
-                    className={`
-                      p-4 rounded-lg border-2 text-left transition-all
-                      ${
-                        selectedTopic?.id === topic.id
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                          : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-                      }
-                    `}
-                  >
-                    <span className="text-2xl block mb-1">{topic.icon}</span>
-                    <span className="font-medium text-slate-700 dark:text-slate-200 text-sm">
-                      {topic.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Custom Topic Input */}
-              {selectedTopic?.id === "custom" && (
-                <input
-                  type="text"
-                  value={customTopic}
-                  onChange={(e) => setCustomTopic(e.target.value)}
-                  placeholder="Enter your topic..."
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400"
-                />
-              )}
-
-              {/* Title Input */}
-              {selectedTopic && (
-                <input
-                  type="text"
-                  value={conversationTitle}
-                  onChange={(e) => setConversationTitle(e.target.value)}
-                  placeholder="Conversation title (optional)"
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400"
-                />
-              )}
-            </div>
-
-            <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
+            <div className="px-6 pb-6 flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowNewDialog(false);
-                  setSelectedTopic(null);
-                  setCustomTopic("");
-                  setConversationTitle("");
+                  setNewTopic("");
                 }}
                 className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
@@ -251,10 +197,9 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               </button>
               <button
                 onClick={handleCreateConversation}
-                disabled={!selectedTopic || (selectedTopic.id === "custom" && !customTopic.trim())}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
-                Start Conversation
+                Start
               </button>
             </div>
           </div>

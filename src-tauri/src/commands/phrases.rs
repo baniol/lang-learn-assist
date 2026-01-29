@@ -1,16 +1,8 @@
-use crate::db::get_db_path;
+use crate::db::get_conn;
 use crate::models::{
     CreatePhraseRequest, Phrase, PhraseProgress, PhraseWithProgress, UpdatePhraseRequest,
 };
-use rusqlite::{params, Connection};
-
-fn get_conn() -> Result<Connection, String> {
-    let db_path = get_db_path();
-    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
-    conn.execute("PRAGMA foreign_keys = ON", [])
-        .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
-    Ok(conn)
-}
+use rusqlite::params;
 
 fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
     let accepted_json: String = row.get(4)?;
@@ -32,50 +24,90 @@ fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
     })
 }
 
+/// Status filter for phrase queries
+/// - "all": no filtering
+/// - "new": phrases with no progress
+/// - "learning": phrases with progress but streak < 2
+/// - "learned": phrases with streak >= 2
 #[tauri::command]
+#[allow(non_snake_case)]
 pub fn get_phrases(
     conversationId: Option<i64>,
     starredOnly: Option<bool>,
     targetLanguage: Option<String>,
+    status: Option<String>,
+    searchQuery: Option<String>,
 ) -> Result<Vec<PhraseWithProgress>, String> {
     let conn = get_conn()?;
 
-    let mut query = String::from(
+    // Build query with parameter placeholders
+    let mut conditions = Vec::new();
+    let mut param_values: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(cid) = conversationId {
+        conditions.push("p.conversation_id = ?");
+        param_values.push(Box::new(cid));
+    }
+
+    if starredOnly.unwrap_or(false) {
+        conditions.push("p.starred = 1");
+    }
+
+    if let Some(ref lang) = targetLanguage {
+        conditions.push("p.target_language = ?");
+        param_values.push(Box::new(lang.clone()));
+    }
+
+    // Status filtering based on progress
+    if let Some(ref status_filter) = status {
+        match status_filter.as_str() {
+            "new" => {
+                conditions.push("pp.id IS NULL");
+            }
+            "learning" => {
+                conditions.push("pp.id IS NOT NULL AND pp.total_attempts > 0 AND pp.correct_streak < 2");
+            }
+            "learned" => {
+                conditions.push("pp.id IS NOT NULL AND pp.correct_streak >= 2");
+            }
+            _ => {} // "all" or any other value means no filtering
+        }
+    }
+
+    // Search filter
+    if let Some(ref query) = searchQuery {
+        if !query.is_empty() {
+            conditions.push("(p.prompt LIKE ? OR p.answer LIKE ?)");
+            let search_pattern = format!("%{}%", query);
+            param_values.push(Box::new(search_pattern.clone()));
+            param_values.push(Box::new(search_pattern));
+        }
+    }
+
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!(" AND {}", conditions.join(" AND "))
+    };
+
+    let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen
          FROM phrases p
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
-         WHERE 1=1",
+         WHERE 1=1{}
+         ORDER BY p.created_at DESC",
+        where_clause
     );
-
-    let mut conditions = Vec::new();
-
-    if let Some(cid) = conversationId {
-        conditions.push(format!("p.conversation_id = {}", cid));
-    }
-
-    if starredOnly.unwrap_or(false) {
-        conditions.push("p.starred = 1".to_string());
-    }
-
-    if let Some(lang) = targetLanguage {
-        conditions.push(format!("p.target_language = '{}'", lang));
-    }
-
-    for condition in conditions {
-        query.push_str(" AND ");
-        query.push_str(&condition);
-    }
-
-    query.push_str(" ORDER BY p.created_at DESC");
 
     let mut stmt = conn
         .prepare(&query)
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
+    let params: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
     let phrases = stmt
-        .query_map([], |row| {
+        .query_map(params.as_slice(), |row| {
             let phrase = row_to_phrase(row)?;
 
             let progress = if let Ok(progress_id) = row.get::<_, i64>(11) {
@@ -176,22 +208,29 @@ pub fn create_phrase(request: CreatePhraseRequest) -> Result<Phrase, String> {
 
 #[tauri::command]
 pub fn create_phrases_batch(phrases: Vec<CreatePhraseRequest>) -> Result<Vec<Phrase>, String> {
-    let conn = get_conn()?;
+    let mut conn = get_conn()?;
 
-    let mut created = Vec::new();
+    // Use transaction for atomicity - all phrases created or none
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Failed to begin transaction: {}", e))?;
 
-    for request in phrases {
-        let accepted_json = serde_json::to_string(&request.accepted.unwrap_or_default())
+    let mut created_ids = Vec::new();
+
+    for request in &phrases {
+        let accepted_json = serde_json::to_string(&request.accepted.clone().unwrap_or_default())
             .map_err(|e| format!("Failed to serialize accepted: {}", e))?;
 
         let target_lang = request
             .target_language
+            .clone()
             .unwrap_or_else(|| "de".to_string());
         let native_lang = request
             .native_language
+            .clone()
             .unwrap_or_else(|| "pl".to_string());
 
-        conn.execute(
+        tx.execute(
             "INSERT INTO phrases (conversation_id, prompt, answer, accepted_json, target_language, native_language, notes)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
@@ -206,9 +245,13 @@ pub fn create_phrases_batch(phrases: Vec<CreatePhraseRequest>) -> Result<Vec<Phr
         )
         .map_err(|e| format!("Failed to create phrase: {}", e))?;
 
-        let id = conn.last_insert_rowid();
+        created_ids.push(tx.last_insert_rowid());
+    }
 
-        let phrase = conn
+    // Fetch all created phrases before committing
+    let mut created = Vec::new();
+    for id in &created_ids {
+        let phrase = tx
             .query_row(
                 "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, created_at
                  FROM phrases WHERE id = ?1",
@@ -216,9 +259,11 @@ pub fn create_phrases_batch(phrases: Vec<CreatePhraseRequest>) -> Result<Vec<Phr
                 row_to_phrase,
             )
             .map_err(|e| format!("Failed to retrieve created phrase: {}", e))?;
-
         created.push(phrase);
     }
+
+    tx.commit()
+        .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
     Ok(created)
 }
@@ -312,13 +357,10 @@ pub fn update_phrase_audio(id: i64, audio_path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn delete_phrase(id: i64) -> Result<(), String> {
-    println!("delete_phrase called with id: {}", id);
     let conn = get_conn()?;
 
-    let rows_affected = conn.execute("DELETE FROM phrases WHERE id = ?1", params![id])
+    conn.execute("DELETE FROM phrases WHERE id = ?1", params![id])
         .map_err(|e| format!("Failed to delete phrase: {}", e))?;
-
-    println!("delete_phrase: {} rows affected", rows_affected);
 
     Ok(())
 }

@@ -1,5 +1,23 @@
 use serde::{Deserialize, Serialize};
 
+/// Convert language code to human-readable name
+pub fn get_language_name(code: &str) -> &str {
+    match code {
+        "de" => "German",
+        "en" => "English",
+        "fr" => "French",
+        "es" => "Spanish",
+        "it" => "Italian",
+        "pl" => "Polish",
+        "pt" => "Portuguese",
+        "ru" => "Russian",
+        "zh" => "Chinese",
+        "ja" => "Japanese",
+        "ko" => "Korean",
+        _ => code,
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Conversation {
@@ -112,16 +130,6 @@ impl AppSettings {
             default_exercise_mode: "speaking".to_string(),
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WhisperModel {
-    pub name: String,
-    pub file_name: String,
-    pub size_mb: u64,
-    pub url: String,
-    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

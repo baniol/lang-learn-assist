@@ -1,18 +1,21 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTTS } from "../hooks/useTTS";
-import type { PhraseWithProgress, CreatePhraseRequest } from "../types";
+import type { PhraseWithProgress, CreatePhraseRequest, LearningStats } from "../types";
 
 type FilterStatus = "all" | "new" | "learning" | "learned";
 
 export function PhraseLibraryView() {
   const [phrases, setPhrases] = useState<PhraseWithProgress[]>([]);
+  const [stats, setStats] = useState<LearningStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [playingId, setPlayingId] = useState<number | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [newPhrase, setNewPhrase] = useState<CreatePhraseRequest>({
     prompt: "",
@@ -27,14 +30,47 @@ export function PhraseLibraryView() {
     onError: (err) => console.error("TTS error:", err),
   });
 
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // Load stats on mount
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  // Load phrases when filters change
   useEffect(() => {
     loadPhrases();
-  }, [showStarredOnly]);
+  }, [showStarredOnly, filterStatus, debouncedSearch]);
+
+  const loadStats = async () => {
+    try {
+      const data = await invoke<LearningStats>("get_learning_stats", {});
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to load stats:", err);
+    }
+  };
 
   const loadPhrases = async () => {
+    setIsLoading(true);
     try {
       const data = await invoke<PhraseWithProgress[]>("get_phrases", {
         starredOnly: showStarredOnly || null,
+        status: filterStatus !== "all" ? filterStatus : null,
+        searchQuery: debouncedSearch || null,
       });
       setPhrases(data);
     } catch (err) {
@@ -44,28 +80,8 @@ export function PhraseLibraryView() {
     }
   };
 
-  const filteredPhrases = phrases.filter((p) => {
-    // Status filter
-    if (filterStatus !== "all") {
-      const hasProgress = p.progress && p.progress.totalAttempts > 0;
-      const isLearned = p.progress && p.progress.correctStreak >= 2;
-
-      if (filterStatus === "new" && hasProgress) return false;
-      if (filterStatus === "learning" && (!hasProgress || isLearned)) return false;
-      if (filterStatus === "learned" && !isLearned) return false;
-    }
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        p.phrase.prompt.toLowerCase().includes(query) ||
-        p.phrase.answer.toLowerCase().includes(query)
-      );
-    }
-
-    return true;
-  });
+  // Filtering now done on backend
+  const filteredPhrases = phrases;
 
   const handleToggleStar = async (id: number) => {
     try {
@@ -109,6 +125,7 @@ export function PhraseLibraryView() {
     try {
       await invoke("delete_phrase", { id: deleteConfirmId });
       setPhrases((prev) => prev.filter((p) => p.phrase.id !== deleteConfirmId));
+      loadStats(); // Refresh stats after deletion
     } catch (err) {
       console.error("Failed to delete phrase:", err);
     } finally {
@@ -123,23 +140,17 @@ export function PhraseLibraryView() {
       await invoke("create_phrase", { request: newPhrase });
       setShowAddDialog(false);
       setNewPhrase({ prompt: "", answer: "", accepted: [], notes: "" });
-      loadPhrases();
+      refreshStats();
     } catch (err) {
       console.error("Failed to create phrase:", err);
     }
   };
 
-  const getStats = () => {
-    const total = phrases.length;
-    const learned = phrases.filter((p) => p.progress && p.progress.correctStreak >= 2).length;
-    const learning = phrases.filter(
-      (p) => p.progress && p.progress.totalAttempts > 0 && p.progress.correctStreak < 2
-    ).length;
-    const newCount = total - learned - learning;
-    return { total, learned, learning, newCount };
+  // Refresh stats after changes
+  const refreshStats = async () => {
+    await loadStats();
+    await loadPhrases();
   };
-
-  const stats = getStats();
 
   return (
     <div className="p-6">
@@ -150,7 +161,7 @@ export function PhraseLibraryView() {
             Phrase Library
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            {stats.total} phrases ({stats.learned} learned, {stats.learning} learning, {stats.newCount} new)
+            {stats ? `${stats.totalPhrases} phrases (${stats.learnedCount} learned, ${stats.learningCount} learning, ${stats.newCount} new)` : "Loading..."}
           </p>
         </div>
         <button

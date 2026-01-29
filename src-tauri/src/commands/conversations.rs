@@ -1,11 +1,6 @@
-use crate::db::get_db_path;
+use crate::db::get_conn;
 use crate::models::{ChatMessage, Conversation, CreateConversationRequest};
-use rusqlite::{params, Connection};
-
-fn get_conn() -> Result<Connection, String> {
-    let db_path = get_db_path();
-    Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))
-}
+use rusqlite::params;
 
 #[tauri::command]
 pub fn get_conversations() -> Result<Vec<Conversation>, String> {
@@ -119,6 +114,7 @@ pub fn update_conversation_title(id: i64, title: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[allow(non_snake_case)]
 pub fn finalize_conversation(
     id: i64,
     finalMessages: Vec<ChatMessage>,

@@ -1,11 +1,6 @@
-use crate::db::get_db_path;
+use crate::db::get_conn;
 use crate::models::{LearningStats, PhraseProgress, PhraseWithProgress, PracticeSession};
-use rusqlite::{params, Connection};
-
-fn get_conn() -> Result<Connection, String> {
-    let db_path = get_db_path();
-    Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))
-}
+use rusqlite::params;
 
 /// Calculate priority for spaced repetition
 /// Higher priority = should be shown sooner
@@ -49,36 +44,49 @@ pub fn get_next_phrase(
 ) -> Result<Option<PhraseWithProgress>, String> {
     let conn = get_conn()?;
 
-    let mut query = String::from(
+    // Build query with parameter placeholders
+    let mut conditions = Vec::new();
+    let mut param_values: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(ref lang) = target_language {
+        conditions.push("p.target_language = ?".to_string());
+        param_values.push(Box::new(lang.clone()));
+    }
+
+    // For exclude_ids, we build placeholders dynamically but values are still parameterized
+    if let Some(ref ids) = exclude_ids {
+        if !ids.is_empty() {
+            let placeholders: Vec<&str> = ids.iter().map(|_| "?").collect();
+            conditions.push(format!("p.id NOT IN ({})", placeholders.join(",")));
+            for id in ids {
+                param_values.push(Box::new(*id));
+            }
+        }
+    }
+
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!(" AND {}", conditions.join(" AND "))
+    };
+
+    let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen
          FROM phrases p
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
-         WHERE 1=1",
+         WHERE 1=1{}",
+        where_clause
     );
-
-    if let Some(lang) = &target_language {
-        query.push_str(&format!(" AND p.target_language = '{}'", lang));
-    }
-
-    if let Some(ids) = &exclude_ids {
-        if !ids.is_empty() {
-            let ids_str = ids
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(",");
-            query.push_str(&format!(" AND p.id NOT IN ({})", ids_str));
-        }
-    }
 
     let mut stmt = conn
         .prepare(&query)
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
+    let params: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
     let phrases: Vec<PhraseWithProgress> = stmt
-        .query_map([], |row| {
+        .query_map(params.as_slice(), |row| {
             let accepted_json: String = row.get(4)?;
             let accepted: Vec<String> = serde_json::from_str(&accepted_json).unwrap_or_default();
             let starred_int: i32 = row.get(9)?;
@@ -209,18 +217,17 @@ pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress,
 pub fn get_learning_stats(target_language: Option<String>) -> Result<LearningStats, String> {
     let conn = get_conn()?;
 
-    let lang_filter = target_language
-        .map(|l| format!(" AND p.target_language = '{}'", l))
-        .unwrap_or_default();
+    // Use parameterized queries for language filter
+    let (lang_filter, params): (&str, Vec<&dyn rusqlite::ToSql>) = match &target_language {
+        Some(lang) => (" AND p.target_language = ?", vec![lang as &dyn rusqlite::ToSql]),
+        None => ("", vec![]),
+    };
 
     // Total phrases
     let total_phrases: i32 = conn
         .query_row(
-            &format!(
-                "SELECT COUNT(*) FROM phrases p WHERE 1=1{}",
-                lang_filter
-            ),
-            [],
+            &format!("SELECT COUNT(*) FROM phrases p WHERE 1=1{}", lang_filter),
+            params.as_slice(),
             |row| row.get(0),
         )
         .unwrap_or(0);
@@ -234,7 +241,7 @@ pub fn get_learning_stats(target_language: Option<String>) -> Result<LearningSta
                  WHERE pp.correct_streak >= 2{}",
                 lang_filter
             ),
-            [],
+            params.as_slice(),
             |row| row.get(0),
         )
         .unwrap_or(0);
@@ -248,7 +255,7 @@ pub fn get_learning_stats(target_language: Option<String>) -> Result<LearningSta
                  WHERE pp.correct_streak < 2 AND pp.total_attempts > 0{}",
                 lang_filter
             ),
-            [],
+            params.as_slice(),
             |row| row.get(0),
         )
         .unwrap_or(0);
@@ -266,7 +273,7 @@ pub fn get_learning_stats(target_language: Option<String>) -> Result<LearningSta
                  WHERE 1=1{}",
                 lang_filter
             ),
-            [],
+            params.as_slice(),
             |row| row.get(0),
         )
         .unwrap_or(0.0);

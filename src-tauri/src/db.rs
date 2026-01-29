@@ -10,21 +10,21 @@ pub fn get_db_path() -> PathBuf {
     app_dir.join("data.db")
 }
 
+/// Get a database connection with foreign keys enabled.
+/// This is the standard way to get a connection across all command modules.
+pub fn get_conn() -> std::result::Result<Connection, String> {
+    let db_path = get_db_path();
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    conn.execute("PRAGMA foreign_keys = ON", [])
+        .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
+    Ok(conn)
+}
+
 pub fn get_audio_dir() -> PathBuf {
     let app_dir = dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("com.marcinbaniowski.lang-learn-assist")
         .join("audio");
-
-    std::fs::create_dir_all(&app_dir).ok();
-    app_dir
-}
-
-pub fn get_models_dir() -> PathBuf {
-    let app_dir = dirs::data_local_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("com.marcinbaniowski.lang-learn-assist")
-        .join("models");
 
     std::fs::create_dir_all(&app_dir).ok();
     app_dir
