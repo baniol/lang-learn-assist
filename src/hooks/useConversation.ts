@@ -12,9 +12,10 @@ interface UseConversationResult {
   messages: ChatMessage[];
   isLoading: boolean;
   error: string | null;
-  sendMessage: (content: string, isMeta?: boolean) => Promise<void>;
+  sendMessage: (content: string) => Promise<void>;
   loadMessages: () => void;
   clearError: () => void;
+  deleteMessage: (messageId: string) => void;
 }
 
 export function useConversation({
@@ -57,7 +58,7 @@ export function useConversation({
   );
 
   const sendMessage = useCallback(
-    async (content: string, isMeta = false) => {
+    async (content: string) => {
       if (!conversation || !content.trim()) return;
 
       setError(null);
@@ -65,9 +66,8 @@ export function useConversation({
 
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
-        role: isMeta ? "meta" : "user",
-        content: isMeta ? `[META] ${content}` : content,
-        isMetaQuestion: isMeta,
+        role: "user",
+        content: content,
       };
 
       const updatedMessages = [...messages, userMessage];
@@ -84,8 +84,7 @@ export function useConversation({
         const assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: response.content,
-          isMetaQuestion: false,
+          content: response.content.trim(),
         };
 
         const finalMessages = [...updatedMessages, assistantMessage];
@@ -94,13 +93,44 @@ export function useConversation({
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         setError(errorMsg);
-        // Remove the user message on error
         setMessages(messages);
       } finally {
         setIsLoading(false);
       }
     },
     [conversation, messages, saveMessages]
+  );
+
+  const deleteMessage = useCallback(
+    (messageId: string) => {
+      setMessages((prevMessages) => {
+        const msgIndex = prevMessages.findIndex((msg) => msg.id === messageId);
+        if (msgIndex === -1) return prevMessages;
+
+        const msg = prevMessages[msgIndex];
+        let newMessages: ChatMessage[];
+
+        if (msg.role === "assistant") {
+          // If deleting assistant message, also delete the preceding user message
+          if (msgIndex > 0 && prevMessages[msgIndex - 1].role === "user") {
+            newMessages = prevMessages.filter((_, i) => i !== msgIndex && i !== msgIndex - 1);
+          } else {
+            newMessages = prevMessages.filter((_, i) => i !== msgIndex);
+          }
+        } else {
+          // If deleting user message, also delete the following assistant message
+          if (msgIndex < prevMessages.length - 1 && prevMessages[msgIndex + 1].role === "assistant") {
+            newMessages = prevMessages.filter((_, i) => i !== msgIndex && i !== msgIndex + 1);
+          } else {
+            newMessages = prevMessages.filter((_, i) => i !== msgIndex);
+          }
+        }
+
+        saveMessages(newMessages);
+        return newMessages;
+      });
+    },
+    [saveMessages]
   );
 
   const clearError = useCallback(() => {
@@ -114,5 +144,6 @@ export function useConversation({
     sendMessage,
     loadMessages,
     clearError,
+    deleteMessage,
   };
 }

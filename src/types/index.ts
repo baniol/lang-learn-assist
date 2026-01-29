@@ -24,9 +24,8 @@ export interface Conversation {
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "meta";
+  role: "user" | "assistant";
   content: string;
-  isMetaQuestion: boolean;
 }
 
 export interface Phrase {

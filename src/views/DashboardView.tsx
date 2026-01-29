@@ -14,6 +14,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   const [selectedTopic, setSelectedTopic] = useState<TopicCategory | null>(null);
   const [customTopic, setCustomTopic] = useState("");
   const [conversationTitle, setConversationTitle] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   useEffect(() => {
     loadConversations();
@@ -52,15 +53,21 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     }
   };
 
-  const handleDeleteConversation = async (id: number, e: React.MouseEvent) => {
+  const handleDeleteClick = (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Delete this conversation?")) return;
+    setDeleteConfirmId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmId) return;
 
     try {
-      await invoke("delete_conversation", { id });
-      setConversations((prev) => prev.filter((c) => c.id !== id));
+      await invoke("delete_conversation", { id: deleteConfirmId });
+      setConversations((prev) => prev.filter((c) => c.id !== deleteConfirmId));
     } catch (err) {
       console.error("Failed to delete conversation:", err);
+    } finally {
+      setDeleteConfirmId(null);
     }
   };
 
@@ -157,11 +164,11 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                   </p>
                 </div>
                 <button
-                  onClick={(e) => handleDeleteConversation(conversation.id, e)}
+                  onClick={(e) => handleDeleteClick(conversation.id, e)}
                   className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
@@ -248,6 +255,34 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Start Conversation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-2">
+              Delete conversation?
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">
+              This will permanently delete this conversation and cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Delete
               </button>
             </div>
           </div>

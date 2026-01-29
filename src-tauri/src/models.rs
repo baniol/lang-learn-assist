@@ -22,8 +22,6 @@ pub struct ChatMessage {
     pub id: String,
     pub role: String,
     pub content: String,
-    #[serde(default)]
-    pub is_meta_question: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,7 +54,6 @@ pub struct PhraseProgress {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PhraseWithProgress {
-    #[serde(flatten)]
     pub phrase: Phrase,
     pub progress: Option<PhraseProgress>,
 }

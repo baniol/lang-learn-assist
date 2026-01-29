@@ -255,17 +255,20 @@ fn build_conversation_system_prompt(subject: &str, target_lang: &str, native_lan
     };
 
     format!(
-        r#"You are a {} language tutor having a conversation with a {}-speaking student.
-Topic: {}
+        r#"You are a translator. Translate {} to natural spoken {}.
+Topic context: {}
 
-Guidelines:
-- Respond in {} at B1-B2 level
-- Keep responses short (2-3 sentences)
-- Use practical, everyday vocabulary
-- When student writes [META] followed by {}, answer in {} about {}, then continue the conversation
-- If the student makes grammatical errors, gently correct them
-- Suggest useful phrases the student might want to use"#,
-        target_name, native_name, subject, target_name, native_name, native_name, target_name
+RULES:
+- Output ONLY the {} translation - no quotes, no explanations, no JSON, no formatting
+- Sound natural, like a native speaker in casual conversation
+- B1-B2 vocabulary level
+
+Input: Cześć, jak się masz?
+Output: Hallo! Wie geht's dir?
+
+Input: Byłem na zakupach
+Output: Ich war einkaufen."#,
+        native_name, target_name, subject, target_name
     )
 }
 
@@ -295,7 +298,6 @@ pub async fn send_conversation_message(
     // Convert ChatMessages to LLM format
     let llm_messages: Vec<serde_json::Value> = messages
         .iter()
-        .filter(|m| m.role != "meta")
         .map(|m| {
             let role = if m.role == "user" { "user" } else { "assistant" };
             serde_json::json!({"role": role, "content": m.content})
@@ -348,11 +350,11 @@ pub async fn suggest_conversation_cleanup(
 
     let prompt = format!(
         r#"Analyze this {} learning conversation and provide:
-1. A cleaned version removing meta-questions (marked with [META])
+1. A cleaned final conversation containing only the accepted {} phrases
 2. A suggested title
 3. Useful phrases for the student to learn
 
-Conversation:
+Conversation (user messages are requests in {}, assistant messages are {} phrase suggestions):
 ---
 {}
 ---
@@ -361,7 +363,7 @@ Respond ONLY with valid JSON in this exact format:
 {{
   "title": "Short descriptive title",
   "cleanedMessages": [
-    {{"id": "unique-id", "role": "user|assistant", "content": "message text", "isMetaQuestion": false}}
+    {{"id": "unique-id", "role": "assistant", "content": "{} phrase text"}}
   ],
   "suggestedPhrases": [
     {{"prompt": "{} translation", "answer": "{} phrase", "accepted": ["alternative spellings"]}}
@@ -369,13 +371,18 @@ Respond ONLY with valid JSON in this exact format:
 }}
 
 Rules:
-- Remove all [META] questions and their responses from cleanedMessages
+- cleanedMessages should only contain the {} phrases from assistant messages (no user requests)
 - Extract 5-10 most useful phrases from the conversation
-- Phrases should be practical vocabulary the student used or should learn
+- Phrases should be practical vocabulary for the student to learn
 - "prompt" is in {} (native), "answer" is in {} (target)"#,
         target_name,
-        conversation_text,
+        target_name,
         native_name,
+        target_name,
+        conversation_text,
+        target_name,
+        native_name,
+        target_name,
         target_name,
         native_name,
         target_name

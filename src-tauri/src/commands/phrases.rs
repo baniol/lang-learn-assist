@@ -6,7 +6,10 @@ use rusqlite::{params, Connection};
 
 fn get_conn() -> Result<Connection, String> {
     let db_path = get_db_path();
-    Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    conn.execute("PRAGMA foreign_keys = ON", [])
+        .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
+    Ok(conn)
 }
 
 fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
@@ -31,9 +34,9 @@ fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
 
 #[tauri::command]
 pub fn get_phrases(
-    conversation_id: Option<i64>,
-    starred_only: Option<bool>,
-    target_language: Option<String>,
+    conversationId: Option<i64>,
+    starredOnly: Option<bool>,
+    targetLanguage: Option<String>,
 ) -> Result<Vec<PhraseWithProgress>, String> {
     let conn = get_conn()?;
 
@@ -48,15 +51,15 @@ pub fn get_phrases(
 
     let mut conditions = Vec::new();
 
-    if let Some(cid) = conversation_id {
+    if let Some(cid) = conversationId {
         conditions.push(format!("p.conversation_id = {}", cid));
     }
 
-    if starred_only.unwrap_or(false) {
+    if starredOnly.unwrap_or(false) {
         conditions.push("p.starred = 1".to_string());
     }
 
-    if let Some(lang) = target_language {
+    if let Some(lang) = targetLanguage {
         conditions.push(format!("p.target_language = '{}'", lang));
     }
 
@@ -309,10 +312,13 @@ pub fn update_phrase_audio(id: i64, audio_path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn delete_phrase(id: i64) -> Result<(), String> {
+    println!("delete_phrase called with id: {}", id);
     let conn = get_conn()?;
 
-    conn.execute("DELETE FROM phrases WHERE id = ?1", params![id])
+    let rows_affected = conn.execute("DELETE FROM phrases WHERE id = ?1", params![id])
         .map_err(|e| format!("Failed to delete phrase: {}", e))?;
+
+    println!("delete_phrase: {} rows affected", rows_affected);
 
     Ok(())
 }

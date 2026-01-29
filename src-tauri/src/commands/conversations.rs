@@ -121,12 +121,12 @@ pub fn update_conversation_title(id: i64, title: String) -> Result<(), String> {
 #[tauri::command]
 pub fn finalize_conversation(
     id: i64,
-    final_messages: Vec<ChatMessage>,
+    finalMessages: Vec<ChatMessage>,
     summary: Option<String>,
 ) -> Result<(), String> {
     let conn = get_conn()?;
 
-    let messages_json = serde_json::to_string(&final_messages)
+    let messages_json = serde_json::to_string(&finalMessages)
         .map_err(|e| format!("Failed to serialize messages: {}", e))?;
 
     conn.execute(
