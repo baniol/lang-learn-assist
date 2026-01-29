@@ -1,0 +1,79 @@
+mod commands;
+mod db;
+mod models;
+mod state;
+
+use commands::{audio, conversations, learning, llm, phrases, settings, tts};
+use db::{get_db_path, init_db};
+use rusqlite::Connection;
+use state::AppState;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    // Initialize database
+    let db_path = get_db_path();
+    let conn = Connection::open(&db_path).expect("Failed to open database");
+    init_db(&conn).expect("Failed to initialize database");
+    drop(conn);
+
+    // Load initial settings
+    let initial_settings = settings::load_initial_settings();
+    let app_state = AppState::new(initial_settings);
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_mic_recorder::init())
+        .manage(app_state)
+        .invoke_handler(tauri::generate_handler![
+            // Settings
+            settings::get_settings,
+            settings::save_settings,
+            // Conversations
+            conversations::get_conversations,
+            conversations::get_conversation,
+            conversations::create_conversation,
+            conversations::update_conversation_messages,
+            conversations::update_conversation_title,
+            conversations::finalize_conversation,
+            conversations::archive_conversation,
+            conversations::delete_conversation,
+            // Phrases
+            phrases::get_phrases,
+            phrases::get_phrase,
+            phrases::create_phrase,
+            phrases::create_phrases_batch,
+            phrases::update_phrase,
+            phrases::toggle_starred,
+            phrases::update_phrase_audio,
+            phrases::delete_phrase,
+            // Learning
+            learning::get_next_phrase,
+            learning::record_answer,
+            learning::get_learning_stats,
+            learning::start_practice_session,
+            learning::update_practice_session,
+            learning::finish_practice_session,
+            learning::reset_progress,
+            learning::validate_answer,
+            // LLM
+            llm::send_conversation_message,
+            llm::suggest_conversation_cleanup,
+            llm::extract_phrases_from_conversation,
+            llm::test_llm_connection,
+            // Audio
+            audio::get_available_models,
+            audio::get_model_status,
+            audio::is_model_downloaded,
+            audio::download_model,
+            audio::delete_model,
+            audio::init_whisper,
+            audio::is_whisper_ready,
+            audio::transcribe_audio,
+            // TTS
+            tts::get_available_voices,
+            tts::generate_tts,
+            tts::test_tts_connection,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
