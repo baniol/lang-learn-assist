@@ -1,4 +1,4 @@
-use crate::models::{get_language_name, AppSettings, ChatMessage, ConversationCleanupResult, SuggestedPhrase};
+use crate::models::{get_language_name, AppSettings, ChatMessage, ConversationCleanupResult, Phrase, PhraseThreadMessage, RefinePhraseSuggestion, SuggestedPhrase};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -493,4 +493,120 @@ pub async fn test_llm_connection(state: State<'_, AppState>) -> Result<String, S
         "Connection successful! Response: {}",
         response.content
     ))
+}
+
+fn build_refinement_system_prompt(phrase: &Phrase) -> String {
+    let target_name = get_language_name(&phrase.target_language);
+    let native_name = get_language_name(&phrase.native_language);
+
+    format!(
+        r#"You are a language learning assistant helping refine phrases for a {} learner whose native language is {}.
+
+Current phrase:
+- Prompt ({}): {}
+- Answer ({}): {}
+- Accepted alternatives: {}
+
+Your role is to help the user refine this phrase based on their requests. You might be asked to:
+- Make it more casual/formal
+- Add alternative forms or variations
+- Fix grammar or spelling issues
+- Make it more natural sounding
+- Simplify or elaborate the phrase
+- Change the context or nuance
+
+When you suggest changes, respond with JSON in this exact format:
+{{
+  "suggestion": {{
+    "prompt": "new prompt in {} (or null if unchanged)",
+    "answer": "new answer in {} (or null if unchanged)",
+    "accepted": ["array", "of", "alternatives"] or null if unchanged,
+    "explanation": "Brief explanation of your changes"
+  }}
+}}
+
+Always include the explanation. Only include fields that you're suggesting to change.
+If the user just asks a question or wants clarification without changes, respond with:
+{{
+  "suggestion": {{
+    "prompt": null,
+    "answer": null,
+    "accepted": null,
+    "explanation": "Your answer to their question"
+  }}
+}}"#,
+        target_name,
+        native_name,
+        native_name,
+        phrase.prompt,
+        target_name,
+        phrase.answer,
+        phrase.accepted.join(", "),
+        native_name,
+        target_name
+    )
+}
+
+#[tauri::command]
+pub async fn refine_phrase(
+    state: State<'_, AppState>,
+    phrase: Phrase,
+    messages: Vec<PhraseThreadMessage>,
+    user_message: String,
+) -> Result<RefinePhraseSuggestion, String> {
+    let settings = {
+        let guard = state
+            .settings
+            .lock()
+            .map_err(|e| format!("Failed to lock settings: {}", e))?;
+        guard.clone()
+    };
+
+    if settings.llm_api_key.is_empty() {
+        return Err("LLM API key not configured".to_string());
+    }
+
+    let system_prompt = build_refinement_system_prompt(&phrase);
+
+    // Convert thread messages to LLM format, then add the new user message
+    let mut llm_messages: Vec<serde_json::Value> = messages
+        .iter()
+        .map(|m| {
+            let role = if m.role == "user" { "user" } else { "assistant" };
+            serde_json::json!({"role": role, "content": m.content})
+        })
+        .collect();
+
+    llm_messages.push(serde_json::json!({"role": "user", "content": user_message}));
+
+    let response = call_llm(&settings, &llm_messages, Some(&system_prompt), 1000).await?;
+
+    // Parse the JSON response
+    let json_start = response.content.find('{');
+    let json_end = response.content.rfind('}');
+
+    let (json_start, json_end) = match (json_start, json_end) {
+        (Some(start), Some(end)) if end >= start => (start, end),
+        _ => {
+            // If no JSON found, treat the whole response as explanation
+            return Ok(RefinePhraseSuggestion {
+                prompt: None,
+                answer: None,
+                accepted: None,
+                explanation: response.content,
+            });
+        }
+    };
+
+    let json_str = &response.content[json_start..=json_end];
+
+    #[derive(Deserialize)]
+    struct ParsedResponse {
+        suggestion: RefinePhraseSuggestion,
+    }
+
+    let parsed: ParsedResponse = serde_json::from_str(json_str)
+        .map_err(|e| format!("Failed to parse response: {}. Raw: {}", e, json_str))?;
+
+    Ok(parsed.suggestion)
 }

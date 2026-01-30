@@ -46,6 +46,12 @@ pub fn run() {
             phrases::toggle_starred,
             phrases::update_phrase_audio,
             phrases::delete_phrase,
+            // Phrase threads
+            phrases::get_phrase_thread,
+            phrases::create_phrase_thread,
+            phrases::update_phrase_thread,
+            phrases::accept_phrase_thread,
+            phrases::delete_phrase_thread,
             // Learning
             learning::get_next_phrase,
             learning::record_answer,
@@ -60,6 +66,7 @@ pub fn run() {
             llm::suggest_conversation_cleanup,
             llm::extract_phrases_from_conversation,
             llm::test_llm_connection,
+            llm::refine_phrase,
             // Audio
             audio::get_available_models,
             audio::get_model_status,

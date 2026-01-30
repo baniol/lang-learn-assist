@@ -137,23 +137,21 @@ export function LearnView() {
           }
         }
 
-        // Wait a moment before moving to next (or showing retry prompt)
-        setTimeout(() => {
-          if (isCorrect && !requiresRetry) {
+        // Auto-advance only on correct answers
+        if (isCorrect && !requiresRetry) {
+          setTimeout(() => {
             const newSeenIds = [...seenPhraseIds, currentPhrase.phrase.id];
             setSeenPhraseIds(newSeenIds);
             loadNextPhrase(newSeenIds);
-          } else if (isCorrect && requiresRetry && retryCount + 1 >= 2) {
+          }, 1500);
+        } else if (isCorrect && requiresRetry && retryCount + 1 >= 2) {
+          setTimeout(() => {
             const newSeenIds = [...seenPhraseIds, currentPhrase.phrase.id];
             setSeenPhraseIds(newSeenIds);
             loadNextPhrase(newSeenIds);
-          } else {
-            // Reset for retry
-            setShowAnswer(false);
-            setInputAnswer("");
-            setFeedback(null);
-          }
-        }, 1500);
+          }, 1500);
+        }
+        // On incorrect: keep feedback visible, user clicks "Try Again"
       } catch (err) {
         console.error("Failed to check answer:", err);
       }
@@ -362,11 +360,37 @@ export function LearnView() {
                 {feedback === "correct" ? "Correct!" : "Not quite..."}
               </p>
               {feedback === "incorrect" && (
-                <p className="text-sm mt-1">
-                  Correct answer: <strong>{currentPhrase.phrase.answer}</strong>
-                </p>
+                <>
+                  <p className="text-sm mt-1">
+                    Correct answer: <strong>{currentPhrase.phrase.answer}</strong>
+                  </p>
+                  <button
+                    onClick={handlePlayAnswer}
+                    disabled={tts.isPlaying || tts.isLoading}
+                    className="mt-2 p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full transition-colors inline-flex items-center justify-center"
+                    title="Listen to pronunciation"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+                </>
               )}
             </div>
+          )}
+
+          {/* Try Again button for incorrect answers */}
+          {feedback === "incorrect" && (
+            <button
+              onClick={() => {
+                setShowAnswer(false);
+                setInputAnswer("");
+                setFeedback(null);
+              }}
+              className="w-full py-3 mb-6 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors font-medium"
+            >
+              Try Again
+            </button>
           )}
 
           {/* Mode-specific UI */}

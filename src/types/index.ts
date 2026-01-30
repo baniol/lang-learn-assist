@@ -49,6 +49,10 @@ export interface PhraseProgress {
   totalAttempts: number;
   successCount: number;
   lastSeen: string | null;
+  // SRS fields
+  easeFactor: number;
+  intervalDays: number;
+  nextReviewAt: string | null;
 }
 
 export interface PhraseWithProgress {
@@ -150,6 +154,31 @@ export interface LlmResponse {
   content: string;
   inputTokens: number | null;
   outputTokens: number | null;
+}
+
+export interface PhraseThreadMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface PhraseThread {
+  id: number;
+  phraseId: number;
+  messages: PhraseThreadMessage[];
+  suggestedPrompt: string | null;
+  suggestedAnswer: string | null;
+  suggestedAccepted: string[] | null;
+  status: "active" | "accepted" | "dismissed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RefinePhraseSuggestion {
+  prompt: string | null;
+  answer: string | null;
+  accepted: string[] | null;
+  explanation: string;
 }
 
 export interface TopicCategory {

@@ -2,37 +2,40 @@ use crate::db::get_conn;
 use crate::models::{LearningStats, PhraseProgress, PhraseWithProgress, PracticeSession};
 use rusqlite::params;
 
-/// Calculate priority for spaced repetition
+/// Calculate priority for SRS-based scheduling
 /// Higher priority = should be shown sooner
+/// Priority levels:
+/// - Due for review (next_review_at <= now): 2000 + overdue_hours (most urgent first)
+/// - New phrases (no progress): 1000
+/// - Not yet due: 0 (skip these)
 fn calculate_priority(progress: &Option<PhraseProgress>) -> f64 {
     match progress {
-        None => 1000.0, // New phrases get highest priority
+        None => 1000.0, // New phrases get high priority
         Some(p) => {
             if p.total_attempts == 0 {
-                return 1000.0;
+                return 1000.0; // Never practiced = treat as new
             }
 
-            let success_rate = p.success_count as f64 / p.total_attempts as f64;
-
-            // Calculate hours since last seen
-            let hours_since = match &p.last_seen {
-                Some(last_seen) => {
-                    // Parse the datetime string and calculate hours difference
-                    // For simplicity, we'll use a basic calculation
-                    match chrono::NaiveDateTime::parse_from_str(last_seen, "%Y-%m-%d %H:%M:%S") {
-                        Ok(dt) => {
+            // Check if due for review based on next_review_at
+            match &p.next_review_at {
+                Some(next_review) => {
+                    match chrono::NaiveDateTime::parse_from_str(next_review, "%Y-%m-%d %H:%M:%S") {
+                        Ok(review_dt) => {
                             let now = chrono::Utc::now().naive_utc();
-                            let duration = now.signed_duration_since(dt);
-                            duration.num_hours() as f64
+                            if review_dt <= now {
+                                // Due or overdue - higher priority for more overdue
+                                let overdue_hours = now.signed_duration_since(review_dt).num_hours() as f64;
+                                2000.0 + overdue_hours
+                            } else {
+                                // Not yet due - very low priority
+                                0.0
+                            }
                         }
-                        Err(_) => 24.0, // Default to 24 hours if parse fails
+                        Err(_) => 500.0, // Parse error - medium priority
                     }
                 }
-                None => 168.0, // 1 week if never seen
-            };
-
-            // Priority formula: (1 - success_rate) * ln(hours + 1)
-            (1.0 - success_rate) * (hours_since + 1.0).ln()
+                None => 500.0, // No next_review_at set - medium priority (legacy data)
+            }
         }
     }
 }
@@ -73,7 +76,8 @@ pub fn get_next_phrase(
     let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at,
-                pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen
+                pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
+                pp.ease_factor, pp.interval_days, pp.next_review_at
          FROM phrases p
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
          WHERE 1=1{}",
@@ -113,6 +117,9 @@ pub fn get_next_phrase(
                     total_attempts: row.get(13).unwrap_or(0),
                     success_count: row.get(14).unwrap_or(0),
                     last_seen: row.get(15).ok(),
+                    ease_factor: row.get(16).unwrap_or(2.5),
+                    interval_days: row.get(17).unwrap_or(1),
+                    next_review_at: row.get(18).ok(),
                 }
             });
 
@@ -126,36 +133,80 @@ pub fn get_next_phrase(
         return Ok(None);
     }
 
-    // Find the phrase with highest priority
-    let next_phrase = phrases
+    // Calculate priorities and filter out phrases with priority 0 (not yet due)
+    // unless there are no phrases with priority > 0
+    let mut phrases_with_priority: Vec<(PhraseWithProgress, f64)> = phrases
         .into_iter()
-        .max_by(|a, b| {
-            let priority_a = calculate_priority(&a.progress);
-            let priority_b = calculate_priority(&b.progress);
-            priority_a
-                .partial_cmp(&priority_b)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        .map(|p| {
+            let priority = calculate_priority(&p.progress);
+            (p, priority)
+        })
+        .collect();
+
+    // Sort by priority descending
+    phrases_with_priority.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Get the phrase with highest priority, but only if priority > 0
+    // (meaning it's due for review or is a new phrase)
+    let next_phrase = phrases_with_priority
+        .into_iter()
+        .find(|(_, priority)| *priority > 0.0)
+        .map(|(phrase, _)| phrase);
 
     Ok(next_phrase)
+}
+
+/// Calculate next review date using simplified SM-2 algorithm
+fn calculate_srs(
+    is_correct: bool,
+    current_ease: f64,
+    current_interval: i32,
+) -> (f64, i32, String) {
+    let min_ease = 1.3;
+    let now = chrono::Utc::now();
+
+    if is_correct {
+        // Correct answer: multiply interval by ease factor
+        let new_interval = ((current_interval as f64) * current_ease).round() as i32;
+        // Ensure interval increases by at least 1 day
+        let new_interval = new_interval.max(current_interval + 1);
+        let next_review = now + chrono::Duration::days(new_interval as i64);
+        let next_review_str = next_review.format("%Y-%m-%d %H:%M:%S").to_string();
+
+        (current_ease, new_interval, next_review_str)
+    } else {
+        // Incorrect answer: reset interval to 1, decrease ease
+        let new_ease = (current_ease - 0.2).max(min_ease);
+        let new_interval = 1;
+        let next_review = now + chrono::Duration::days(1);
+        let next_review_str = next_review.format("%Y-%m-%d %H:%M:%S").to_string();
+
+        (new_ease, new_interval, next_review_str)
+    }
 }
 
 #[tauri::command]
 pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress, String> {
     let conn = get_conn()?;
 
-    // Check if progress record exists
-    let existing: Option<i64> = conn
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // Check if progress record exists and get current SRS values
+    let existing: Option<(i64, f64, i32)> = conn
         .query_row(
-            "SELECT id FROM phrase_progress WHERE phrase_id = ?1",
+            "SELECT id, ease_factor, interval_days FROM phrase_progress WHERE phrase_id = ?1",
             params![phrase_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .ok();
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    if let Some((_, current_ease, current_interval)) = existing {
+        // Calculate new SRS values
+        let (new_ease, new_interval, next_review) =
+            calculate_srs(is_correct, current_ease, current_interval);
 
-    if let Some(_) = existing {
         // Update existing progress
         if is_correct {
             conn.execute(
@@ -163,9 +214,12 @@ pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress,
                     correct_streak = correct_streak + 1,
                     total_attempts = total_attempts + 1,
                     success_count = success_count + 1,
-                    last_seen = ?1
-                 WHERE phrase_id = ?2",
-                params![now, phrase_id],
+                    last_seen = ?1,
+                    ease_factor = ?2,
+                    interval_days = ?3,
+                    next_review_at = ?4
+                 WHERE phrase_id = ?5",
+                params![now, new_ease, new_interval, next_review, phrase_id],
             )
             .map_err(|e| format!("Failed to update progress: {}", e))?;
         } else {
@@ -173,22 +227,30 @@ pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress,
                 "UPDATE phrase_progress SET
                     correct_streak = 0,
                     total_attempts = total_attempts + 1,
-                    last_seen = ?1
-                 WHERE phrase_id = ?2",
-                params![now, phrase_id],
+                    last_seen = ?1,
+                    ease_factor = ?2,
+                    interval_days = ?3,
+                    next_review_at = ?4
+                 WHERE phrase_id = ?5",
+                params![now, new_ease, new_interval, next_review, phrase_id],
             )
             .map_err(|e| format!("Failed to update progress: {}", e))?;
         }
     } else {
-        // Create new progress record
+        // Create new progress record with initial SRS values
+        let (new_ease, new_interval, next_review) = calculate_srs(is_correct, 2.5, 1);
+
         conn.execute(
-            "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts, success_count, last_seen)
-             VALUES (?1, ?2, 1, ?3, ?4)",
+            "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at)
+             VALUES (?1, ?2, 1, ?3, ?4, ?5, ?6, ?7)",
             params![
                 phrase_id,
                 if is_correct { 1 } else { 0 },
                 if is_correct { 1 } else { 0 },
-                now
+                now,
+                new_ease,
+                new_interval,
+                next_review
             ],
         )
         .map_err(|e| format!("Failed to create progress: {}", e))?;
@@ -196,7 +258,7 @@ pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress,
 
     // Return updated progress
     conn.query_row(
-        "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen
+        "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at
          FROM phrase_progress WHERE phrase_id = ?1",
         params![phrase_id],
         |row| {
@@ -207,6 +269,9 @@ pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress,
                 total_attempts: row.get(3)?,
                 success_count: row.get(4)?,
                 last_seen: row.get(5)?,
+                ease_factor: row.get(6)?,
+                interval_days: row.get(7)?,
+                next_review_at: row.get(8)?,
             })
         },
     )

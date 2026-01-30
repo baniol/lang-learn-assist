@@ -1,6 +1,7 @@
 use crate::db::get_conn;
 use crate::models::{
-    CreatePhraseRequest, Phrase, PhraseProgress, PhraseWithProgress, UpdatePhraseRequest,
+    CreatePhraseRequest, Phrase, PhraseProgress, PhraseThread, PhraseThreadMessage,
+    PhraseWithProgress, UpdatePhraseRequest,
 };
 use rusqlite::params;
 
@@ -93,7 +94,8 @@ pub fn get_phrases(
     let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at,
-                pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen
+                pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
+                pp.ease_factor, pp.interval_days, pp.next_review_at
          FROM phrases p
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
          WHERE 1=1{}
@@ -118,6 +120,9 @@ pub fn get_phrases(
                     total_attempts: row.get(13)?,
                     success_count: row.get(14)?,
                     last_seen: row.get(15)?,
+                    ease_factor: row.get(16).unwrap_or(2.5),
+                    interval_days: row.get(17).unwrap_or(1),
+                    next_review_at: row.get(18).ok(),
                 })
             } else {
                 None
@@ -139,7 +144,8 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
     conn.query_row(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at,
-                pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen
+                pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
+                pp.ease_factor, pp.interval_days, pp.next_review_at
          FROM phrases p
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
          WHERE p.id = ?1",
@@ -155,6 +161,9 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
                     total_attempts: row.get(13)?,
                     success_count: row.get(14)?,
                     last_seen: row.get(15)?,
+                    ease_factor: row.get(16).unwrap_or(2.5),
+                    interval_days: row.get(17).unwrap_or(1),
+                    next_review_at: row.get(18).ok(),
                 })
             } else {
                 None
@@ -361,6 +370,133 @@ pub fn delete_phrase(id: i64) -> Result<(), String> {
 
     conn.execute("DELETE FROM phrases WHERE id = ?1", params![id])
         .map_err(|e| format!("Failed to delete phrase: {}", e))?;
+
+    Ok(())
+}
+
+fn row_to_phrase_thread(row: &rusqlite::Row) -> Result<PhraseThread, rusqlite::Error> {
+    let messages_json: String = row.get(2)?;
+    let messages: Vec<PhraseThreadMessage> = serde_json::from_str(&messages_json).unwrap_or_default();
+    let suggested_accepted_json: Option<String> = row.get(5)?;
+    let suggested_accepted: Option<Vec<String>> = suggested_accepted_json
+        .and_then(|j| serde_json::from_str(&j).ok());
+
+    Ok(PhraseThread {
+        id: row.get(0)?,
+        phrase_id: row.get(1)?,
+        messages,
+        suggested_prompt: row.get(3)?,
+        suggested_answer: row.get(4)?,
+        suggested_accepted,
+        status: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+    })
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_phrase_thread(phraseId: i64) -> Result<Option<PhraseThread>, String> {
+    let conn = get_conn()?;
+
+    let result = conn.query_row(
+        "SELECT id, phrase_id, messages_json, suggested_prompt, suggested_answer,
+                suggested_accepted, status, created_at, updated_at
+         FROM phrase_threads
+         WHERE phrase_id = ?1 AND status = 'active'
+         ORDER BY created_at DESC
+         LIMIT 1",
+        params![phraseId],
+        row_to_phrase_thread,
+    );
+
+    match result {
+        Ok(thread) => Ok(Some(thread)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(format!("Failed to get phrase thread: {}", e)),
+    }
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn create_phrase_thread(phraseId: i64) -> Result<PhraseThread, String> {
+    let conn = get_conn()?;
+
+    conn.execute(
+        "INSERT INTO phrase_threads (phrase_id, messages_json, status, created_at, updated_at)
+         VALUES (?1, '[]', 'active', datetime('now'), datetime('now'))",
+        params![phraseId],
+    )
+    .map_err(|e| format!("Failed to create phrase thread: {}", e))?;
+
+    let id = conn.last_insert_rowid();
+
+    conn.query_row(
+        "SELECT id, phrase_id, messages_json, suggested_prompt, suggested_answer,
+                suggested_accepted, status, created_at, updated_at
+         FROM phrase_threads WHERE id = ?1",
+        params![id],
+        row_to_phrase_thread,
+    )
+    .map_err(|e| format!("Failed to retrieve created thread: {}", e))
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn update_phrase_thread(
+    threadId: i64,
+    messages: Vec<PhraseThreadMessage>,
+    suggestedPrompt: Option<String>,
+    suggestedAnswer: Option<String>,
+    suggestedAccepted: Option<Vec<String>>,
+) -> Result<PhraseThread, String> {
+    let conn = get_conn()?;
+
+    let messages_json = serde_json::to_string(&messages)
+        .map_err(|e| format!("Failed to serialize messages: {}", e))?;
+    let accepted_json = suggestedAccepted
+        .map(|a| serde_json::to_string(&a).unwrap_or_else(|_| "[]".to_string()));
+
+    conn.execute(
+        "UPDATE phrase_threads
+         SET messages_json = ?1, suggested_prompt = ?2, suggested_answer = ?3,
+             suggested_accepted = ?4, updated_at = datetime('now')
+         WHERE id = ?5",
+        params![messages_json, suggestedPrompt, suggestedAnswer, accepted_json, threadId],
+    )
+    .map_err(|e| format!("Failed to update phrase thread: {}", e))?;
+
+    conn.query_row(
+        "SELECT id, phrase_id, messages_json, suggested_prompt, suggested_answer,
+                suggested_accepted, status, created_at, updated_at
+         FROM phrase_threads WHERE id = ?1",
+        params![threadId],
+        row_to_phrase_thread,
+    )
+    .map_err(|e| format!("Failed to retrieve updated thread: {}", e))
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn accept_phrase_thread(threadId: i64) -> Result<(), String> {
+    let conn = get_conn()?;
+
+    conn.execute(
+        "UPDATE phrase_threads SET status = 'accepted', updated_at = datetime('now') WHERE id = ?1",
+        params![threadId],
+    )
+    .map_err(|e| format!("Failed to accept phrase thread: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn delete_phrase_thread(threadId: i64) -> Result<(), String> {
+    let conn = get_conn()?;
+
+    conn.execute("DELETE FROM phrase_threads WHERE id = ?1", params![threadId])
+        .map_err(|e| format!("Failed to delete phrase thread: {}", e))?;
 
     Ok(())
 }

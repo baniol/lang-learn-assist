@@ -80,7 +80,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Phrase progress table
+    // Phrase progress table with SRS fields
     conn.execute(
         "CREATE TABLE IF NOT EXISTS phrase_progress (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,10 +89,43 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             total_attempts INTEGER NOT NULL DEFAULT 0,
             success_count INTEGER NOT NULL DEFAULT 0,
             last_seen TEXT,
+            ease_factor REAL NOT NULL DEFAULT 2.5,
+            interval_days INTEGER NOT NULL DEFAULT 1,
+            next_review_at TEXT,
             FOREIGN KEY (phrase_id) REFERENCES phrases(id) ON DELETE CASCADE
         )",
         [],
     )?;
+
+    // Migration: Add SRS columns if they don't exist (for existing databases)
+    let columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(phrase_progress)")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    if !columns.contains(&"ease_factor".to_string()) {
+        conn.execute(
+            "ALTER TABLE phrase_progress ADD COLUMN ease_factor REAL NOT NULL DEFAULT 2.5",
+            [],
+        ).ok();
+    }
+    if !columns.contains(&"interval_days".to_string()) {
+        conn.execute(
+            "ALTER TABLE phrase_progress ADD COLUMN interval_days INTEGER NOT NULL DEFAULT 1",
+            [],
+        ).ok();
+    }
+    if !columns.contains(&"next_review_at".to_string()) {
+        conn.execute(
+            "ALTER TABLE phrase_progress ADD COLUMN next_review_at TEXT",
+            [],
+        ).ok();
+    }
 
     // Practice sessions table
     conn.execute(
@@ -103,6 +136,22 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             total_phrases INTEGER NOT NULL DEFAULT 0,
             correct_answers INTEGER NOT NULL DEFAULT 0,
             exercise_mode TEXT NOT NULL DEFAULT 'speaking'
+        )",
+        [],
+    )?;
+
+    // Phrase refinement threads table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS phrase_threads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            phrase_id INTEGER NOT NULL REFERENCES phrases(id) ON DELETE CASCADE,
+            messages_json TEXT NOT NULL DEFAULT '[]',
+            suggested_prompt TEXT,
+            suggested_answer TEXT,
+            suggested_accepted TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )",
         [],
     )?;
@@ -122,6 +171,10 @@ pub fn init_db(conn: &Connection) -> Result<()> {
     )?;
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_phrase_threads_phrase ON phrase_threads(phrase_id)",
         [],
     )?;
 

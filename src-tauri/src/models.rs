@@ -67,6 +67,10 @@ pub struct PhraseProgress {
     pub total_attempts: i32,
     pub success_count: i32,
     pub last_seen: Option<String>,
+    // SRS fields
+    pub ease_factor: f64,
+    pub interval_days: i32,
+    pub next_review_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -188,4 +192,35 @@ pub struct UpdatePhraseRequest {
     pub accepted: Option<Vec<String>>,
     pub notes: Option<String>,
     pub starred: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhraseThread {
+    pub id: i64,
+    pub phrase_id: i64,
+    pub messages: Vec<PhraseThreadMessage>,
+    pub suggested_prompt: Option<String>,
+    pub suggested_answer: Option<String>,
+    pub suggested_accepted: Option<Vec<String>>,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhraseThreadMessage {
+    pub id: String,
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefinePhraseSuggestion {
+    pub prompt: Option<String>,
+    pub answer: Option<String>,
+    pub accepted: Option<Vec<String>>,
+    pub explanation: String,
 }
