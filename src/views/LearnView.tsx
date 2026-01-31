@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { VoiceButton } from "../components/VoiceButton";
 import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
@@ -29,6 +29,9 @@ export function LearnView() {
 
   // For speak mode retry: how many correct retries done after last failure
   const [retryCount, setRetryCount] = useState(0);
+
+  // Track how many new phrases have been introduced this session
+  const [newPhraseCount, setNewPhraseCount] = useState(0);
 
   // Whether in retry mode (speak mode only, after wrong answer)
   const [inRetryMode, setInRetryMode] = useState(false);
@@ -69,6 +72,24 @@ export function LearnView() {
     onError: (err) => console.error("Voice error:", err),
     disableSpaceKey: awaitingProceed,
   });
+
+  // Track session ID in a ref so cleanup can access it without stale closure
+  const sessionIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    sessionIdRef.current = session?.id ?? null;
+  }, [session?.id]);
+
+  // Cleanup: finish session when navigating away
+  useEffect(() => {
+    return () => {
+      if (sessionIdRef.current) {
+        invoke("finish_practice_session", { sessionId: sessionIdRef.current }).catch((err) =>
+          console.error("Failed to finish session on unmount:", err)
+        );
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadStats();
@@ -112,7 +133,8 @@ export function LearnView() {
       setRetryCount(0);
       setInRetryMode(false);
       setAwaitingProceed(false);
-      await loadNextPhrase([]);
+      setNewPhraseCount(0);
+      await loadNextPhrase([], 0, loadedSettings);
     } catch (err) {
       console.error("Failed to start session:", err);
     } finally {
@@ -120,9 +142,9 @@ export function LearnView() {
     }
   };
 
-  const loadNextPhrase = async (excludeIds: number[]) => {
+  const loadNextPhrase = async (excludeIds: number[], currentNewCount: number, currentSettings: AppSettings | null) => {
     // Check if session limit reached
-    if (settings && settings.sessionPhraseLimit > 0 && excludeIds.length >= settings.sessionPhraseLimit) {
+    if (currentSettings && currentSettings.sessionPhraseLimit > 0 && excludeIds.length >= currentSettings.sessionPhraseLimit) {
       setCurrentPhrase(null);
       if (session) {
         await invoke("finish_practice_session", { sessionId: session.id });
@@ -139,10 +161,18 @@ export function LearnView() {
     try {
       const phrase = await invoke<PhraseWithProgress | null>("get_next_phrase", {
         excludeIds: excludeIds.length > 0 ? excludeIds : null,
+        newPhraseCount: currentNewCount,
+        newPhraseLimit: currentSettings?.newPhrasesPerSession ?? 0,
       });
       setCurrentPhrase(phrase);
 
-      if (!phrase) {
+      if (phrase) {
+        // Check if this phrase is new (no progress or never attempted)
+        const isNew = !phrase.progress || phrase.progress.totalAttempts === 0;
+        if (isNew) {
+          setNewPhraseCount(currentNewCount + 1);
+        }
+      } else {
         // No more phrases
         if (session) {
           await invoke("finish_practice_session", { sessionId: session.id });
@@ -343,8 +373,8 @@ export function LearnView() {
     const newSeenIds = [...seenPhraseIds, phraseId];
     setSeenPhraseIds(newSeenIds);
     setAwaitingProceed(false);
-    loadNextPhrase(newSeenIds);
-  }, [currentPhrase, awaitingProceed, seenPhraseIds]);
+    loadNextPhrase(newSeenIds, newPhraseCount, settings);
+  }, [currentPhrase, awaitingProceed, seenPhraseIds, newPhraseCount, settings]);
 
   // Keyboard listener for Space (proceed) and P (playback)
   useEffect(() => {
@@ -382,6 +412,7 @@ export function LearnView() {
     setRetryCount(0);
     setInRetryMode(false);
     setAwaitingProceed(false);
+    setNewPhraseCount(0);
     setSettings(null);
     loadStats();
   };
@@ -491,7 +522,7 @@ export function LearnView() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Practiced: {seenPhraseIds.length}{settings && settings.sessionPhraseLimit > 0 ? `/${settings.sessionPhraseLimit}` : ""} | Correct: {session.correctAnswers} | Learned this session: {sessionLearnedIds.size}
+            Practiced: {seenPhraseIds.length}{settings && settings.sessionPhraseLimit > 0 ? `/${settings.sessionPhraseLimit}` : ""} | Correct: {session.correctAnswers} | New: {newPhraseCount}{settings && settings.newPhrasesPerSession > 0 ? `/${settings.newPhrasesPerSession}` : ""} | Learned: {sessionLearnedIds.size}
           </p>
         </div>
         <button
@@ -525,7 +556,7 @@ export function LearnView() {
                   const phraseId = currentPhrase.phrase.id;
                   const newSeenIds = [...seenPhraseIds, phraseId];
                   setSeenPhraseIds(newSeenIds);
-                  loadNextPhrase(newSeenIds);
+                  loadNextPhrase(newSeenIds, newPhraseCount, settings);
                 } catch (err) {
                   console.error("Failed to exclude phrase:", err);
                 }
@@ -789,7 +820,7 @@ export function LearnView() {
                   const newSeenIds = [...seenPhraseIds, phraseId];
                   setSeenPhraseIds(newSeenIds);
                   setShowAnswer(false);
-                  loadNextPhrase(newSeenIds);
+                  loadNextPhrase(newSeenIds, newPhraseCount, settings);
                 }}
                 className="w-full py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
               >

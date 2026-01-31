@@ -607,6 +607,23 @@ export function SettingsView() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                New phrases per session
+              </label>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                Maximum new phrases to introduce in one session. Master existing phrases before adding more. (0 = unlimited)
+              </p>
+              <input
+                type="number"
+                min={0}
+                max={20}
+                value={settings.newPhrasesPerSession}
+                onChange={(e) => updateSetting("newPhrasesPerSession", parseInt(e.target.value) || 2)}
+                className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Default Exercise Mode
               </label>
               <select

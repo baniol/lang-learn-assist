@@ -118,6 +118,7 @@ pub struct AppSettings {
     pub default_exercise_mode: String,
     pub failure_repetitions: i32,
     pub session_phrase_limit: i32,
+    pub new_phrases_per_session: i32,
 }
 
 impl AppSettings {
@@ -137,6 +138,7 @@ impl AppSettings {
             default_exercise_mode: "speaking".to_string(),
             failure_repetitions: 2,
             session_phrase_limit: 20,
+            new_phrases_per_session: 2,
         }
     }
 }

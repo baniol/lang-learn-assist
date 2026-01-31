@@ -44,6 +44,8 @@ fn calculate_priority(progress: &Option<PhraseProgress>) -> f64 {
 pub fn get_next_phrase(
     target_language: Option<String>,
     exclude_ids: Option<Vec<i64>>,
+    new_phrase_count: Option<i32>,
+    new_phrase_limit: Option<i32>,
 ) -> Result<Option<PhraseWithProgress>, String> {
     let conn = get_conn()?;
 
@@ -138,11 +140,24 @@ pub fn get_next_phrase(
         return Ok(None);
     }
 
+    // Check if we've hit the new phrase limit
+    let limit_new_phrases = match (new_phrase_count, new_phrase_limit) {
+        (Some(count), Some(limit)) if limit > 0 => count >= limit,
+        _ => false,
+    };
+
     // Calculate priorities
     let mut phrases_with_priority: Vec<(PhraseWithProgress, f64)> = phrases
         .into_iter()
         .map(|p| {
-            let priority = calculate_priority(&p.progress);
+            let mut priority = calculate_priority(&p.progress);
+
+            // If we've hit the new phrase limit, skip new phrases (priority 1000)
+            // New phrases have priority 1000.0 (no progress or total_attempts == 0)
+            if limit_new_phrases && priority == 1000.0 {
+                priority = 0.0;
+            }
+
             (p, priority)
         })
         .collect();

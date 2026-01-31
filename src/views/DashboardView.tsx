@@ -9,8 +9,6 @@ interface DashboardViewProps {
 export function DashboardView({ onNavigate }: DashboardViewProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showNewDialog, setShowNewDialog] = useState(false);
-  const [newTopic, setNewTopic] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -29,14 +27,13 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   };
 
   const handleCreateConversation = async () => {
-    const topic = newTopic.trim() || "General conversation";
+    const now = new Date();
+    const title = `Conversation ${now.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
 
     try {
       const conversation = await invoke<Conversation>("create_conversation", {
-        request: { title: topic, subject: topic },
+        request: { title, subject: "" },
       });
-      setShowNewDialog(false);
-      setNewTopic("");
       onNavigate("conversation", { conversationId: conversation.id });
     } catch (err) {
       console.error("Failed to create conversation:", err);
@@ -95,7 +92,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
           </p>
         </div>
         <button
-          onClick={() => setShowNewDialog(true)}
+          onClick={handleCreateConversation}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -122,7 +119,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             Start a new conversation to practice your German
           </p>
           <button
-            onClick={() => setShowNewDialog(true)}
+            onClick={handleCreateConversation}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             Start your first conversation
@@ -164,45 +161,6 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* New Conversation Dialog */}
-      {showNewDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm mx-4">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
-                New Conversation
-              </h2>
-              <input
-                type="text"
-                value={newTopic}
-                onChange={(e) => setNewTopic(e.target.value)}
-                placeholder="Topic (e.g. At the restaurant)"
-                autoFocus
-                onKeyDown={(e) => e.key === "Enter" && handleCreateConversation()}
-                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400"
-              />
-            </div>
-            <div className="px-6 pb-6 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowNewDialog(false);
-                  setNewTopic("");
-                }}
-                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateConversation}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Start
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

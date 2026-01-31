@@ -21,8 +21,6 @@ export function QuestionsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [question, setQuestion] = useState("");
-  const [showNewThreadDialog, setShowNewThreadDialog] = useState(false);
-  const [newThreadTitle, setNewThreadTitle] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [addedExamples, setAddedExamples] = useState<Set<string>>(new Set());
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -73,18 +71,17 @@ export function QuestionsView() {
   };
 
   const handleCreateThread = async () => {
-    if (!newThreadTitle.trim()) return;
+    const now = new Date();
+    const title = `Question ${now.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
 
     try {
       const thread = await createQuestionThread(
-        newThreadTitle.trim(),
+        title,
         settings?.targetLanguage,
         settings?.nativeLanguage
       );
       setThreads((prev) => [thread, ...prev]);
       setSelectedThread(thread);
-      setShowNewThreadDialog(false);
-      setNewThreadTitle("");
       setAddedExamples(new Set());
     } catch (err) {
       console.error("Failed to create thread:", err);
@@ -171,7 +168,7 @@ export function QuestionsView() {
       <div className="w-72 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-slate-50 dark:bg-slate-800/50">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
           <button
-            onClick={() => setShowNewThreadDialog(true)}
+            onClick={handleCreateThread}
             className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -314,55 +311,6 @@ export function QuestionsView() {
           </div>
         )}
       </div>
-
-      {/* New Thread Dialog */}
-      {showNewThreadDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md mx-4">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-                New Question Thread
-              </h2>
-            </div>
-
-            <div className="p-6">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Topic or Title
-              </label>
-              <input
-                type="text"
-                value={newThreadTitle}
-                onChange={(e) => setNewThreadTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateThread();
-                }}
-                placeholder="e.g., German dative case, Konjunktiv II..."
-                autoFocus
-                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400"
-              />
-            </div>
-
-            <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowNewThreadDialog(false);
-                  setNewThreadTitle("");
-                }}
-                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateThread}
-                disabled={!newThreadTitle.trim()}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirmId && (

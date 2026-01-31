@@ -92,6 +92,7 @@ export interface AppSettings {
   defaultExerciseMode: ExerciseMode;
   failureRepetitions: number;
   sessionPhraseLimit: number;
+  newPhrasesPerSession: number;
 }
 
 export interface WhisperModel {
