@@ -1,21 +1,7 @@
-use axum::{routing::get, Json, Router};
-use serde::Serialize;
+use langlearn_web::{create_router, AppState};
+use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
-use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-#[derive(Serialize)]
-struct HealthResponse {
-    status: &'static str,
-    version: &'static str,
-}
-
-async fn health() -> Json<HealthResponse> {
-    Json(HealthResponse {
-        status: "ok",
-        version: env!("CARGO_PKG_VERSION"),
-    })
-}
 
 #[tokio::main]
 async fn main() {
@@ -26,15 +12,33 @@ async fn main() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "langlearn_web=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "langlearn_web=debug,tower_http=debug,sqlx=warn".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Build router
-    let app = Router::new()
-        .route("/health", get(health))
-        .layer(TraceLayer::new_for_http());
+    // Database connection
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+    let db = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("Failed to connect to database");
+
+    tracing::info!("Connected to database");
+
+    // Run migrations
+    sqlx::migrate!("./migrations")
+        .run(&db)
+        .await
+        .expect("Failed to run migrations");
+
+    tracing::info!("Migrations complete");
+
+    // Build app
+    let state = AppState { db };
+    let app = create_router(state);
 
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));

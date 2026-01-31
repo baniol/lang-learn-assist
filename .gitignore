@@ -1,3 +1,7 @@
+# Rust
+**/target/
+*.env
+
 # Logs
 logs
 *.log

@@ -145,22 +145,29 @@ PUT    /api/settings               # Update source language, active target
 
 ---
 
-### Phase 2: Phrases Library
-**Goal:** Manage saved phrases, basic CRUD.
+### Phase 2: Phrases Library + Tags
+**Goal:** Manage saved phrases with tagging system.
 
 #### Tasks
-- [ ] Phrases list with filtering (by target language)
+- [ ] Phrases list with filtering (by target language, by tag)
 - [ ] Edit phrase (phrase, translation, notes)
-- [ ] Star/exclude phrases
+- [ ] Tag CRUD (create, rename, delete, set color)
+- [ ] Assign/remove tags from phrases
 - [ ] Search phrases
 - [ ] Link to source question
 
 #### API Endpoints
 ```
-GET    /api/phrases                # List with filters
+GET    /api/phrases                # List with filters (?tag=, ?language=)
 PUT    /api/phrases/:id            # Update phrase
-POST   /api/phrases/:id/star       # Toggle star
-POST   /api/phrases/:id/exclude    # Toggle exclude
+DELETE /api/phrases/:id            # Delete phrase
+POST   /api/phrases/:id/tags       # Add tags to phrase
+DELETE /api/phrases/:id/tags/:id   # Remove tag from phrase
+
+GET    /api/tags                   # List user's tags
+POST   /api/tags                   # Create tag
+PUT    /api/tags/:id               # Update tag (name, color)
+DELETE /api/tags/:id               # Delete tag
 ```
 
 ---
@@ -204,18 +211,7 @@ GET    /api/practice/stats         # Learning stats
 
 ---
 
-### Phase 5: Conversations
-**Goal:** AI translation conversations (more structured than Q&A).
-
-#### Tasks
-- [ ] Conversation CRUD
-- [ ] Message handling with streaming
-- [ ] Phrase extraction from conversation
-- [ ] Conversation templates
-
----
-
-### Phase 6: Authentication
+### Phase 5: Authentication
 **Goal:** Real users, sessions, OAuth.
 
 #### Tasks
@@ -227,7 +223,7 @@ GET    /api/practice/stats         # Learning stats
 
 ---
 
-### Phase 7: Polish
+### Phase 6: Polish
 **Goal:** Nice-to-haves.
 
 - [ ] STT / Speaking mode (AWS Transcribe)
@@ -239,18 +235,17 @@ GET    /api/practice/stats         # Learning stats
 
 ## Feature Confirmation
 
-Before implementing each feature from desktop, confirm:
-
-| Desktop Feature | Web? | Changes? |
-|----------------|------|----------|
-| Q&A / Grammar questions | ✓ Phase 1 | First feature |
+| Feature | Phase | Notes |
+|---------|-------|-------|
+| Q&A / Grammar questions | ✓ Phase 1 | Single LLM interaction point |
 | Phrases library | ✓ Phase 2 | Per target language |
+| Tags | ✓ Phase 2 | Per-user normalized tags |
 | TTS (audio) | ✓ Phase 3 | ElevenLabs |
-| SRS Practice | ✓ Phase 4 | Same algorithm |
-| Conversations | ? Phase 5 | Confirm needed |
-| Phrase extraction | ? Phase 5 | Part of conversations |
-| Phrase refinement | ? | Confirm needed |
-| Speaking mode | ? Phase 7 | AWS Transcribe |
+| SRS Practice | ✓ Phase 4 | Same algorithm as desktop |
+| Auth | ✓ Phase 5 | OAuth + email/password |
+| Speaking mode | ? Phase 6 | AWS Transcribe (optional) |
+
+**Removed:** Conversations (separate multi-turn chat) - Q&A covers the core use case of generating phrases.
 
 ---
 
@@ -262,9 +257,11 @@ Before implementing each feature from desktop, confirm:
 | 2025-01 | Source/target terminology | Clearer than native/target |
 | 2025-01 | Multi-target support | Users learn multiple languages |
 | 2025-01 | Separate phrase libraries | Each target has own progress |
-| 2025-01 | Auth deferred to Phase 6 | Build features first |
+| 2025-01 | Auth deferred to Phase 5 | Build features first |
 | 2025-01 | ElevenLabs for TTS | High quality voices |
 | 2025-01 | AWS Transcribe for STT | Voice recognition |
+| 2025-01 | Remove conversations | Q&A covers core use case, simpler UX |
+| 2025-01 | Normalized tags | Per-user, supports rename/merge, metadata |
 
 ---
 

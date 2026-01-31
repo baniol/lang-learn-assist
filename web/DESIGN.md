@@ -1,6 +1,6 @@
 # Web Version Design Document
 
-Language learning app with AI conversations, phrase extraction, and SRS practice.
+Language learning app with AI-powered phrase generation and SRS practice.
 
 ## Goals
 
@@ -93,10 +93,10 @@ struct StorageConfig {
 
 ### PostgreSQL Schema
 
-Based on desktop app's SQLite schema, adapted for multi-user web:
+Simplified schema focused on phrase generation and learning:
 
 ```sql
--- Users (new for web)
+-- Users
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -146,54 +146,50 @@ CREATE TABLE user_languages (
     UNIQUE(user_id, target_language)
 );
 
--- Q&A / Questions (translations, vocabulary, grammar)
+-- Questions: Single entry point for LLM interaction
+-- User asks → LLM responds → Phrases extracted
 CREATE TABLE questions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     target_language VARCHAR(10) NOT NULL,
     source_language VARCHAR(10) NOT NULL,
-    question TEXT NOT NULL,               -- User's question
+    question TEXT NOT NULL,               -- User's prompt/question
     response TEXT,                        -- LLM response
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Conversations (from desktop, add user_id)
-CREATE TABLE conversations (
+-- User's tags (for organizing phrases)
+CREATE TABLE tags (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    title VARCHAR(255),
-    target_language VARCHAR(10) NOT NULL,
-    source_language VARCHAR(10) NOT NULL,
-    system_prompt TEXT,
+    name VARCHAR(50) NOT NULL,
+    color VARCHAR(7),                     -- Hex color e.g. '#ff5733'
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    UNIQUE(user_id, name)
 );
 
--- Messages (from desktop)
-CREATE TABLE messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-    role VARCHAR(20) NOT NULL,  -- 'user', 'assistant', 'system'
-    content TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Phrases (per target language, separate libraries)
+-- Phrases (extracted from questions or manually added)
 CREATE TABLE phrases (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    target_language VARCHAR(10) NOT NULL,  -- Which language this phrase is for
-    source_language VARCHAR(10) NOT NULL,
     question_id UUID REFERENCES questions(id) ON DELETE SET NULL,
-    conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
-    phrase TEXT NOT NULL,                  -- Target language phrase
-    translation TEXT,                      -- Source language translation
-    context TEXT,
-    notes TEXT,
+    target_language VARCHAR(10) NOT NULL,
+    source_language VARCHAR(10) NOT NULL,
+    phrase TEXT NOT NULL,                 -- Target language phrase
+    translation TEXT,                     -- Source language translation
+    context TEXT,                         -- Usage context
+    notes TEXT,                           -- User notes
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- SRS progress (from desktop)
+-- Phrase-tag associations (many-to-many)
+CREATE TABLE phrase_tags (
+    phrase_id UUID REFERENCES phrases(id) ON DELETE CASCADE,
+    tag_id UUID REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (phrase_id, tag_id)
+);
+
+-- SRS progress
 CREATE TABLE phrase_progress (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     phrase_id UUID REFERENCES phrases(id) ON DELETE CASCADE,
@@ -215,19 +211,19 @@ CREATE TABLE email_verification_tokens (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- User settings (learning preferences, voice selection)
+-- User settings
 CREATE TABLE user_settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
     -- Learning parameters
-    daily_goal INTEGER DEFAULT 20,              -- Phrases to review per day
-    session_limit INTEGER DEFAULT 10,           -- Max phrases per session
-    failure_repetitions INTEGER DEFAULT 3,      -- Times to repeat failed phrase
-    -- TTS preferences (ElevenLabs)
-    elevenlabs_voice_id VARCHAR(100),           -- Selected ElevenLabs voice ID
+    daily_goal INTEGER DEFAULT 20,
+    session_limit INTEGER DEFAULT 10,
+    failure_repetitions INTEGER DEFAULT 3,
+    -- TTS preferences
+    elevenlabs_voice_id VARCHAR(100),
     -- Languages
-    source_language VARCHAR(10) DEFAULT 'en',   -- User's native/source language
-    active_target_language VARCHAR(10),         -- Currently selected target language
+    source_language VARCHAR(10) DEFAULT 'en',
+    active_target_language VARCHAR(10),
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -237,9 +233,11 @@ CREATE TABLE user_settings (
 CREATE INDEX idx_user_languages_user_id ON user_languages(user_id);
 CREATE INDEX idx_questions_user_id ON questions(user_id);
 CREATE INDEX idx_questions_target_language ON questions(user_id, target_language);
-CREATE INDEX idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX idx_tags_user_id ON tags(user_id);
 CREATE INDEX idx_phrases_user_id ON phrases(user_id);
 CREATE INDEX idx_phrases_target_language ON phrases(user_id, target_language);
+CREATE INDEX idx_phrases_question_id ON phrases(question_id);
+CREATE INDEX idx_phrase_tags_tag_id ON phrase_tags(tag_id);
 CREATE INDEX idx_phrase_progress_next_review ON phrase_progress(next_review_at);
 CREATE INDEX idx_sessions_token_hash ON sessions(token_hash);
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
@@ -380,21 +378,25 @@ GET    /api/auth/me                  # Current user info
 GET    /api/account/export           # Export all user data (JSON)
 DELETE /api/account                  # Delete account + all data
 
-# Conversations
-GET    /api/conversations            # List user's conversations
-POST   /api/conversations            # Create conversation
-GET    /api/conversations/:id        # Get conversation with messages
-DELETE /api/conversations/:id        # Delete conversation
+# Questions (LLM interaction for phrase generation)
+GET    /api/questions                # List user's questions
+POST   /api/questions                # Ask question, get LLM response
+GET    /api/questions/:id            # Get question with extracted phrases
+DELETE /api/questions/:id            # Delete question
 
-# Messages (within conversation)
-POST   /api/conversations/:id/messages      # Send message, get AI response
-GET    /api/conversations/:id/messages      # List messages (paginated)
+# Tags
+GET    /api/tags                     # List user's tags
+POST   /api/tags                     # Create tag
+PUT    /api/tags/:id                 # Update tag (name, color)
+DELETE /api/tags/:id                 # Delete tag
 
 # Phrases
-GET    /api/phrases                  # List user's phrases
+GET    /api/phrases                  # List phrases (filter by tag, language)
 POST   /api/phrases                  # Add phrase manually
-POST   /api/phrases/extract          # Extract from conversation
+PUT    /api/phrases/:id              # Update phrase
 DELETE /api/phrases/:id              # Delete phrase
+POST   /api/phrases/:id/tags         # Add tags to phrase
+DELETE /api/phrases/:id/tags/:tag_id # Remove tag from phrase
 
 # SRS / Practice
 GET    /api/practice/due             # Get phrases due for review
@@ -426,10 +428,10 @@ GET    /api/settings/voices          # List available ElevenLabs voices
 
 ### Streaming (AI responses)
 
-For AI conversation responses, use Server-Sent Events (SSE):
+For LLM responses, use Server-Sent Events (SSE):
 
 ```
-GET /api/conversations/:id/messages/stream?prompt=...
+POST /api/questions/stream
 
 event: token
 data: {"content": "Hello"}
@@ -438,7 +440,7 @@ event: token
 data: {"content": " there"}
 
 event: done
-data: {"message_id": "uuid"}
+data: {"question_id": "uuid"}
 ```
 
 ---
@@ -457,21 +459,22 @@ web/backend/
 │   ├── routes/
 │   │   ├── mod.rs
 │   │   ├── auth.rs          # Auth endpoints
-│   │   ├── conversations.rs
-│   │   ├── messages.rs
-│   │   ├── phrases.rs
-│   │   └── practice.rs
+│   │   ├── questions.rs     # LLM Q&A endpoints
+│   │   ├── phrases.rs       # Phrase CRUD
+│   │   ├── tags.rs          # Tag management
+│   │   └── practice.rs      # SRS practice
 │   ├── services/
 │   │   ├── mod.rs
 │   │   ├── auth.rs          # Auth logic
 │   │   ├── ai.rs            # AI/LLM integration
 │   │   ├── srs.rs           # Spaced repetition algorithm
-│   │   └── phrases.rs       # Phrase extraction
+│   │   └── phrases.rs       # Phrase extraction from LLM response
 │   ├── models/
 │   │   ├── mod.rs
 │   │   ├── user.rs
-│   │   ├── conversation.rs
+│   │   ├── question.rs
 │   │   ├── phrase.rs
+│   │   ├── tag.rs
 │   │   └── session.rs
 │   ├── db/
 │   │   ├── mod.rs
@@ -493,16 +496,19 @@ Start minimal, expand as needed:
 web/frontend/
 ├── index.html
 ├── css/
-│   └── style.css
+│   ├── variables.css        # Theme variables
+│   ├── reset.css
+│   ├── base.css
+│   └── components.css
 ├── js/
-│   ├── app.js               # Main app logic
+│   ├── app.js               # Router + main app logic
 │   ├── api.js               # API client
-│   ├── auth.js              # Auth handling
 │   ├── views/
-│   │   ├── login.js
-│   │   ├── conversations.js
-│   │   ├── chat.js
-│   │   └── practice.js
+│   │   ├── home.js
+│   │   ├── ask.js           # Question/LLM interaction
+│   │   ├── phrases.js       # Phrase library with tags
+│   │   ├── practice.js      # SRS review
+│   │   └── settings.js
 │   └── components/
 │       └── ...
 └── assets/
@@ -662,29 +668,27 @@ volumes:
 
 ## Migration Plan from Desktop
 
-### Phase 1: Foundation
-- [ ] Backend scaffold with Axum
-- [ ] PostgreSQL schema + migrations
-- [ ] Google OAuth authentication
-- [ ] Email + password authentication
-- [ ] Basic session management
-- [ ] GDPR endpoints (data export, account deletion)
-- [ ] Minimal frontend (login, register)
+### Phase 1: Core (Questions + Phrases)
+- [ ] Questions API (LLM integration)
+- [ ] Phrase extraction from LLM responses
+- [ ] Phrases CRUD
+- [ ] Tags CRUD
+- [ ] Frontend: Ask view, Phrases view
 
-### Phase 2: Core Features
-- [ ] Conversations CRUD
-- [ ] AI message handling (port from `ai.rs`)
-- [ ] Phrase extraction (port from `learning.rs`)
-- [ ] Basic frontend for conversations
-
-### Phase 3: SRS Practice
+### Phase 2: SRS Practice
 - [ ] SRS algorithm (port from `learning.rs`)
 - [ ] Practice endpoints
 - [ ] Practice UI
 
-### Phase 4: Polish
-- [ ] Object storage integration
-- [ ] Additional OAuth providers
+### Phase 3: TTS (Audio)
+- [ ] ElevenLabs integration
+- [ ] Object storage for audio files
+- [ ] Audio playback in practice
+
+### Phase 4: Auth + Polish
+- [ ] Google OAuth authentication
+- [ ] Email + password authentication
+- [ ] GDPR endpoints (data export, account deletion)
 - [ ] Settings and preferences
 - [ ] PWA setup (manifest, service worker, offline support)
 
@@ -708,7 +712,7 @@ Built-in from Phase 1:
 
 ### Data Portability (Article 20)
 - `GET /api/account/export` returns all user data as JSON
-- Includes: profile, conversations, messages, phrases, progress
+- Includes: profile, questions, phrases, tags, progress
 - Response format allows easy import to other services
 
 ### Right to Erasure (Article 17)
@@ -722,8 +726,9 @@ Built-in from Phase 1:
 #[derive(Serialize)]
 struct UserDataExport {
     user: UserProfile,
-    conversations: Vec<ConversationExport>,
+    questions: Vec<QuestionExport>,
     phrases: Vec<PhraseExport>,
+    tags: Vec<TagExport>,
     progress: Vec<ProgressExport>,
     exported_at: DateTime<Utc>,
 }

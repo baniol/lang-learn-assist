@@ -5,18 +5,25 @@ Web version of language learning app. Rust/Axum backend + vanilla JS frontend. M
 ## Current Status
 
 **Branch:** `web`
-**Current Phase:** 0 - Infrastructure (not started)
+**Current Phase:** 1 - Q&A + Phrases (backend complete, frontend pending)
+
+Completed:
+- Backend scaffold (Axum) with `/health` endpoint
+- Docker/Podman Compose (backend + postgres + nginx)
+- Frontend scaffold (vanilla JS, CSS variables, router)
+- PostgreSQL schema + migrations (all tables)
+- Dev user seeding (`DEV_USER_ID` pattern)
+- Full CRUD APIs: questions, phrases, tags
+- Phrase-tag associations (add/remove)
+- Integration tests (22 tests passing)
 
 ## Next Steps
 
-Start Phase 0 - create the backend scaffold:
+Complete Phase 1:
+1. **LLM integration** - Generate phrase suggestions from questions
+2. **Frontend views** - Questions page, Phrases library, Tags management
 
-1. Create `web/backend/` with Cargo project (Axum)
-2. Create `web/docker-compose.yml` for local dev
-3. Add `/health` endpoint
-4. Verify `docker-compose up` works
-
-See `web/INFRASTRUCTURE.md` for full Phase 0 tasks and setup details.
+See `web/MIGRATION.md` for detailed tasks.
 
 ## Commands
 
@@ -60,18 +67,17 @@ See `web/CLAUDE.md` for detailed patterns. Quick reference:
 
 | Phase | Feature | Status |
 |-------|---------|--------|
-| 0 | Infrastructure (CI/CD, deployment) | Pending |
-| 1 | Q&A / Translations (LLM + phrase confirm) | Pending |
+| 0 | Infrastructure | Complete |
+| 1 | Q&A + Phrases + Tags | Backend done, frontend pending |
 | 2 | Phrases Library | Pending |
 | 3 | TTS (ElevenLabs) | Pending |
 | 4 | SRS Practice | Pending |
-| 5 | Conversations | Pending |
-| 6 | Authentication | Pending |
-| 7 | Polish (STT, PWA) | Pending |
+| 5 | Authentication | Pending |
+| 6 | Polish (STT, PWA) | Pending |
 
 **Language model:** Source language (native) → Target language (learning). Multi-target supported.
 
-**Note:** Auth deferred to Phase 6. Using `DEV_USER_ID` pattern.
+**Note:** Auth deferred to Phase 5. Using `DEV_USER_ID` pattern until then.
 
 ## Reference
 
