@@ -136,13 +136,34 @@ CREATE TABLE sessions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- User's target languages (supports multiple)
+CREATE TABLE user_languages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    target_language VARCHAR(10) NOT NULL,  -- Language being learned (e.g., 'de', 'es')
+    is_active BOOLEAN DEFAULT TRUE,        -- Currently learning
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, target_language)
+);
+
+-- Q&A / Questions (translations, vocabulary, grammar)
+CREATE TABLE questions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    target_language VARCHAR(10) NOT NULL,
+    source_language VARCHAR(10) NOT NULL,
+    question TEXT NOT NULL,               -- User's question
+    response TEXT,                        -- LLM response
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Conversations (from desktop, add user_id)
 CREATE TABLE conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(255),
     target_language VARCHAR(10) NOT NULL,
-    native_language VARCHAR(10) NOT NULL,
+    source_language VARCHAR(10) NOT NULL,
     system_prompt TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -157,17 +178,18 @@ CREATE TABLE messages (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Phrases (from desktop, add user_id)
+-- Phrases (per target language, separate libraries)
 CREATE TABLE phrases (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    target_language VARCHAR(10) NOT NULL,  -- Which language this phrase is for
+    source_language VARCHAR(10) NOT NULL,
+    question_id UUID REFERENCES questions(id) ON DELETE SET NULL,
     conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
-    phrase TEXT NOT NULL,
-    translation TEXT,
+    phrase TEXT NOT NULL,                  -- Target language phrase
+    translation TEXT,                      -- Source language translation
     context TEXT,
     notes TEXT,
-    target_language VARCHAR(10) NOT NULL,
-    native_language VARCHAR(10) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -204,16 +226,20 @@ CREATE TABLE user_settings (
     -- TTS preferences (ElevenLabs)
     elevenlabs_voice_id VARCHAR(100),           -- Selected ElevenLabs voice ID
     -- Languages
-    default_target_language VARCHAR(10),
-    default_native_language VARCHAR(10),
+    source_language VARCHAR(10) DEFAULT 'en',   -- User's native/source language
+    active_target_language VARCHAR(10),         -- Currently selected target language
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes
+CREATE INDEX idx_user_languages_user_id ON user_languages(user_id);
+CREATE INDEX idx_questions_user_id ON questions(user_id);
+CREATE INDEX idx_questions_target_language ON questions(user_id, target_language);
 CREATE INDEX idx_conversations_user_id ON conversations(user_id);
 CREATE INDEX idx_phrases_user_id ON phrases(user_id);
+CREATE INDEX idx_phrases_target_language ON phrases(user_id, target_language);
 CREATE INDEX idx_phrase_progress_next_review ON phrase_progress(next_review_at);
 CREATE INDEX idx_sessions_token_hash ON sessions(token_hash);
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);

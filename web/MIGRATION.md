@@ -1,54 +1,65 @@
 # Migration Plan: Desktop → Web
 
-This document outlines the gradual migration of features from the Tauri desktop app to the web version.
+Gradual migration of features from the Tauri desktop app to the web version.
 
 ---
 
 ## Development Philosophy
 
-- **Infrastructure first** - CI/CD, deployment, storage before features
-- **Flexible from day one** - Schema and APIs designed for multi-user, auth added later
-- **One feature at a time** - Complete and test each feature before moving to next
-- **Rethink, don't copy** - Each feature is an opportunity to improve UX
+- **Infrastructure first** - CI/CD, deployment before features
+- **Q&A first** - Start with questions/translations, confirm each feature before building
+- **Flexible from day one** - Schema designed for multi-user, auth added later
+- **One feature at a time** - Complete and test before moving to next
+
+---
+
+## Language Model
+
+**Terminology:**
+- **Source language** - User's native language (e.g., English)
+- **Target language** - Language being learned (e.g., German, Spanish)
+
+**Multi-language support:**
+- One source language per user (configurable in settings)
+- Multiple target languages supported
+- Separate phrase library per target language
+- Separate learning progress per target language
+- User can switch active target language
+
+```
+User (source: English)
+├── Target: German
+│   ├── Phrases (German)
+│   └── Progress (German)
+├── Target: Spanish
+│   ├── Phrases (Spanish)
+│   └── Progress (Spanish)
+└── Target: French
+    ├── Phrases (French)
+    └── Progress (French)
+```
 
 ---
 
 ## Flexibility Strategy
 
-To avoid redesigns when adding auth later:
-
-### Database
-- All tables have `user_id` foreign key from the start
-- Use hardcoded `DEV_USER_ID` constant during development
-- When auth is added, just start using real user IDs
-
-### API Design
-- All endpoints already scoped to user: `GET /api/phrases` (not `/api/users/:id/phrases`)
-- User context extracted via middleware (returns hardcoded ID initially)
-- When auth is added, middleware extracts real user from session
+### DEV_USER_ID Pattern
+- All tables have `user_id` from the start
+- Use hardcoded UUID during development
+- Switch to real users when auth is added
+- No schema changes needed
 
 ### Middleware Pattern
 ```rust
-// Initially: returns hardcoded dev user
-pub async fn extract_user(req: Request) -> Result<AuthUser, AppError> {
+// Dev: returns hardcoded user
+pub async fn extract_user() -> Result<AuthUser, AppError> {
     Ok(AuthUser { id: DEV_USER_ID })
 }
 
-// Later: extracts from session cookie
+// Later: extracts from session
 pub async fn extract_user(req: Request, db: &Pool) -> Result<AuthUser, AppError> {
     let session = get_session_from_cookie(&req)?;
-    let user = db.get_user_by_session(session).await?;
-    Ok(AuthUser { id: user.id })
-}
-```
-
-### Environment-based Config
-```rust
-// Config switches behavior
-if config.auth_enabled {
-    // Validate session, reject unauthorized
-} else {
-    // Return dev user, allow all requests
+    Ok(AuthUser { id: session.user_id })
 }
 ```
 
@@ -57,261 +68,189 @@ if config.auth_enabled {
 ## Migration Phases
 
 ### Phase 0: Infrastructure
-**Goal:** Dev environment, CI/CD, deployment pipeline ready.
+**Goal:** Dev environment, CI/CD, deployment ready.
 
-See `INFRASTRUCTURE.md` for detailed cost research and Terraform structure.
+See `INFRASTRUCTURE.md` for details.
 
 #### Tasks
 - [ ] Initialize Cargo project with Axum
 - [ ] Docker setup (backend + postgres)
 - [ ] Docker Compose for local dev
-- [ ] Terraform modules (compute, storage, database)
 - [ ] GitHub Actions CI (test, clippy, fmt)
-- [ ] Dev deployment to Hetzner (VPS + Object Storage)
-- [ ] GitHub Actions CD (deploy on push to main)
-- [ ] Environment configuration (.env, secrets)
+- [ ] Terraform for Hetzner (VPS + Object Storage)
+- [ ] GitHub Actions CD (deploy on push)
 - [ ] Health check endpoint
-- [ ] Basic logging (tracing)
-
-#### Estimated Cost
-- Hetzner CX22 (VPS): €3.79/mo
-- Hetzner Object Storage: €4.99/mo
-- Postgres: Docker container (€0) or Managed (€4.90+)
-- **Total: ~€9-14/mo**
+- [ ] Basic logging
 
 #### Deliverables
-- `make dev` runs locally with Docker
-- Push to `main` → deploys to dev server
-- `/health` endpoint returns OK
-
-#### CI Pipeline
-```yaml
-# .github/workflows/ci.yml
-- cargo fmt --check
-- cargo clippy -- -D warnings
-- cargo test
-- cargo build --release
-```
-
-#### CD Pipeline
-```yaml
-# .github/workflows/deploy.yml
-- Build Docker image
-- Push to registry
-- SSH deploy to dev server (or use Docker Compose remote)
-```
+- `docker-compose up` works locally
+- `/health` returns OK
+- Push to main deploys to dev server
 
 ---
 
-### Phase 1: Database + Storage
-**Goal:** Schema in place, object storage working, basic CRUD.
+### Phase 1: Q&A / Translations
+**Goal:** Ask questions, get LLM responses with phrases to confirm.
+
+This is the core learning flow - ask for translations, vocabulary, grammar explanations.
+LLM returns phrases that user can confirm and save.
 
 #### Tasks
-- [ ] PostgreSQL schema (all tables with user_id)
-- [ ] sqlx migrations setup
-- [ ] DEV_USER_ID constant and seeding
-- [ ] Object storage client (S3-compatible)
-- [ ] Phrases CRUD endpoints
-- [ ] Audio file upload/download
-- [ ] Basic frontend (list phrases, play audio)
+- [ ] PostgreSQL schema (users, questions, phrases)
+- [ ] sqlx migrations
+- [ ] DEV_USER_ID seeding
+- [ ] AI provider client (OpenAI/Anthropic)
+- [ ] Questions endpoints (ask, list history)
+- [ ] LLM prompt for returning structured phrases
+- [ ] Frontend: Question input, response display
+- [ ] Frontend: Confirm/save phrases from response
+- [ ] Language selector (source + target)
 
-#### Database Schema
-Full schema in `DESIGN.md`. Key point: all tables reference `users(id)`.
-
-```sql
--- Seed dev user (migration)
-INSERT INTO users (id, email, email_verified)
-VALUES ('00000000-0000-0000-0000-000000000001', 'dev@localhost', true)
-ON CONFLICT DO NOTHING;
-```
+#### Database Tables
+- `users` - Basic user record
+- `user_settings` - Source language, active target
+- `user_languages` - User's target languages
+- `questions` - Q&A history
+- `phrases` - Confirmed phrases (per target language)
 
 #### API Endpoints
 ```
-GET    /api/phrases              # List phrases (dev user)
-POST   /api/phrases              # Create phrase
-GET    /api/phrases/:id          # Get phrase
-PUT    /api/phrases/:id          # Update phrase
-DELETE /api/phrases/:id          # Delete phrase
-GET    /api/phrases/:id/audio    # Get/generate audio URL
-POST   /api/audio/upload         # Upload audio file
+POST   /api/questions              # Ask a question
+GET    /api/questions              # List past questions
+GET    /api/questions/:id          # Get specific Q&A
+
+POST   /api/phrases                # Save confirmed phrase
+GET    /api/phrases                # List phrases (filtered by target_language)
+DELETE /api/phrases/:id            # Delete phrase
+
+GET    /api/languages              # List user's target languages
+POST   /api/languages              # Add target language
+DELETE /api/languages/:id          # Remove target language
+PUT    /api/settings               # Update source language, active target
+```
+
+#### LLM Response Format
+```json
+{
+  "explanation": "Here's how to say...",
+  "phrases": [
+    {
+      "phrase": "Ich möchte einen Kaffee",
+      "translation": "I would like a coffee",
+      "context": "Ordering at a café"
+    }
+  ]
+}
 ```
 
 ---
 
-### Phase 2: TTS Integration
-**Goal:** Generate and play phrase audio with ElevenLabs.
+### Phase 2: Phrases Library
+**Goal:** Manage saved phrases, basic CRUD.
 
 #### Tasks
-- [ ] ElevenLabs client (abstracted for other providers)
-- [ ] Voice listing endpoint
+- [ ] Phrases list with filtering (by target language)
+- [ ] Edit phrase (phrase, translation, notes)
+- [ ] Star/exclude phrases
+- [ ] Search phrases
+- [ ] Link to source question
+
+#### API Endpoints
+```
+GET    /api/phrases                # List with filters
+PUT    /api/phrases/:id            # Update phrase
+POST   /api/phrases/:id/star       # Toggle star
+POST   /api/phrases/:id/exclude    # Toggle exclude
+```
+
+---
+
+### Phase 3: TTS Integration
+**Goal:** Generate and play phrase audio.
+
+#### Tasks
+- [ ] ElevenLabs client
+- [ ] Voice listing (per language)
 - [ ] Audio generation on demand
 - [ ] Audio caching in object storage
-- [ ] User voice preference (stored in user_settings)
+- [ ] Voice preference per target language
 - [ ] Frontend audio player
 
-#### Architecture
-```rust
-#[async_trait]
-trait TtsProvider {
-    async fn list_voices(&self, language: &str) -> Result<Vec<Voice>>;
-    async fn synthesize(&self, text: &str, voice_id: &str) -> Result<Vec<u8>>;
-}
-
-struct ElevenLabsProvider { api_key: String }
-// Other providers can be added later
-```
-
 #### API Endpoints
 ```
-GET    /api/settings/voices      # List available ElevenLabs voices
-GET    /api/phrases/:id/audio    # Get or generate audio
+GET    /api/settings/voices        # List voices for language
+GET    /api/phrases/:id/audio      # Get or generate audio
 ```
 
 ---
 
-### Phase 3: SRS Practice
-**Goal:** Spaced repetition practice loop working.
+### Phase 4: SRS Practice
+**Goal:** Spaced repetition learning.
 
 #### Tasks
-- [ ] Port SM-2 algorithm from `learning.rs`
-- [ ] Due phrases endpoint
+- [ ] Port SM-2 algorithm from desktop `learning.rs`
+- [ ] Due phrases endpoint (per target language)
 - [ ] Answer submission + SRS update
-- [ ] Practice session tracking
-- [ ] Statistics endpoints
-- [ ] Practice UI (manual + typing modes)
-- [ ] User settings for learning params
-
-#### Algorithm
-Port from desktop `src-tauri/src/commands/learning.rs`:
-- `calculate_priority()` - Which phrase to show next
-- `calculate_srs()` - Update ease_factor, interval, next_review_at
-- `validate_answer()` - Flexible matching with normalization
-
-#### User Settings
-```sql
--- Already in schema, used here
-daily_goal, session_limit, failure_repetitions
-```
+- [ ] Practice modes (manual reveal, typing)
+- [ ] Session tracking
+- [ ] Statistics
 
 #### API Endpoints
 ```
-GET    /api/practice/due              # Get next phrase(s) for review
-POST   /api/practice/answer           # Submit answer, get SRS update
-GET    /api/practice/stats            # Learning statistics
-GET    /api/settings                  # Get user settings
-PUT    /api/settings                  # Update settings
+GET    /api/practice/due           # Get due phrases
+POST   /api/practice/answer        # Submit answer
+GET    /api/practice/stats         # Learning stats
 ```
 
 ---
 
-### Phase 4: Conversations + AI
-**Goal:** AI-powered translation conversations.
+### Phase 5: Conversations
+**Goal:** AI translation conversations (more structured than Q&A).
 
 #### Tasks
-- [ ] AI provider client (OpenAI/Anthropic abstraction)
 - [ ] Conversation CRUD
-- [ ] Message handling with AI responses
-- [ ] Streaming responses (SSE)
-- [ ] Conversation UI
-- [ ] System prompts for translation context
-
-#### Architecture
-```rust
-#[async_trait]
-trait AiProvider {
-    async fn complete(&self, messages: Vec<Message>) -> Result<String>;
-    async fn stream(&self, messages: Vec<Message>) -> Result<impl Stream<Item = String>>;
-}
-```
-
-#### API Endpoints
-```
-GET    /api/conversations                    # List conversations
-POST   /api/conversations                    # Create conversation
-GET    /api/conversations/:id                # Get with messages
-DELETE /api/conversations/:id                # Delete
-POST   /api/conversations/:id/messages       # Send message
-GET    /api/conversations/:id/stream         # SSE for streaming
-```
+- [ ] Message handling with streaming
+- [ ] Phrase extraction from conversation
+- [ ] Conversation templates
 
 ---
 
-### Phase 5: Authentication
+### Phase 6: Authentication
 **Goal:** Real users, sessions, OAuth.
 
 #### Tasks
-- [ ] Enable auth middleware (flip config flag)
+- [ ] Enable auth middleware
 - [ ] Email + password registration
-- [ ] Password hashing (argon2)
-- [ ] Session management (cookies)
 - [ ] Google OAuth
-- [ ] Email verification (optional initially)
-- [ ] Password reset
+- [ ] Session management
 - [ ] Login/register UI
-- [ ] Protected routes in frontend
-
-#### Implementation
-- Middleware already exists, just validates sessions now
-- All endpoints already scoped to user
-- Just need login/register endpoints + UI
-
-#### API Endpoints
-```
-POST   /api/auth/register        # Email + password
-POST   /api/auth/login           # Login
-POST   /api/auth/logout          # Logout
-GET    /api/auth/me              # Current user
-POST   /api/auth/google          # OAuth initiate
-GET    /api/auth/google/callback # OAuth callback
-```
 
 ---
 
-### Phase 6: Phrase Extraction
-**Goal:** Extract phrases from conversations.
+### Phase 7: Polish
+**Goal:** Nice-to-haves.
 
-#### Tasks
-- [ ] AI extraction prompt
-- [ ] Batch phrase creation
-- [ ] Link phrases to source conversation
-- [ ] Extraction UI in conversation view
-
-#### API Endpoints
-```
-POST   /api/conversations/:id/extract   # Extract phrases
-POST   /api/phrases/batch               # Create multiple
-```
-
----
-
-### Phase 7: Polish & Extras
-**Goal:** Nice-to-have features.
-
-#### Features
-- [ ] Grammar Q&A
-- [ ] Phrase refinement (AI suggestions)
-- [ ] GDPR (data export, account deletion)
-- [ ] User settings page
+- [ ] STT / Speaking mode (AWS Transcribe)
+- [ ] GDPR (data export, deletion)
+- [ ] PWA setup
 - [ ] Mobile-responsive UI
-- [ ] PWA setup (manifest, service worker)
-- [ ] Speaking mode (Web Speech API)
 
 ---
 
-## Feature Inventory
+## Feature Confirmation
 
-| Feature | Desktop | Priority | Phase | Notes |
-|---------|---------|----------|-------|-------|
-| Infrastructure | N/A | P0 | 0 | CI/CD, deployment |
-| Phrases CRUD | Complete | P0 | 1 | Core feature |
-| Audio Storage | Complete | P0 | 1 | Object storage |
-| TTS (ElevenLabs) | Complete | P1 | 2 | Voice selection |
-| SRS Practice | Complete | P1 | 3 | Core learning |
-| Conversations | Complete | P1 | 4 | AI translation |
-| Authentication | N/A | P1 | 5 | Multi-user |
-| Phrase Extraction | Complete | P2 | 6 | AI-powered |
-| Grammar Q&A | Complete | P3 | 7 | Nice to have |
-| Speaking Mode | Complete | P3 | 7 | Web Speech API |
+Before implementing each feature from desktop, confirm:
+
+| Desktop Feature | Web? | Changes? |
+|----------------|------|----------|
+| Q&A / Grammar questions | ✓ Phase 1 | First feature |
+| Phrases library | ✓ Phase 2 | Per target language |
+| TTS (audio) | ✓ Phase 3 | ElevenLabs |
+| SRS Practice | ✓ Phase 4 | Same algorithm |
+| Conversations | ? Phase 5 | Confirm needed |
+| Phrase extraction | ? Phase 5 | Part of conversations |
+| Phrase refinement | ? | Confirm needed |
+| Speaking mode | ? Phase 7 | AWS Transcribe |
 
 ---
 
@@ -319,30 +258,13 @@ POST   /api/phrases/batch               # Create multiple
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-01 | Infrastructure before features | Need CI/CD and deployment first |
-| 2025-01 | Auth deferred to Phase 5 | Build core features faster, schema ready from start |
-| 2025-01 | DEV_USER_ID pattern | Keeps code multi-user ready without auth complexity |
-| 2025-01 | ElevenLabs for TTS | High quality voices, good variety |
-| 2025-01 | AWS Transcribe for STT | Voice recognition in speaking mode |
-| 2025-01 | Provider abstractions | Easy to swap AI/TTS/STT providers later |
-| 2025-01 | Backend-managed API keys | Users select preferences, not provide keys |
-
----
-
-## Open Questions
-
-1. **Dev deployment provider?**
-   - Hetzner (cheapest, EU)
-   - DigitalOcean (simple, good DX)
-   - Fly.io (easy Docker deploys)
-
-2. **Container registry?**
-   - GitHub Container Registry (free with Actions)
-   - Provider's registry
-
-3. **Database for dev?**
-   - Docker container on same VPS
-   - Managed Postgres (more cost)
+| 2025-01 | Q&A as first feature | Core value, validates LLM integration |
+| 2025-01 | Source/target terminology | Clearer than native/target |
+| 2025-01 | Multi-target support | Users learn multiple languages |
+| 2025-01 | Separate phrase libraries | Each target has own progress |
+| 2025-01 | Auth deferred to Phase 6 | Build features first |
+| 2025-01 | ElevenLabs for TTS | High quality voices |
+| 2025-01 | AWS Transcribe for STT | Voice recognition |
 
 ---
 
@@ -352,6 +274,5 @@ POST   /api/phrases/batch               # Create multiple
 - SRS algorithm: `src-tauri/src/commands/learning.rs`
 - LLM integration: `src-tauri/src/commands/llm.rs`
 - STT patterns: `~/projects/voice-notes-app` (AWS Transcribe)
-- Voice services: ElevenLabs (TTS), AWS Transcribe (STT)
 - Web design: `web/DESIGN.md`
-- Infrastructure & costs: `web/INFRASTRUCTURE.md`
+- Infrastructure: `web/INFRASTRUCTURE.md`

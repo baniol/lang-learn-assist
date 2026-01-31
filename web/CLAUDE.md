@@ -51,6 +51,10 @@ web/
 ├── frontend/
 │   ├── index.html
 │   ├── css/
+│   │   ├── variables.css     # Theme (colors, spacing, fonts)
+│   │   ├── reset.css         # CSS reset
+│   │   ├── base.css          # Base element styles
+│   │   └── components.css    # Component styles
 │   └── js/
 │       ├── app.js
 │       ├── api.js
@@ -92,6 +96,117 @@ cd web/frontend
 
 # For now, just serve static files
 python -m http.server 3000    # Or any static server
+```
+
+### CSS Architecture
+
+Centralized styling via CSS custom properties in `css/variables.css`:
+
+```css
+/* css/variables.css - Change theme here */
+:root {
+  /* Colors */
+  --color-primary: #4a90d9;
+  --color-primary-hover: #3a7bc8;
+  --color-secondary: #6c757d;
+  --color-success: #28a745;
+  --color-error: #dc3545;
+  --color-warning: #ffc107;
+
+  /* Text */
+  --color-text: #212529;
+  --color-text-muted: #6c757d;
+  --color-text-inverse: #ffffff;
+
+  /* Backgrounds */
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-hover: #e9ecef;
+
+  /* Borders */
+  --color-border: #dee2e6;
+  --border-radius: 8px;
+  --border-radius-sm: 4px;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* Typography */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+}
+
+/* Dark mode (optional) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text: #f8f9fa;
+    --color-text-muted: #adb5bd;
+    --color-bg: #212529;
+    --color-bg-secondary: #343a40;
+    --color-bg-hover: #495057;
+    --color-border: #495057;
+  }
+}
+```
+
+Usage in components:
+```css
+/* css/components.css */
+.btn {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius);
+  transition: background var(--transition-fast);
+}
+
+.btn:hover {
+  background: var(--color-primary-hover);
+}
+
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+}
+```
+
+File structure:
+```
+frontend/
+├── css/
+│   ├── variables.css    # Theme variables (change here)
+│   ├── reset.css        # CSS reset/normalize
+│   ├── base.css         # Base styles (body, headings, links)
+│   └── components.css   # Component styles
+├── index.html
+└── js/
+```
+
+Import order in HTML:
+```html
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/reset.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
 ```
 
 ## Adding Features

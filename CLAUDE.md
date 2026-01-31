@@ -4,9 +4,19 @@ Web version of language learning app. Rust/Axum backend + vanilla JS frontend. M
 
 ## Current Status
 
-Branch: `web` - Web version development (separate from Tauri desktop app)
+**Branch:** `web`
+**Current Phase:** 0 - Infrastructure (not started)
 
-See `web/MIGRATION.md` for migration phases and progress.
+## Next Steps
+
+Start Phase 0 - create the backend scaffold:
+
+1. Create `web/backend/` with Cargo project (Axum)
+2. Create `web/docker-compose.yml` for local dev
+3. Add `/health` endpoint
+4. Verify `docker-compose up` works
+
+See `web/INFRASTRUCTURE.md` for full Phase 0 tasks and setup details.
 
 ## Commands
 
@@ -51,15 +61,17 @@ See `web/CLAUDE.md` for detailed patterns. Quick reference:
 | Phase | Feature | Status |
 |-------|---------|--------|
 | 0 | Infrastructure (CI/CD, deployment) | Pending |
-| 1 | Database + Storage (phrases, audio) | Pending |
-| 2 | TTS Integration (Polly) | Pending |
-| 3 | SRS Practice | Pending |
-| 4 | Conversations + AI | Pending |
-| 5 | Authentication | Pending |
-| 6 | Phrase Extraction | Pending |
-| 7 | Polish & Extras | Pending |
+| 1 | Q&A / Translations (LLM + phrase confirm) | Pending |
+| 2 | Phrases Library | Pending |
+| 3 | TTS (ElevenLabs) | Pending |
+| 4 | SRS Practice | Pending |
+| 5 | Conversations | Pending |
+| 6 | Authentication | Pending |
+| 7 | Polish (STT, PWA) | Pending |
 
-**Note:** Auth deferred to Phase 5. Using `DEV_USER_ID` pattern - schema is multi-user ready from start.
+**Language model:** Source language (native) → Target language (learning). Multi-target supported.
+
+**Note:** Auth deferred to Phase 6. Using `DEV_USER_ID` pattern.
 
 ## Reference
 

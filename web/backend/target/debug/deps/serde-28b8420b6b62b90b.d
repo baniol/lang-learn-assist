@@ -1,0 +1,12 @@
+/Users/marcinbaniowski/projects/lang-learn-assist/web/backend/target/debug/deps/serde-28b8420b6b62b90b.d: /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/marcinbaniowski/projects/lang-learn-assist/web/backend/target/debug/build/serde-8b65f3d89392c4f4/out/private.rs
+
+/Users/marcinbaniowski/projects/lang-learn-assist/web/backend/target/debug/deps/libserde-28b8420b6b62b90b.rmeta: /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/marcinbaniowski/projects/lang-learn-assist/web/backend/target/debug/build/serde-8b65f3d89392c4f4/out/private.rs
+
+/Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/marcinbaniowski/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/marcinbaniowski/projects/lang-learn-assist/web/backend/target/debug/build/serde-8b65f3d89392c4f4/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/marcinbaniowski/projects/lang-learn-assist/web/backend/target/debug/build/serde-8b65f3d89392c4f4/out
