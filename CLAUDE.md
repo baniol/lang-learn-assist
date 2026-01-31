@@ -1,55 +1,70 @@
 # CLAUDE.md
 
-Tauri desktop app: React/TypeScript frontend + Rust backend. Language learning with AI conversations, phrase extraction, and SRS practice.
+Web version of language learning app. Rust/Axum backend + vanilla JS frontend. Migrating features from desktop app.
+
+## Current Status
+
+Branch: `web` - Web version development (separate from Tauri desktop app)
+
+See `web/MIGRATION.md` for migration phases and progress.
 
 ## Commands
+
 ```bash
-make dev          # Run development
-make build        # Production build
-make type-check   # TypeScript check
-make test-rust    # Rust tests
+cd web/backend
+cargo run                     # Start server
+cargo watch -x run            # Auto-reload on changes
+cargo test                    # Run tests
+cargo check && cargo clippy   # Check + lint
+sqlx migrate run              # Apply migrations
+sqlx migrate add <name>       # Create new migration
+```
+
+## Project Structure
+
+```
+web/
+├── backend/                  # Rust/Axum server
+│   ├── migrations/           # SQL migrations (sqlx)
+│   └── src/
+│       ├── routes/           # HTTP handlers
+│       ├── services/         # Business logic
+│       ├── models/           # Database models
+│       └── db/               # Database queries
+├── frontend/                 # Static HTML/CSS/JS
+├── DESIGN.md                 # Architecture, schema, API design
+├── MIGRATION.md              # Feature migration plan (phases 1-8)
+└── CLAUDE.md                 # Web dev guide (detailed)
 ```
 
 ## Adding Features
 
-**New Tauri command:**
-1. Add function in `src-tauri/src/commands/{domain}.rs`
-2. Register in `src-tauri/src/lib.rs` invoke_handler
-3. Add TypeScript wrapper in `src/lib/{domain}.ts`
-4. Add types in `src/types/index.ts`
+See `web/CLAUDE.md` for detailed patterns. Quick reference:
 
-**New view:**
-1. Create `src/views/{Name}View.tsx`
-2. Add to `ViewType` union in `src/types/index.ts`
-3. Add case in `src/App.tsx` renderView switch
+1. **Route handler** in `src/routes/{domain}.rs`
+2. **Register route** in `src/routes/mod.rs`
+3. **Database query** in `src/db/{domain}.rs`
+4. **Frontend API** in `js/api.js`
 
-**New component:** Create in `src/components/` - no registration needed
+## Migration Phases
 
-**Database changes:**
-1. Update schema in `src-tauri/src/db.rs`
-2. Add migration for existing DBs (see `phrase_progress` SRS fields example)
-3. Update models in `src-tauri/src/models.rs`
+| Phase | Feature | Status |
+|-------|---------|--------|
+| 0 | Infrastructure (CI/CD, deployment) | Pending |
+| 1 | Database + Storage (phrases, audio) | Pending |
+| 2 | TTS Integration (Polly) | Pending |
+| 3 | SRS Practice | Pending |
+| 4 | Conversations + AI | Pending |
+| 5 | Authentication | Pending |
+| 6 | Phrase Extraction | Pending |
+| 7 | Polish & Extras | Pending |
 
-## Patterns
-
-**Navigation:** State-based via `onNavigate(view: ViewType, data?: unknown)` - no router library
-
-**Tauri commands:** Use `#[tauri::command]` + camelCase params (Rust snake_case auto-converts)
-
-**Frontend state:** Local useState per view, invoke Tauri commands directly
-
-**SRS algorithm:** Located in `learning.rs` - simplified SM-2 with ease_factor, interval_days, next_review_at
-
-## IMPORTANT
-
-- ALWAYS read existing files before modifying - understand patterns first
-- New DB columns MUST include migration for existing databases
-- Tauri command params use camelCase in TypeScript, snake_case in Rust
-- Test with `make type-check` and `cargo build` before considering done
-- Keep components self-contained - avoid prop drilling, use Tauri commands for data
+**Note:** Auth deferred to Phase 5. Using `DEV_USER_ID` pattern - schema is multi-user ready from start.
 
 ## Reference
-- `DOCUMENTATION.md` - User-facing feature docs
-- `src-tauri/src/db.rs` - Database schema and migrations
-- `src-tauri/src/models.rs` - All Rust data structures
-- `src/types/index.ts` - All TypeScript interfaces
+
+- `web/DESIGN.md` - Architecture, PostgreSQL schema, API endpoints
+- `web/MIGRATION.md` - Detailed migration plan per feature
+- `web/INFRASTRUCTURE.md` - Cloud costs, Terraform setup, CI/CD
+- `web/CLAUDE.md` - Development patterns and guidelines
+- `src-tauri/src/commands/` - Desktop code to port (reference only)
