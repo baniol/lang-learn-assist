@@ -107,6 +107,8 @@ pub struct AppSettings {
     pub tts_provider: String,
     pub tts_api_key: String,
     pub tts_voice_id: String,
+    pub tts_voice_id_a: String,
+    pub tts_voice_id_b: String,
 
     // Language settings
     pub target_language: String,
@@ -131,6 +133,8 @@ impl AppSettings {
             tts_provider: "none".to_string(),
             tts_api_key: String::new(),
             tts_voice_id: String::new(),
+            tts_voice_id_a: String::new(),
+            tts_voice_id_b: String::new(),
             target_language: "de".to_string(),
             native_language: "pl".to_string(),
             required_streak: 2,

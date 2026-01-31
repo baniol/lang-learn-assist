@@ -1,6 +1,7 @@
 use crate::db::get_audio_dir;
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Write;
 use std::time::Duration;
@@ -100,6 +101,7 @@ pub async fn generate_tts(
     state: State<'_, AppState>,
     text: String,
     phrase_id: Option<i64>,
+    voice_id: Option<String>,
 ) -> Result<String, String> {
     let settings = {
         let guard = state
@@ -109,9 +111,14 @@ pub async fn generate_tts(
         guard.clone()
     };
 
+    // Use provided voice_id or fall back to default
+    let effective_voice_id = voice_id
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| settings.tts_voice_id.clone());
+
     match settings.tts_provider.as_str() {
         "elevenlabs" => {
-            generate_elevenlabs_tts(&settings.tts_api_key, &settings.tts_voice_id, &text, phrase_id)
+            generate_elevenlabs_tts(&settings.tts_api_key, &effective_voice_id, &text, phrase_id)
                 .await
         }
         "none" | "" => Err("TTS not configured".to_string()),
@@ -136,6 +143,30 @@ async fn generate_elevenlabs_tts(
         return Err("ElevenLabs voice not selected".to_string());
     }
 
+    // Generate filename - use phrase_id if available, otherwise hash text+voice for caching
+    let audio_dir = get_audio_dir();
+    let filename = if let Some(id) = phrase_id {
+        format!("phrase_{}.mp3", id)
+    } else {
+        // Create a hash of text + voice_id for consistent filenames
+        let mut hasher = Sha256::new();
+        hasher.update(text.as_bytes());
+        hasher.update(b"::");
+        hasher.update(voice_id.as_bytes());
+        let hash = hasher.finalize();
+        // Format hash as hex string, use first 16 chars for shorter filename
+        let hash_hex: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+        format!("conv_{}.mp3", &hash_hex[..16])
+    };
+
+    let audio_path = audio_dir.join(&filename);
+
+    // Check if file already exists (cache hit)
+    if audio_path.exists() {
+        return Ok(audio_path.to_string_lossy().to_string());
+    }
+
+    // File doesn't exist, generate new audio
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(60))
         .build()
@@ -175,16 +206,6 @@ async fn generate_elevenlabs_tts(
         .bytes()
         .await
         .map_err(|e| format!("Failed to read audio: {}", e))?;
-
-    // Generate filename
-    let audio_dir = get_audio_dir();
-    let filename = if let Some(id) = phrase_id {
-        format!("phrase_{}.mp3", id)
-    } else {
-        format!("tts_{}.mp3", chrono::Utc::now().timestamp_millis())
-    };
-
-    let audio_path = audio_dir.join(&filename);
 
     // Save audio file
     let mut file =

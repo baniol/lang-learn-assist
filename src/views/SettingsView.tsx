@@ -451,7 +451,7 @@ export function SettingsView() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Voice
+                      Default Voice (Practice)
                     </label>
                     <button
                       onClick={loadTtsVoices}
@@ -488,6 +488,53 @@ export function SettingsView() {
                     </p>
                   )}
                 </div>
+
+                {ttsVoices.length > 0 && (
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                      Conversation Voices (alternating)
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-slate-600 dark:text-slate-400 mb-1">
+                          Voice A
+                        </label>
+                        <select
+                          value={settings.ttsVoiceIdA}
+                          onChange={(e) => updateSetting("ttsVoiceIdA", e.target.value)}
+                          className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+                        >
+                          <option value="">Use default</option>
+                          {ttsVoices.map((voice) => (
+                            <option key={voice.voiceId} value={voice.voiceId}>
+                              {voice.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-slate-600 dark:text-slate-400 mb-1">
+                          Voice B
+                        </label>
+                        <select
+                          value={settings.ttsVoiceIdB}
+                          onChange={(e) => updateSetting("ttsVoiceIdB", e.target.value)}
+                          className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+                        >
+                          <option value="">Use default</option>
+                          {ttsVoices.map((voice) => (
+                            <option key={voice.voiceId} value={voice.voiceId}>
+                              {voice.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                      Alternate between Voice A and Voice B when playing conversation messages
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-4">
                   <button

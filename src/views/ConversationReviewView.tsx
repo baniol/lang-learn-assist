@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { extractPhrasesFromConversation } from "../lib/llm";
+import { useAudioPlayback } from "../hooks/useAudioPlayback";
 import type {
   Conversation,
   ChatMessage,
   SuggestedPhrase,
   CreatePhraseRequest,
   ViewType,
+  AppSettings,
 } from "../types";
 
 interface ConversationReviewViewProps {
@@ -32,10 +34,26 @@ export function ConversationReviewView({
   const [suggestedPhrases, setSuggestedPhrases] = useState<SuggestedPhrase[]>([]);
   const [selectedPhrases, setSelectedPhrases] = useState<Set<number>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+
+  const audioPlayback = useAudioPlayback({
+    voiceA: settings?.ttsVoiceIdA,
+    voiceB: settings?.ttsVoiceIdB,
+  });
 
   useEffect(() => {
     loadAndProcess();
+    loadSettings();
   }, [conversationId]);
+
+  const loadSettings = async () => {
+    try {
+      const data = await invoke<AppSettings>("get_settings");
+      setSettings(data);
+    } catch (err) {
+      console.error("Failed to load settings:", err);
+    }
+  };
 
   const loadAndProcess = async () => {
     try {
@@ -234,18 +252,92 @@ export function ConversationReviewView({
 
           {/* Final German Conversation */}
           <div>
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-3">
-              Your German Conversation ({germanPhrases.length} phrases)
-            </h2>
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 space-y-2 border border-green-200 dark:border-green-800">
-              {germanPhrases.map((phrase, i) => (
-                <div
-                  key={i}
-                  className="px-3 py-2 bg-white dark:bg-slate-800 rounded-lg border border-green-200 dark:border-green-700"
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
+                Your German Conversation ({germanPhrases.length} phrases)
+              </h2>
+              {germanPhrases.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (audioPlayback.isPlaying) {
+                      audioPlayback.stop();
+                    } else {
+                      const msgs: ChatMessage[] = germanPhrases.map((text, i) => ({
+                        id: `review-${i}`,
+                        role: "assistant",
+                        content: text,
+                      }));
+                      audioPlayback.playAll(msgs);
+                    }
+                  }}
+                  disabled={audioPlayback.isLoading}
+                  className={`
+                    px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-2
+                    ${audioPlayback.isPlaying
+                      ? "bg-red-500 text-white hover:bg-red-600"
+                      : "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/60"
+                    }
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  `}
                 >
-                  <p className="text-slate-800 dark:text-white font-medium">{phrase}</p>
-                </div>
-              ))}
+                  {audioPlayback.isLoading ? (
+                    <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : audioPlayback.isPlaying ? (
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                      <rect x="6" y="5" width="4" height="14" rx="1" />
+                      <rect x="14" y="5" width="4" height="14" rx="1" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  )}
+                  {audioPlayback.isPlaying ? "Stop" : "Play All"}
+                </button>
+              )}
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 space-y-2 border border-green-200 dark:border-green-800">
+              {germanPhrases.map((phrase, i) => {
+                const messageId = `review-${i}`;
+                const isCurrentPlaying = audioPlayback.currentlyPlayingId === messageId && audioPlayback.isPlaying;
+                const isCurrentLoading = audioPlayback.currentlyPlayingId === messageId && audioPlayback.isLoading;
+                return (
+                  <div
+                    key={i}
+                    className="px-3 py-2 bg-white dark:bg-slate-800 rounded-lg border border-green-200 dark:border-green-700"
+                  >
+                    <div className="flex items-center gap-2">
+                      <p className="text-slate-800 dark:text-white font-medium flex-1">{phrase}</p>
+                      <button
+                        onClick={() => audioPlayback.playMessage(phrase, messageId, i)}
+                        disabled={isCurrentLoading}
+                        className={`
+                          flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors
+                          ${isCurrentPlaying
+                            ? "bg-green-500 text-white"
+                            : "bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/60"
+                          }
+                          disabled:opacity-50
+                        `}
+                        title={isCurrentPlaying ? "Stop" : "Play"}
+                      >
+                        {isCurrentLoading ? (
+                          <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : isCurrentPlaying ? (
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                            <rect x="6" y="5" width="4" height="14" rx="1" />
+                            <rect x="14" y="5" width="4" height="14" rx="1" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

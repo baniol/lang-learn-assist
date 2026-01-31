@@ -85,6 +85,8 @@ export interface AppSettings {
   ttsProvider: TtsProvider;
   ttsApiKey: string;
   ttsVoiceId: string;
+  ttsVoiceIdA: string;
+  ttsVoiceIdB: string;
   targetLanguage: string;
   nativeLanguage: string;
   requiredStreak: number;

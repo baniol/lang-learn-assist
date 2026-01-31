@@ -7,9 +7,10 @@ export async function getAvailableVoices(): Promise<TtsVoice[]> {
 
 export async function generateTts(
   text: string,
-  phraseId?: number
+  phraseId?: number,
+  voiceId?: string
 ): Promise<string> {
-  return invoke<string>("generate_tts", { text, phraseId });
+  return invoke<string>("generate_tts", { text, phraseId, voiceId });
 }
 
 export async function testTtsConnection(): Promise<string> {
