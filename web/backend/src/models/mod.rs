@@ -1,7 +1,9 @@
+mod language;
 mod phrase;
 mod question;
 mod tag;
 
+pub use language::*;
 pub use phrase::*;
 pub use question::*;
 pub use tag::*;

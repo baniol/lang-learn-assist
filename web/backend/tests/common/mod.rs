@@ -35,7 +35,10 @@ pub async fn get_test_db() -> PgPool {
 /// Create a test server with real database
 pub async fn spawn_test_server() -> TestServer {
     let db = get_test_db().await;
-    let state = AppState { db };
+    let state = AppState {
+        db,
+        openai_api_key: None, // Disable LLM in tests
+    };
     let app = create_router(state);
     TestServer::builder()
         .save_cookies()

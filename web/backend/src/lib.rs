@@ -2,6 +2,7 @@ pub mod db;
 pub mod error;
 pub mod models;
 pub mod routes;
+pub mod services;
 
 use axum::{extract::State, routing::get, Json, Router};
 use serde::Serialize;
@@ -12,6 +13,7 @@ use tower_http::trace::TraceLayer;
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
+    pub openai_api_key: Option<String>,
 }
 
 #[derive(Serialize)]

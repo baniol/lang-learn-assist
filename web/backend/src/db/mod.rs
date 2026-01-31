@@ -379,3 +379,102 @@ pub async fn get_tags_for_phrase(pool: &PgPool, phrase_id: Uuid) -> Result<Vec<T
 
     Ok(tags)
 }
+
+// User Languages
+
+pub async fn list_user_languages(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<UserLanguage>, AppError> {
+    let languages = sqlx::query_as::<_, UserLanguage>(
+        "SELECT * FROM user_languages WHERE user_id = $1 ORDER BY created_at",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(languages)
+}
+
+pub async fn add_user_language(
+    pool: &PgPool,
+    user_id: Uuid,
+    input: &CreateUserLanguage,
+) -> Result<UserLanguage, AppError> {
+    let language = sqlx::query_as::<_, UserLanguage>(
+        r#"
+        INSERT INTO user_languages (user_id, target_language, is_active)
+        VALUES ($1, $2, TRUE)
+        ON CONFLICT (user_id, target_language) DO UPDATE SET is_active = TRUE
+        RETURNING *
+        "#,
+    )
+    .bind(user_id)
+    .bind(&input.target_language)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(language)
+}
+
+pub async fn remove_user_language(
+    pool: &PgPool,
+    id: Uuid,
+    user_id: Uuid,
+) -> Result<(), AppError> {
+    let result = sqlx::query("DELETE FROM user_languages WHERE id = $1 AND user_id = $2")
+        .bind(id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Language not found".to_string()));
+    }
+
+    Ok(())
+}
+
+// User Settings
+
+pub async fn get_user_settings(pool: &PgPool, user_id: Uuid) -> Result<UserSettings, AppError> {
+    sqlx::query_as::<_, UserSettings>("SELECT * FROM user_settings WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Settings not found".to_string()))
+}
+
+pub async fn update_user_settings(
+    pool: &PgPool,
+    user_id: Uuid,
+    input: &UpdateUserSettings,
+) -> Result<UserSettings, AppError> {
+    let existing = get_user_settings(pool, user_id).await?;
+
+    let settings = sqlx::query_as::<_, UserSettings>(
+        r#"
+        UPDATE user_settings SET
+            daily_goal = $1,
+            session_limit = $2,
+            failure_repetitions = $3,
+            elevenlabs_voice_id = $4,
+            source_language = $5,
+            active_target_language = $6,
+            updated_at = NOW()
+        WHERE user_id = $7
+        RETURNING *
+        "#,
+    )
+    .bind(input.daily_goal.unwrap_or(existing.daily_goal))
+    .bind(input.session_limit.unwrap_or(existing.session_limit))
+    .bind(input.failure_repetitions.unwrap_or(existing.failure_repetitions))
+    .bind(input.elevenlabs_voice_id.as_ref().or(existing.elevenlabs_voice_id.as_ref()))
+    .bind(input.source_language.as_ref().unwrap_or(&existing.source_language))
+    .bind(input.active_target_language.as_ref().or(existing.active_target_language.as_ref()))
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(settings)
+}

@@ -3,11 +3,13 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::db;
 use crate::error::AppError;
 use crate::models::{CreateQuestion, Question, QuestionWithPhrases, DEV_USER_ID};
+use crate::services;
 use crate::AppState;
 
 pub fn routes() -> Router<AppState> {
@@ -21,12 +23,49 @@ async fn list_questions(State(state): State<AppState>) -> Result<Json<Vec<Questi
     Ok(Json(questions))
 }
 
+#[derive(Debug, Serialize)]
+pub struct CreateQuestionResponse {
+    #[serde(flatten)]
+    pub question: Question,
+    pub suggested_phrases: Vec<services::SuggestedPhrase>,
+}
+
 async fn create_question(
     State(state): State<AppState>,
     Json(input): Json<CreateQuestion>,
-) -> Result<Json<Question>, AppError> {
-    let question = db::create_question(&state.db, DEV_USER_ID, &input).await?;
-    Ok(Json(question))
+) -> Result<Json<CreateQuestionResponse>, AppError> {
+    // Create the question first
+    let mut question = db::create_question(&state.db, DEV_USER_ID, &input).await?;
+
+    // Call LLM if API key is configured
+    let suggested_phrases = if let Some(ref api_key) = state.openai_api_key {
+        match services::ask_question(
+            api_key,
+            &input.question,
+            &input.source_language,
+            &input.target_language,
+        )
+        .await
+        {
+            Ok(response) => {
+                // Update question with the LLM response
+                question = db::update_question_response(&state.db, question.id, &response.explanation).await?;
+                response.phrases
+            }
+            Err(e) => {
+                tracing::error!("LLM call failed: {:?}", e);
+                vec![]
+            }
+        }
+    } else {
+        tracing::warn!("LLM not configured, returning empty phrases");
+        vec![]
+    };
+
+    Ok(Json(CreateQuestionResponse {
+        question,
+        suggested_phrases,
+    }))
 }
 
 async fn get_question(

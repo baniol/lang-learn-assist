@@ -1,5 +1,7 @@
+mod languages;
 mod phrases;
 mod questions;
+mod settings;
 mod tags;
 
 use axum::Router;
@@ -10,4 +12,6 @@ pub fn api_routes() -> Router<AppState> {
         .merge(questions::routes())
         .merge(phrases::routes())
         .merge(tags::routes())
+        .merge(languages::routes())
+        .merge(settings::routes())
 }

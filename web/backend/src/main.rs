@@ -36,8 +36,14 @@ async fn main() {
 
     tracing::info!("Migrations complete");
 
+    // Load API key
+    let openai_api_key = std::env::var("OPENAI_API_KEY").ok();
+    if openai_api_key.is_none() {
+        tracing::warn!("OPENAI_API_KEY not set - LLM features will be disabled");
+    }
+
     // Build app
-    let state = AppState { db };
+    let state = AppState { db, openai_api_key };
     let app = create_router(state);
 
     // Start server
