@@ -134,4 +134,55 @@ export async function updateSettings(settings) {
   });
 }
 
+// Languages
+export async function getLanguages() {
+  return request('/languages');
+}
+
+export async function addLanguage(targetLanguage) {
+  return request('/languages', {
+    method: 'POST',
+    body: { target_language: targetLanguage },
+  });
+}
+
+export async function removeLanguage(id) {
+  return request(`/languages/${id}`, { method: 'DELETE' });
+}
+
+// Tags
+export async function getTags() {
+  return request('/tags');
+}
+
+export async function createTag(name, color) {
+  return request('/tags', {
+    method: 'POST',
+    body: { name, color },
+  });
+}
+
+export async function updateTag(id, data) {
+  return request(`/tags/${id}`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
+export async function deleteTag(id) {
+  return request(`/tags/${id}`, { method: 'DELETE' });
+}
+
+// Phrase tags
+export async function addTagToPhrase(phraseId, tagId) {
+  return request(`/phrases/${phraseId}/tags`, {
+    method: 'POST',
+    body: { tag_id: tagId },
+  });
+}
+
+export async function removeTagFromPhrase(phraseId, tagId) {
+  return request(`/phrases/${phraseId}/tags/${tagId}`, { method: 'DELETE' });
+}
+
 export { ApiError };
