@@ -1,5 +1,5 @@
 use crate::db::get_conn;
-use crate::models::{LearningStats, PhraseProgress, PhraseWithProgress, PracticeSession};
+use crate::models::{IntervalDistribution, LearningStats, PhraseProgress, PhraseWithProgress, PracticeSession, SrsStats};
 use rusqlite::params;
 
 /// Calculate priority for SRS-based scheduling
@@ -51,6 +51,9 @@ pub fn get_next_phrase(
     let mut conditions = Vec::new();
     let mut param_values: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
+    // Always exclude phrases marked as excluded
+    conditions.push("(p.excluded = 0 OR p.excluded IS NULL)".to_string());
+
     if let Some(ref lang) = target_language {
         conditions.push("p.target_language = ?".to_string());
         param_values.push(Box::new(lang.clone()));
@@ -75,7 +78,7 @@ pub fn get_next_phrase(
 
     let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at
          FROM phrases p
@@ -94,6 +97,7 @@ pub fn get_next_phrase(
             let accepted_json: String = row.get(4)?;
             let accepted: Vec<String> = serde_json::from_str(&accepted_json).unwrap_or_default();
             let starred_int: i32 = row.get(9)?;
+            let excluded_int: i32 = row.get(10).unwrap_or(0);
 
             let phrase = crate::models::Phrase {
                 id: row.get(0)?,
@@ -106,20 +110,21 @@ pub fn get_next_phrase(
                 audio_path: row.get(7)?,
                 notes: row.get(8)?,
                 starred: starred_int != 0,
-                created_at: row.get(10)?,
+                excluded: excluded_int != 0,
+                created_at: row.get(11)?,
             };
 
-            let progress: Option<PhraseProgress> = row.get::<_, Option<i64>>(11)?.map(|progress_id| {
+            let progress: Option<PhraseProgress> = row.get::<_, Option<i64>>(12)?.map(|progress_id| {
                 PhraseProgress {
                     id: progress_id,
                     phrase_id: phrase.id,
-                    correct_streak: row.get(12).unwrap_or(0),
-                    total_attempts: row.get(13).unwrap_or(0),
-                    success_count: row.get(14).unwrap_or(0),
-                    last_seen: row.get(15).ok(),
-                    ease_factor: row.get(16).unwrap_or(2.5),
-                    interval_days: row.get(17).unwrap_or(1),
-                    next_review_at: row.get(18).ok(),
+                    correct_streak: row.get(13).unwrap_or(0),
+                    total_attempts: row.get(14).unwrap_or(0),
+                    success_count: row.get(15).unwrap_or(0),
+                    last_seen: row.get(16).ok(),
+                    ease_factor: row.get(17).unwrap_or(2.5),
+                    interval_days: row.get(18).unwrap_or(1),
+                    next_review_at: row.get(19).ok(),
                 }
             });
 
@@ -133,8 +138,7 @@ pub fn get_next_phrase(
         return Ok(None);
     }
 
-    // Calculate priorities and filter out phrases with priority 0 (not yet due)
-    // unless there are no phrases with priority > 0
+    // Calculate priorities
     let mut phrases_with_priority: Vec<(PhraseWithProgress, f64)> = phrases
         .into_iter()
         .map(|p| {
@@ -148,14 +152,21 @@ pub fn get_next_phrase(
         b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    // Get the phrase with highest priority, but only if priority > 0
-    // (meaning it's due for review or is a new phrase)
+    // First try to get a phrase with priority > 0 (due for review or new)
     let next_phrase = phrases_with_priority
-        .into_iter()
+        .iter()
         .find(|(_, priority)| *priority > 0.0)
-        .map(|(phrase, _)| phrase);
+        .map(|(phrase, _)| phrase.clone());
 
-    Ok(next_phrase)
+    // If nothing is due, fall back to showing any phrase (sorted by soonest review)
+    if next_phrase.is_some() {
+        Ok(next_phrase)
+    } else if !phrases_with_priority.is_empty() {
+        // Return the first available phrase (they're all not due, but user wants to practice)
+        Ok(Some(phrases_with_priority.remove(0).0))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Calculate next review date using simplified SM-2 algorithm
@@ -450,6 +461,164 @@ pub fn reset_progress(phrase_id: Option<i64>) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_srs_stats() -> Result<SrsStats, String> {
+    let conn = get_conn()?;
+    let now = chrono::Utc::now().naive_utc();
+    let today_end = now.date().and_hms_opt(23, 59, 59).unwrap();
+    let tomorrow_end = today_end + chrono::Duration::days(1);
+    let week_end = today_end + chrono::Duration::days(7);
+
+    let now_str = now.format("%Y-%m-%d %H:%M:%S").to_string();
+    let today_str = today_end.format("%Y-%m-%d %H:%M:%S").to_string();
+    let tomorrow_str = tomorrow_end.format("%Y-%m-%d %H:%M:%S").to_string();
+    let week_str = week_end.format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // Due now (overdue)
+    let overdue: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at < ?1",
+            params![now_str],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    // Due today (including overdue)
+    let due_today: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at <= ?1",
+            params![today_str],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    // Due tomorrow
+    let due_tomorrow: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at > ?1 AND next_review_at <= ?2",
+            params![today_str, tomorrow_str],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    // Due this week
+    let due_this_week: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at > ?1 AND next_review_at <= ?2",
+            params![today_str, week_str],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    // Total phrases with reviews scheduled
+    let total_reviews: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    // Average ease factor
+    let average_ease_factor: f64 = conn
+        .query_row(
+            "SELECT COALESCE(AVG(ease_factor), 2.5) FROM phrase_progress",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(2.5);
+
+    // Interval distribution
+    let one_day: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let two_to_three_days: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days >= 2 AND interval_days <= 3",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let four_to_seven_days: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days >= 4 AND interval_days <= 7",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let one_to_two_weeks: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days >= 8 AND interval_days <= 14",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let two_weeks_plus: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days > 14",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    Ok(SrsStats {
+        due_now: overdue,
+        overdue,
+        due_today,
+        due_tomorrow,
+        due_this_week,
+        total_reviews,
+        average_ease_factor,
+        interval_distribution: IntervalDistribution {
+            one_day,
+            two_to_three_days,
+            four_to_seven_days,
+            one_to_two_weeks,
+            two_weeks_plus,
+        },
+    })
+}
+
+#[tauri::command]
+pub fn get_practice_sessions(limit: Option<i32>) -> Result<Vec<PracticeSession>, String> {
+    let conn = get_conn()?;
+    let limit = limit.unwrap_or(20);
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, started_at, finished_at, total_phrases, correct_answers, exercise_mode
+             FROM practice_sessions
+             ORDER BY started_at DESC
+             LIMIT ?1",
+        )
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let sessions = stmt
+        .query_map(params![limit], |row| {
+            Ok(PracticeSession {
+                id: row.get(0)?,
+                started_at: row.get(1)?,
+                finished_at: row.get(2)?,
+                total_phrases: row.get(3)?,
+                correct_answers: row.get(4)?,
+                exercise_mode: row.get(5)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query sessions: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect sessions: {}", e))?;
+
+    Ok(sessions)
+}
+
 /// Validate an answer against the phrase's correct answer and accepted alternatives
 #[tauri::command]
 pub fn validate_answer(phrase_id: i64, input: String) -> Result<bool, String> {
@@ -465,7 +634,7 @@ pub fn validate_answer(phrase_id: i64, input: String) -> Result<bool, String> {
 
     let accepted: Vec<String> = serde_json::from_str(&accepted_json).unwrap_or_default();
 
-    // Normalize input for comparison
+    // Normalize input for comparison (preserves spaces)
     let normalize = |s: &str| -> String {
         s.to_lowercase()
             .trim()
@@ -477,17 +646,34 @@ pub fn validate_answer(phrase_id: i64, input: String) -> Result<bool, String> {
             .join(" ")
     };
 
+    // Normalize without spaces (for compound word comparison like "da lassen" vs "dalassen")
+    let normalize_no_spaces = |s: &str| -> String {
+        s.to_lowercase()
+            .chars()
+            .filter(|c| c.is_alphanumeric())
+            .collect::<String>()
+    };
+
     let normalized_input = normalize(&input);
     let normalized_answer = normalize(&answer);
 
-    // Check main answer
+    // Check main answer (exact match with spaces)
     if normalized_input == normalized_answer {
         return Ok(true);
     }
 
+    // Check main answer (without spaces - handles compound words)
+    if normalize_no_spaces(&input) == normalize_no_spaces(&answer) {
+        return Ok(true);
+    }
+
     // Check accepted alternatives
-    for alt in accepted {
-        if normalize(&alt) == normalized_input {
+    for alt in &accepted {
+        if normalize(alt) == normalized_input {
+            return Ok(true);
+        }
+        // Also check without spaces
+        if normalize_no_spaces(alt) == normalize_no_spaces(&input) {
             return Ok(true);
         }
     }

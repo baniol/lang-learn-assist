@@ -44,9 +44,17 @@ pub async fn get_available_voices(state: State<'_, AppState>) -> Result<Vec<TtsV
 }
 
 async fn get_elevenlabs_voices(api_key: &str) -> Result<Vec<TtsVoice>, String> {
+    let api_key = api_key.trim();
     if api_key.is_empty() {
         return Err("ElevenLabs API key not configured".to_string());
     }
+
+    // Debug: log key length and prefix
+    eprintln!(
+        "[TTS Debug] API key length: {}, prefix: {}...",
+        api_key.len(),
+        &api_key[..api_key.len().min(10)]
+    );
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -61,9 +69,12 @@ async fn get_elevenlabs_voices(api_key: &str) -> Result<Vec<TtsVoice>, String> {
         .map_err(|e| format!("Failed to fetch voices: {}", e))?;
 
     if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        eprintln!("[TTS Debug] Error response body: {}", body);
         return Err(format!(
-            "ElevenLabs API error: HTTP {}",
-            response.status()
+            "ElevenLabs API error: HTTP {} - {}",
+            status, body
         ));
     }
 
@@ -114,6 +125,9 @@ async fn generate_elevenlabs_tts(
     text: &str,
     phrase_id: Option<i64>,
 ) -> Result<String, String> {
+    let api_key = api_key.trim();
+    let voice_id = voice_id.trim();
+
     if api_key.is_empty() {
         return Err("ElevenLabs API key not configured".to_string());
     }
@@ -180,6 +194,14 @@ async fn generate_elevenlabs_tts(
         .map_err(|e| format!("Failed to write audio file: {}", e))?;
 
     Ok(audio_path.to_string_lossy().to_string())
+}
+
+use base64::{engine::general_purpose::STANDARD, Engine};
+
+#[tauri::command]
+pub async fn get_audio_base64(path: String) -> Result<String, String> {
+    let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read audio file: {}", e))?;
+    Ok(format!("data:audio/mpeg;base64,{}", STANDARD.encode(&bytes)))
 }
 
 #[tauri::command]

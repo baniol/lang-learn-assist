@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type {
   Phrase,
   PhraseThread,
@@ -13,6 +14,7 @@ import {
   deletePhraseThread,
   refinePhrase,
 } from "../lib/phrases";
+import { generateTts, getAudioBase64 } from "../lib/tts";
 
 type EditMode = "ai" | "manual";
 
@@ -24,14 +26,20 @@ interface PhraseRefinementDialogProps {
     answer: string,
     accepted: string[]
   ) => Promise<void>;
+  onAudioRegenerated?: (audioPath: string) => void;
+  /** Optional initial message to send automatically when dialog opens (e.g., user's answer context) */
+  initialMessage?: string;
 }
 
 export function PhraseRefinementDialog({
   phrase,
   onClose,
   onAccept,
+  onAudioRegenerated,
+  initialMessage,
 }: PhraseRefinementDialogProps) {
   const [mode, setMode] = useState<EditMode>("ai");
+  const [initialMessageSent, setInitialMessageSent] = useState(false);
   const [thread, setThread] = useState<PhraseThread | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -39,6 +47,12 @@ export function PhraseRefinementDialog({
   const [userInput, setUserInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Audio state
+  const [audioPath, setAudioPath] = useState<string | null>(phrase.audioPath);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Pending AI suggestions (not yet accepted by user)
   const [pendingSuggestion, setPendingSuggestion] =
@@ -58,6 +72,75 @@ export function PhraseRefinementDialog({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [thread?.messages]);
+
+  // Auto-send initial message if provided and thread is ready
+  useEffect(() => {
+    if (initialMessage && thread && !initialMessageSent && !isLoading && mode === "ai") {
+      setInitialMessageSent(true);
+      setUserInput(initialMessage);
+      // Trigger send after a short delay to ensure state is updated
+      setTimeout(() => {
+        sendInitialMessage(initialMessage);
+      }, 100);
+    }
+  }, [initialMessage, thread, initialMessageSent, isLoading, mode]);
+
+  const sendInitialMessage = async (message: string) => {
+    if (!thread || isSending) return;
+
+    setUserInput("");
+    setIsSending(true);
+    setError(null);
+
+    const userMessage: PhraseThreadMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: message,
+    };
+    const updatedMessages = [...thread.messages, userMessage];
+    setThread({ ...thread, messages: updatedMessages });
+
+    try {
+      const currentPhrase: Phrase = {
+        ...phrase,
+        prompt: editedPrompt,
+        answer: editedAnswer,
+        accepted: editedAccepted.split(",").map((s) => s.trim()).filter(Boolean),
+      };
+
+      const suggestion = await refinePhrase(
+        currentPhrase,
+        thread.messages,
+        message
+      );
+
+      const assistantMessage: PhraseThreadMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: suggestion.explanation,
+      };
+      const finalMessages = [...updatedMessages, assistantMessage];
+
+      const updatedThread = await updatePhraseThread(
+        thread.id,
+        finalMessages,
+        null,
+        null,
+        null
+      );
+
+      setThread(updatedThread);
+
+      if (suggestion.prompt || suggestion.answer || suggestion.accepted) {
+        setPendingSuggestion(suggestion);
+      }
+    } catch (err) {
+      setError(`Failed to get refinement: ${err}`);
+      setThread({ ...thread, messages: thread.messages });
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const loadOrCreateThread = async () => {
     setIsLoading(true);
@@ -216,6 +299,56 @@ export function PhraseRefinementDialog({
       }
     }
     onClose();
+  };
+
+  const handlePlayAudio = async () => {
+    if (!audioPath) return;
+
+    if (isPlayingAudio && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    try {
+      const audioUrl = await getAudioBase64(audioPath);
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setIsPlayingAudio(false);
+        audioRef.current = null;
+      };
+
+      setIsPlayingAudio(true);
+      await audio.play();
+    } catch (err) {
+      console.error("Failed to play audio:", err);
+      setError("Failed to play audio");
+    }
+  };
+
+  const handleRegenerateAudio = async () => {
+    setIsGeneratingAudio(true);
+    setError(null);
+
+    try {
+      // Use current edited answer for regeneration
+      const newPath = await generateTts(editedAnswer, phrase.id);
+      setAudioPath(newPath);
+
+      // Update in database
+      await invoke("update_phrase_audio", { id: phrase.id, audioPath: newPath });
+
+      // Notify parent
+      onAudioRegenerated?.(newPath);
+    } catch (err) {
+      console.error("Failed to regenerate audio:", err);
+      setError(`Failed to regenerate audio: ${err}`);
+    } finally {
+      setIsGeneratingAudio(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -428,6 +561,63 @@ export function PhraseRefinementDialog({
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Audio section */}
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide block mb-1">
+                Audio
+              </label>
+              <div className="flex items-center gap-2">
+                {audioPath ? (
+                  <button
+                    onClick={handlePlayAudio}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                  >
+                    {isPlayingAudio ? (
+                      <>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                        </svg>
+                        Stop
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        Play
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <span className="text-sm text-slate-500 dark:text-slate-400 py-2">
+                    No audio generated
+                  </span>
+                )}
+                <button
+                  onClick={handleRegenerateAudio}
+                  disabled={isGeneratingAudio}
+                  className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50 disabled:opacity-50 transition-colors"
+                >
+                  {isGeneratingAudio ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {audioPath ? "Regenerate" : "Generate"} Audio
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

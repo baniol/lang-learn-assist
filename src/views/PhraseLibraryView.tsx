@@ -5,6 +5,7 @@ import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
 import type { PhraseWithProgress, CreatePhraseRequest, LearningStats, Phrase, UpdatePhraseRequest } from "../types";
 
 type FilterStatus = "all" | "new" | "learning" | "learned";
+type ExcludedFilter = "active" | "excluded" | "all";
 
 export function PhraseLibraryView() {
   const [phrases, setPhrases] = useState<PhraseWithProgress[]>([]);
@@ -12,6 +13,7 @@ export function PhraseLibraryView() {
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [showStarredOnly, setShowStarredOnly] = useState(false);
+  const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>("active");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -27,9 +29,27 @@ export function PhraseLibraryView() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [refiningPhrase, setRefiningPhrase] = useState<Phrase | null>(null);
 
+  const handleAudioGenerated = useCallback(async (phraseId: number, audioPath: string) => {
+    // Save audio path to database
+    try {
+      await invoke("update_phrase_audio", { id: phraseId, audioPath });
+      // Update local state so next play uses cached path
+      setPhrases((prev) =>
+        prev.map((p) =>
+          p.phrase.id === phraseId
+            ? { ...p, phrase: { ...p.phrase, audioPath } }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("Failed to save audio path:", err);
+    }
+  }, []);
+
   const tts = useTTS({
     enabled: true,
     onError: (err) => console.error("TTS error:", err),
+    onAudioGenerated: handleAudioGenerated,
   });
 
   // Debounce search input
@@ -55,7 +75,7 @@ export function PhraseLibraryView() {
   // Load phrases when filters change
   useEffect(() => {
     loadPhrases();
-  }, [showStarredOnly, filterStatus, debouncedSearch]);
+  }, [showStarredOnly, excludedFilter, filterStatus, debouncedSearch]);
 
   const loadStats = async () => {
     try {
@@ -71,6 +91,7 @@ export function PhraseLibraryView() {
     try {
       const data = await invoke<PhraseWithProgress[]>("get_phrases", {
         starredOnly: showStarredOnly || null,
+        excludedOnly: excludedFilter === "all" ? null : excludedFilter === "excluded",
         status: filterStatus !== "all" ? filterStatus : null,
         searchQuery: debouncedSearch || null,
       });
@@ -98,20 +119,42 @@ export function PhraseLibraryView() {
     }
   };
 
+  const handleToggleExcluded = async (id: number) => {
+    try {
+      const newExcluded = await invoke<boolean>("toggle_excluded", { id });
+      setPhrases((prev) =>
+        prev.map((p) =>
+          p.phrase.id === id ? { ...p, phrase: { ...p.phrase, excluded: newExcluded } } : p
+        )
+      );
+    } catch (err) {
+      console.error("Failed to toggle excluded:", err);
+    }
+  };
+
   const handlePlay = useCallback(
     async (phrase: PhraseWithProgress) => {
+      console.log("[TTS] handlePlay called for phrase:", phrase.phrase.id, phrase.phrase.answer);
+
       if (tts.isPlaying && playingId === phrase.phrase.id) {
+        console.log("[TTS] Stopping playback");
         tts.stop();
         setPlayingId(null);
         return;
       }
 
       setPlayingId(phrase.phrase.id);
-      await tts.speak(
-        phrase.phrase.answer,
-        phrase.phrase.id,
-        phrase.phrase.audioPath || undefined
-      );
+      try {
+        console.log("[TTS] Calling tts.speak...");
+        await tts.speak(
+          phrase.phrase.answer,
+          phrase.phrase.id,
+          phrase.phrase.audioPath || undefined
+        );
+        console.log("[TTS] speak completed");
+      } catch (err) {
+        console.error("[TTS] Error in handlePlay:", err);
+      }
       setPlayingId(null);
     },
     [tts, playingId]
@@ -236,6 +279,27 @@ export function PhraseLibraryView() {
           Starred
         </button>
 
+        <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-4">
+          {(["active", "excluded", "all"] as ExcludedFilter[]).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setExcludedFilter(filter)}
+              className={`
+                px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                ${
+                  excludedFilter === filter
+                    ? filter === "excluded"
+                      ? "bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200"
+                      : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                }
+              `}
+            >
+              {filter === "active" ? "Active" : filter === "excluded" ? "Excluded" : "All"}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1 max-w-md">
           <input
             type="text"
@@ -310,11 +374,16 @@ export function PhraseLibraryView() {
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     onClick={() => handlePlay(item)}
-                    disabled={playingId === p.id}
-                    className="p-2 rounded text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors opacity-0 group-hover:opacity-100"
+                    disabled={tts.isLoading && playingId === p.id}
+                    className="p-2 rounded text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
                     title="Play"
                   >
-                    {playingId === p.id ? (
+                    {tts.isLoading && playingId === p.id ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                    ) : playingId === p.id ? (
                       <svg className="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
                       </svg>
@@ -331,6 +400,23 @@ export function PhraseLibraryView() {
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => handleToggleExcluded(p.id)}
+                    className={`p-2 rounded transition-colors opacity-0 group-hover:opacity-100 ${
+                      p.excluded
+                        ? "text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
+                        : "text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                    }`}
+                    title={p.excluded ? "Include in learning" : "Exclude from learning"}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      {p.excluded ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      )}
                     </svg>
                   </button>
                   <button
@@ -480,6 +566,19 @@ export function PhraseLibraryView() {
           phrase={refiningPhrase}
           onClose={() => setRefiningPhrase(null)}
           onAccept={handleRefineAccept}
+          onAudioRegenerated={(audioPath) => {
+            // Update local state with new audio path
+            setPhrases((prev) =>
+              prev.map((p) =>
+                p.phrase.id === refiningPhrase.id
+                  ? { ...p, phrase: { ...p.phrase, audioPath } }
+                  : p
+              )
+            );
+            setRefiningPhrase((prev) =>
+              prev ? { ...prev, audioPath } : null
+            );
+          }}
         />
       )}
     </div>

@@ -32,6 +32,8 @@ export function SettingsView() {
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [testResults, setTestResults] = useState<{ llm?: string; tts?: string }>({});
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
+  const [voicesLoading, setVoicesLoading] = useState(false);
+  const [voicesError, setVoicesError] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -82,11 +84,19 @@ export function SettingsView() {
   };
 
   const loadTtsVoices = async () => {
+    setVoicesLoading(true);
+    setVoicesError(null);
     try {
       const voices = await getAvailableVoices();
       setTtsVoices(voices);
+      if (voices.length === 0) {
+        setVoicesError("No voices found");
+      }
     } catch (err) {
       console.error("Failed to load TTS voices:", err);
+      setVoicesError(String(err));
+    } finally {
+      setVoicesLoading(false);
     }
   };
 
@@ -438,11 +448,28 @@ export function SettingsView() {
                   />
                 </div>
 
-                {ttsVoices.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                       Voice
                     </label>
+                    <button
+                      onClick={loadTtsVoices}
+                      disabled={voicesLoading}
+                      className="text-xs text-blue-500 hover:text-blue-600 disabled:opacity-50"
+                    >
+                      {voicesLoading ? "Loading..." : "Refresh voices"}
+                    </button>
+                  </div>
+                  {voicesError && (
+                    <p className="text-sm text-red-500 mb-1">{voicesError}</p>
+                  )}
+                  {voicesLoading ? (
+                    <div className="flex items-center gap-2 py-2 text-slate-500">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
+                      <span className="text-sm">Loading voices...</span>
+                    </div>
+                  ) : ttsVoices.length > 0 ? (
                     <select
                       value={settings.ttsVoiceId}
                       onChange={(e) => updateSetting("ttsVoiceId", e.target.value)}
@@ -455,8 +482,12 @@ export function SettingsView() {
                         </option>
                       ))}
                     </select>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-slate-500 dark:text-slate-400 py-2">
+                      Save settings first, then click "Refresh voices"
+                    </p>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-4">
                   <button
@@ -525,14 +556,51 @@ export function SettingsView() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Required Streak to Mark as Learned
+                Correct answers to mark as learned
               </label>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                Answer a phrase correctly this many times in ONE session to mark it as learned
+              </p>
               <input
                 type="number"
                 min={1}
                 max={10}
                 value={settings.requiredStreak}
                 onChange={(e) => updateSetting("requiredStreak", parseInt(e.target.value) || 2)}
+                className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Required repetitions after failure (speaking mode)
+              </label>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                After a wrong answer in speaking mode, repeat correctly this many times to continue
+              </p>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                value={settings.failureRepetitions}
+                onChange={(e) => updateSetting("failureRepetitions", parseInt(e.target.value) || 2)}
+                className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Phrases per session
+              </label>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                Maximum number of phrases to practice in one session (0 = unlimited)
+              </p>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={settings.sessionPhraseLimit}
+                onChange={(e) => updateSetting("sessionPhraseLimit", parseInt(e.target.value) || 20)}
                 className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               />
             </div>

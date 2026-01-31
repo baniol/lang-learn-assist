@@ -127,6 +127,24 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         ).ok();
     }
 
+    // Migration: Add excluded column to phrases if it doesn't exist
+    let phrase_columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(phrases)")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    if !phrase_columns.contains(&"excluded".to_string()) {
+        conn.execute(
+            "ALTER TABLE phrases ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0",
+            [],
+        ).ok();
+    }
+
     // Practice sessions table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS practice_sessions (
@@ -150,6 +168,20 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             suggested_answer TEXT,
             suggested_accepted TEXT,
             status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+
+    // Question threads table for grammar/style Q&A
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS question_threads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            target_language TEXT NOT NULL DEFAULT 'de',
+            native_language TEXT NOT NULL DEFAULT 'pl',
+            messages_json TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )",

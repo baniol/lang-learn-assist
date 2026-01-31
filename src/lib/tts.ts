@@ -15,3 +15,7 @@ export async function generateTts(
 export async function testTtsConnection(): Promise<string> {
   return invoke<string>("test_tts_connection");
 }
+
+export async function getAudioBase64(path: string): Promise<string> {
+  return invoke<string>("get_audio_base64", { path });
+}

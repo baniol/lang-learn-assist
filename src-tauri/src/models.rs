@@ -55,6 +55,7 @@ pub struct Phrase {
     pub audio_path: Option<String>,
     pub notes: Option<String>,
     pub starred: bool,
+    pub excluded: bool,
     pub created_at: String,
 }
 
@@ -115,6 +116,8 @@ pub struct AppSettings {
     pub required_streak: i32,
     pub immediate_retry: bool,
     pub default_exercise_mode: String,
+    pub failure_repetitions: i32,
+    pub session_phrase_limit: i32,
 }
 
 impl AppSettings {
@@ -132,6 +135,8 @@ impl AppSettings {
             required_streak: 2,
             immediate_retry: true,
             default_exercise_mode: "speaking".to_string(),
+            failure_repetitions: 2,
+            session_phrase_limit: 20,
         }
     }
 }
@@ -145,6 +150,29 @@ pub struct LearningStats {
     pub new_count: i32,
     pub average_success_rate: f64,
     pub total_sessions: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SrsStats {
+    pub due_now: i32,
+    pub overdue: i32,
+    pub due_today: i32,
+    pub due_tomorrow: i32,
+    pub due_this_week: i32,
+    pub total_reviews: i32,
+    pub average_ease_factor: f64,
+    pub interval_distribution: IntervalDistribution,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IntervalDistribution {
+    pub one_day: i32,
+    pub two_to_three_days: i32,
+    pub four_to_seven_days: i32,
+    pub one_to_two_weeks: i32,
+    pub two_weeks_plus: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -223,4 +251,42 @@ pub struct RefinePhraseSuggestion {
     pub answer: Option<String>,
     pub accepted: Option<Vec<String>>,
     pub explanation: String,
+}
+
+// Question threads for grammar/style Q&A
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionThread {
+    pub id: i64,
+    pub title: String,
+    pub target_language: String,
+    pub native_language: String,
+    pub messages: Vec<QuestionMessage>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionMessage {
+    pub id: String,
+    pub role: String,
+    pub content: String,
+    pub examples: Option<Vec<QuestionExample>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionExample {
+    pub sentence: String,
+    pub translation: String,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrammarQuestionResponse {
+    pub explanation: String,
+    pub examples: Vec<QuestionExample>,
 }

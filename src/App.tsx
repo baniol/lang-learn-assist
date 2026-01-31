@@ -5,6 +5,8 @@ import { ConversationView } from "./views/ConversationView";
 import { ConversationReviewView } from "./views/ConversationReviewView";
 import { PhraseLibraryView } from "./views/PhraseLibraryView";
 import { LearnView } from "./views/LearnView";
+import { StatsView } from "./views/StatsView";
+import { QuestionsView } from "./views/QuestionsView";
 import { SettingsView } from "./views/SettingsView";
 import type { ViewType } from "./types";
 
@@ -42,6 +44,10 @@ function App() {
         return <PhraseLibraryView />;
       case "learn":
         return <LearnView />;
+      case "stats":
+        return <StatsView />;
+      case "questions":
+        return <QuestionsView />;
       case "settings":
         return <SettingsView />;
       default:

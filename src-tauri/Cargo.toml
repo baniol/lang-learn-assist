@@ -27,3 +27,4 @@ uuid = { version = "1", features = ["v4"] }
 whisper-rs = { version = "0.14", features = ["metal"] }
 hound = "3.5"
 futures-util = "0.3"
+base64 = "0.22"

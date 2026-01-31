@@ -17,6 +17,7 @@ interface UseVoiceRecordingOptions {
   language?: string;
   onTranscription: (text: string) => void;
   onError?: (error: string) => void;
+  disableSpaceKey?: boolean;
 }
 
 interface UseVoiceRecordingResult {
@@ -32,6 +33,7 @@ export function useVoiceRecording({
   language,
   onTranscription,
   onError,
+  disableSpaceKey = false,
 }: UseVoiceRecordingOptions): UseVoiceRecordingResult {
   const [status, setStatus] = useState<RecordingStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -133,21 +135,25 @@ export function useVoiceRecording({
     }
   }, [onTranscription, onError]);
 
-  // Handle Option+Space key events (Alt+Space on Windows/Linux)
+  // Handle Space key events for voice recording
   useEffect(() => {
-    if (!enabled || !isAvailable) return;
+    if (!enabled || !isAvailable || disableSpaceKey) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only trigger on Option+Space (Alt+Space)
-      if (e.code !== "Space" || !e.altKey) return;
+      if (e.code !== "Space") return;
       if (e.repeat) return; // Ignore key repeat
+
+      // Don't trigger if typing in an input/textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        return;
+      }
 
       e.preventDefault();
       startRecording();
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      // Stop on Space release (Alt may already be released)
       if (e.code !== "Space") return;
       if (!isRecordingRef.current) return;
 
@@ -162,7 +168,7 @@ export function useVoiceRecording({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [enabled, isAvailable, startRecording, stopRecording]);
+  }, [enabled, isAvailable, disableSpaceKey, startRecording, stopRecording]);
 
   return {
     status,

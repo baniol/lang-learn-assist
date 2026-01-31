@@ -3,7 +3,7 @@ mod db;
 mod models;
 mod state;
 
-use commands::{audio, conversations, learning, llm, phrases, settings, tts};
+use commands::{audio, conversations, learning, llm, phrases, questions, settings, tts};
 use db::{get_db_path, init_db};
 use rusqlite::Connection;
 use state::AppState;
@@ -44,6 +44,7 @@ pub fn run() {
             phrases::create_phrases_batch,
             phrases::update_phrase,
             phrases::toggle_starred,
+            phrases::toggle_excluded,
             phrases::update_phrase_audio,
             phrases::delete_phrase,
             // Phrase threads
@@ -56,6 +57,8 @@ pub fn run() {
             learning::get_next_phrase,
             learning::record_answer,
             learning::get_learning_stats,
+            learning::get_srs_stats,
+            learning::get_practice_sessions,
             learning::start_practice_session,
             learning::update_practice_session,
             learning::finish_practice_session,
@@ -79,7 +82,14 @@ pub fn run() {
             // TTS
             tts::get_available_voices,
             tts::generate_tts,
+            tts::get_audio_base64,
             tts::test_tts_connection,
+            // Questions
+            questions::get_question_threads,
+            questions::get_question_thread,
+            questions::create_question_thread,
+            questions::delete_question_thread,
+            questions::ask_grammar_question,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

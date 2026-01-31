@@ -38,6 +38,12 @@ fn load_settings_from_db(conn: &Connection) -> AppSettings {
                 settings.immediate_retry = value == "true";
             }
             "default_exercise_mode" => settings.default_exercise_mode = value,
+            "failure_repetitions" => {
+                settings.failure_repetitions = value.parse().unwrap_or(2);
+            }
+            "session_phrase_limit" => {
+                settings.session_phrase_limit = value.parse().unwrap_or(20);
+            }
             _ => {}
         }
     }
@@ -61,6 +67,14 @@ fn save_settings_to_db(conn: &Connection, settings: &AppSettings) -> Result<(), 
         (
             "default_exercise_mode",
             settings.default_exercise_mode.clone(),
+        ),
+        (
+            "failure_repetitions",
+            settings.failure_repetitions.to_string(),
+        ),
+        (
+            "session_phrase_limit",
+            settings.session_phrase_limit.to_string(),
         ),
     ];
 

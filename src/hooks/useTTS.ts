@@ -1,10 +1,10 @@
 import { useState, useCallback, useRef } from "react";
-import { generateTts } from "../lib/tts";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { generateTts, getAudioBase64 } from "../lib/tts";
 
 interface UseTTSOptions {
   enabled: boolean;
   onError?: (error: string) => void;
+  onAudioGenerated?: (phraseId: number, audioPath: string) => void;
 }
 
 interface UseTTSResult {
@@ -15,7 +15,7 @@ interface UseTTSResult {
   stop: () => void;
 }
 
-export function useTTS({ enabled, onError }: UseTTSOptions): UseTTSResult {
+export function useTTS({ enabled, onError, onAudioGenerated }: UseTTSOptions): UseTTSResult {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,12 +40,28 @@ export function useTTS({ enabled, onError }: UseTTSOptions): UseTTSResult {
 
       try {
         let audioPath = cachedPath;
+        let wasGenerated = false;
 
         if (!audioPath) {
           audioPath = await generateTts(text, phraseId);
+          wasGenerated = true;
         }
 
-        const audioUrl = convertFileSrc(audioPath);
+        // Get audio as base64 data URL
+        let audioUrl: string;
+        try {
+          audioUrl = await getAudioBase64(audioPath);
+        } catch {
+          // Cached file doesn't exist, regenerate
+          audioPath = await generateTts(text, phraseId);
+          audioUrl = await getAudioBase64(audioPath);
+          wasGenerated = true;
+        }
+
+        // Notify that audio was generated so it can be cached
+        if (wasGenerated && phraseId && onAudioGenerated) {
+          onAudioGenerated(phraseId, audioPath);
+        }
         const audio = new Audio(audioUrl);
 
         audioRef.current = audio;
@@ -74,7 +90,7 @@ export function useTTS({ enabled, onError }: UseTTSOptions): UseTTSResult {
         onError?.(errorMsg);
       }
     },
-    [enabled, stop, onError]
+    [enabled, stop, onError, onAudioGenerated]
   );
 
   return {

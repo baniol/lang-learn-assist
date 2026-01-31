@@ -289,7 +289,7 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
                 ) : voiceRecording.status === "transcribing" ? (
                   <span className="text-amber-500">Transcribing...</span>
                 ) : voiceRecording.isAvailable ? (
-                  "Hold Option+Space or click & hold to speak in Polish"
+                  "Hold Space or click & hold to speak in Polish"
                 ) : (
                   <span className="text-red-500">Whisper not available. Check settings.</span>
                 )}

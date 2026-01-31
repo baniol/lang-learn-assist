@@ -9,6 +9,7 @@ fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
     let accepted_json: String = row.get(4)?;
     let accepted: Vec<String> = serde_json::from_str(&accepted_json).unwrap_or_default();
     let starred_int: i32 = row.get(9)?;
+    let excluded_int: i32 = row.get(10).unwrap_or(0);
 
     Ok(Phrase {
         id: row.get(0)?,
@@ -21,7 +22,8 @@ fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
         audio_path: row.get(7)?,
         notes: row.get(8)?,
         starred: starred_int != 0,
-        created_at: row.get(10)?,
+        excluded: excluded_int != 0,
+        created_at: row.get(11)?,
     })
 }
 
@@ -30,11 +32,13 @@ fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
 /// - "new": phrases with no progress
 /// - "learning": phrases with progress but streak < 2
 /// - "learned": phrases with streak >= 2
+/// - "excluded": only excluded phrases
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn get_phrases(
     conversationId: Option<i64>,
     starredOnly: Option<bool>,
+    excludedOnly: Option<bool>,
     targetLanguage: Option<String>,
     status: Option<String>,
     searchQuery: Option<String>,
@@ -52,6 +56,14 @@ pub fn get_phrases(
 
     if starredOnly.unwrap_or(false) {
         conditions.push("p.starred = 1");
+    }
+
+    if let Some(excluded) = excludedOnly {
+        if excluded {
+            conditions.push("p.excluded = 1");
+        } else {
+            conditions.push("p.excluded = 0");
+        }
     }
 
     if let Some(ref lang) = targetLanguage {
@@ -93,7 +105,7 @@ pub fn get_phrases(
 
     let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at
          FROM phrases p
@@ -112,17 +124,17 @@ pub fn get_phrases(
         .query_map(params.as_slice(), |row| {
             let phrase = row_to_phrase(row)?;
 
-            let progress = if let Ok(progress_id) = row.get::<_, i64>(11) {
+            let progress = if let Ok(progress_id) = row.get::<_, i64>(12) {
                 Some(PhraseProgress {
                     id: progress_id,
                     phrase_id: phrase.id,
-                    correct_streak: row.get(12)?,
-                    total_attempts: row.get(13)?,
-                    success_count: row.get(14)?,
-                    last_seen: row.get(15)?,
-                    ease_factor: row.get(16).unwrap_or(2.5),
-                    interval_days: row.get(17).unwrap_or(1),
-                    next_review_at: row.get(18).ok(),
+                    correct_streak: row.get(13)?,
+                    total_attempts: row.get(14)?,
+                    success_count: row.get(15)?,
+                    last_seen: row.get(16)?,
+                    ease_factor: row.get(17).unwrap_or(2.5),
+                    interval_days: row.get(18).unwrap_or(1),
+                    next_review_at: row.get(19).ok(),
                 })
             } else {
                 None
@@ -143,7 +155,7 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
 
     conn.query_row(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at
          FROM phrases p
@@ -153,17 +165,17 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
         |row| {
             let phrase = row_to_phrase(row)?;
 
-            let progress = if let Ok(progress_id) = row.get::<_, i64>(11) {
+            let progress = if let Ok(progress_id) = row.get::<_, i64>(12) {
                 Some(PhraseProgress {
                     id: progress_id,
                     phrase_id: phrase.id,
-                    correct_streak: row.get(12)?,
-                    total_attempts: row.get(13)?,
-                    success_count: row.get(14)?,
-                    last_seen: row.get(15)?,
-                    ease_factor: row.get(16).unwrap_or(2.5),
-                    interval_days: row.get(17).unwrap_or(1),
-                    next_review_at: row.get(18).ok(),
+                    correct_streak: row.get(13)?,
+                    total_attempts: row.get(14)?,
+                    success_count: row.get(15)?,
+                    last_seen: row.get(16)?,
+                    ease_factor: row.get(17).unwrap_or(2.5),
+                    interval_days: row.get(18).unwrap_or(1),
+                    next_review_at: row.get(19).ok(),
                 })
             } else {
                 None
@@ -207,7 +219,7 @@ pub fn create_phrase(request: CreatePhraseRequest) -> Result<Phrase, String> {
     let id = conn.last_insert_rowid();
 
     conn.query_row(
-        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, created_at
+        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,
@@ -262,7 +274,7 @@ pub fn create_phrases_batch(phrases: Vec<CreatePhraseRequest>) -> Result<Vec<Phr
     for id in &created_ids {
         let phrase = tx
             .query_row(
-                "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, created_at
+                "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at
                  FROM phrases WHERE id = ?1",
                 params![id],
                 row_to_phrase,
@@ -324,12 +336,31 @@ pub fn update_phrase(id: i64, request: UpdatePhraseRequest) -> Result<Phrase, St
     }
 
     conn.query_row(
-        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, created_at
+        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,
     )
     .map_err(|e| format!("Phrase not found: {}", e))
+}
+
+#[tauri::command]
+pub fn toggle_excluded(id: i64) -> Result<bool, String> {
+    let conn = get_conn()?;
+
+    conn.execute(
+        "UPDATE phrases SET excluded = NOT excluded WHERE id = ?1",
+        params![id],
+    )
+    .map_err(|e| format!("Failed to toggle excluded: {}", e))?;
+
+    let excluded: i32 = conn
+        .query_row("SELECT excluded FROM phrases WHERE id = ?1", params![id], |row| {
+            row.get(0)
+        })
+        .map_err(|e| format!("Failed to get excluded status: {}", e))?;
+
+    Ok(excluded != 0)
 }
 
 #[tauri::command]

@@ -4,6 +4,8 @@ export type ViewType =
   | "conversation-review"
   | "phrase-library"
   | "learn"
+  | "stats"
+  | "questions"
   | "settings";
 
 export type ConversationStatus = "draft" | "finalized" | "archived";
@@ -39,6 +41,7 @@ export interface Phrase {
   audioPath: string | null;
   notes: string | null;
   starred: boolean;
+  excluded: boolean;
   createdAt: string;
 }
 
@@ -87,6 +90,8 @@ export interface AppSettings {
   requiredStreak: number;
   immediateRetry: boolean;
   defaultExerciseMode: ExerciseMode;
+  failureRepetitions: number;
+  sessionPhraseLimit: number;
 }
 
 export interface WhisperModel {
@@ -111,6 +116,25 @@ export interface LearningStats {
   newCount: number;
   averageSuccessRate: number;
   totalSessions: number;
+}
+
+export interface SrsStats {
+  dueNow: number;
+  overdue: number;
+  dueToday: number;
+  dueTomorrow: number;
+  dueThisWeek: number;
+  totalReviews: number;
+  averageEaseFactor: number;
+  intervalDistribution: IntervalDistribution;
+}
+
+export interface IntervalDistribution {
+  oneDay: number;
+  twoToThreeDays: number;
+  fourToSevenDays: number;
+  oneToTwoWeeks: number;
+  twoWeeksPlus: number;
 }
 
 export interface ConversationCleanupResult {
@@ -212,3 +236,33 @@ export const NATIVE_LANGUAGE_OPTIONS = [
   { code: "en", name: "English" },
   { code: "de", name: "German" },
 ];
+
+// Question threads for grammar/style Q&A
+
+export interface QuestionThread {
+  id: number;
+  title: string;
+  targetLanguage: string;
+  nativeLanguage: string;
+  messages: QuestionMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuestionMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  examples?: QuestionExample[];
+}
+
+export interface QuestionExample {
+  sentence: string;
+  translation: string;
+  notes?: string;
+}
+
+export interface GrammarQuestionResponse {
+  explanation: string;
+  examples: QuestionExample[];
+}
