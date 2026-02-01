@@ -1,23 +1,27 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Conversation, ViewType } from "../types";
+import type { Conversation, ViewType, AppSettings } from "../types";
+import { LANGUAGE_OPTIONS } from "../types";
 
 interface DashboardViewProps {
   onNavigate: (view: ViewType, data?: unknown) => void;
+  settings: AppSettings | null;
 }
 
-export function DashboardView({ onNavigate }: DashboardViewProps) {
+export function DashboardView({ onNavigate, settings }: DashboardViewProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   useEffect(() => {
     loadConversations();
-  }, []);
+  }, [settings?.targetLanguage]);
 
   const loadConversations = async () => {
     try {
-      const data = await invoke<Conversation[]>("get_conversations");
+      const data = await invoke<Conversation[]>("get_conversations", {
+        targetLanguage: settings?.targetLanguage || null,
+      });
       setConversations(data);
     } catch (err) {
       console.error("Failed to load conversations:", err);
@@ -88,7 +92,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             Conversations
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Practice German through realistic conversations
+            Practice {LANGUAGE_OPTIONS.find(l => l.code === settings?.targetLanguage)?.name || "your target language"} through realistic conversations
           </p>
         </div>
         <button
@@ -116,7 +120,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             No conversations yet
           </h3>
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            Start a new conversation to practice your German
+            Start a new conversation to practice your {LANGUAGE_OPTIONS.find(l => l.code === settings?.targetLanguage)?.name || "target language"}
           </p>
           <button
             onClick={handleCreateConversation}

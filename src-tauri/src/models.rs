@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Convert language code to human-readable name
 pub fn get_language_name(code: &str) -> &str {
@@ -92,6 +93,15 @@ pub struct PracticeSession {
     pub exercise_mode: String,
 }
 
+/// Voice settings for a specific language (default voice + conversation voices A/B)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LanguageVoiceSettings {
+    pub default: String,
+    pub voice_a: String,
+    pub voice_b: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -106,9 +116,12 @@ pub struct AppSettings {
     // TTS settings
     pub tts_provider: String,
     pub tts_api_key: String,
+    // Legacy voice settings (kept for migration, may be empty)
     pub tts_voice_id: String,
     pub tts_voice_id_a: String,
     pub tts_voice_id_b: String,
+    // Per-language voice settings
+    pub tts_voices_per_language: HashMap<String, LanguageVoiceSettings>,
 
     // Language settings
     pub target_language: String,
@@ -135,6 +148,7 @@ impl AppSettings {
             tts_voice_id: String::new(),
             tts_voice_id_a: String::new(),
             tts_voice_id_b: String::new(),
+            tts_voices_per_language: HashMap::new(),
             target_language: "de".to_string(),
             native_language: "pl".to_string(),
             required_streak: 2,

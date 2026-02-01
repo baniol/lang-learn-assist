@@ -84,6 +84,7 @@ pub fn run() {
             tts::generate_tts,
             tts::get_audio_base64,
             tts::test_tts_connection,
+            tts::get_voice_for_language,
             // Questions
             questions::get_question_threads,
             questions::get_question_thread,

@@ -1,9 +1,23 @@
-import type { ViewType } from "../types";
+import { useState, useRef, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import type { ViewType, AppSettings } from "../types";
+import { LANGUAGE_OPTIONS } from "../types";
+
+// Flag emoji for each language
+const LANGUAGE_FLAGS: Record<string, string> = {
+  de: "🇩🇪",
+  en: "🇬🇧",
+  fr: "🇫🇷",
+  es: "🇪🇸",
+  it: "🇮🇹",
+};
 
 interface LayoutProps {
   currentView: ViewType;
   onNavigate: (view: ViewType) => void;
   children: React.ReactNode;
+  settings: AppSettings | null;
+  onSettingsChange: (settings: AppSettings) => void;
 }
 
 interface NavItem {
@@ -70,19 +84,95 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function Layout({ currentView, onNavigate, children }: LayoutProps) {
+export function Layout({ currentView, onNavigate, children, settings, onSettingsChange }: LayoutProps) {
+  const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setLanguageDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLanguageChange = async (languageCode: string) => {
+    if (!settings) return;
+
+    const newSettings = { ...settings, targetLanguage: languageCode };
+    try {
+      await invoke("save_settings", { settings: newSettings });
+      onSettingsChange(newSettings);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    }
+    setLanguageDropdownOpen(false);
+  };
+
+  const currentLang = settings?.targetLanguage || "de";
+  const currentLangOption = LANGUAGE_OPTIONS.find(l => l.code === currentLang);
+  const currentFlag = LANGUAGE_FLAGS[currentLang] || "🌐";
+
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900">
       {/* Sidebar */}
       <aside className="w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col">
-        {/* Logo */}
+        {/* Logo and Language Switcher */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
           <h1 className="text-xl font-bold text-slate-800 dark:text-white">
             Lang Learn
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            German Practice
-          </p>
+          {/* Language Switcher */}
+          <div className="relative mt-2" ref={dropdownRef}>
+            <button
+              onClick={() => setLanguageDropdownOpen(!languageDropdownOpen)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{currentFlag}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {currentLangOption?.name || "German"}
+                </span>
+              </div>
+              <svg
+                className={`w-4 h-4 text-slate-500 dark:text-slate-400 transition-transform ${languageDropdownOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* Dropdown */}
+            {languageDropdownOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-lg z-50 overflow-hidden">
+                {LANGUAGE_OPTIONS.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => handleLanguageChange(lang.code)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${
+                      lang.code === currentLang
+                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                        : 'text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <span className="text-lg">{LANGUAGE_FLAGS[lang.code] || "🌐"}</span>
+                    <span className="text-sm font-medium">{lang.name}</span>
+                    {lang.code === currentLang && (
+                      <svg className="w-4 h-4 ml-auto" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Navigation */}

@@ -3,8 +3,17 @@ import { invoke } from "@tauri-apps/api/core";
 import { testLlmConnection } from "../lib/llm";
 import { testTtsConnection, getAvailableVoices } from "../lib/tts";
 import { getAvailableModels, getModelStatus, downloadModel, deleteModel } from "../lib/audio";
-import type { AppSettings, WhisperModel, TtsVoice, LlmProvider, TtsProvider, ExerciseMode } from "../types";
+import type { AppSettings, WhisperModel, TtsVoice, LlmProvider, TtsProvider, ExerciseMode, LanguageVoiceSettings } from "../types";
 import { LANGUAGE_OPTIONS, NATIVE_LANGUAGE_OPTIONS } from "../types";
+
+// All supported target languages for voice configuration
+const VOICE_LANGUAGES = [
+  { code: "de", name: "German" },
+  { code: "en", name: "English" },
+  { code: "fr", name: "French" },
+  { code: "es", name: "Spanish" },
+  { code: "it", name: "Italian" },
+];
 
 const LLM_MODELS = {
   anthropic: [
@@ -22,7 +31,11 @@ const LLM_MODELS = {
   none: [],
 };
 
-export function SettingsView() {
+interface SettingsViewProps {
+  onSettingsChange?: (settings: AppSettings) => void;
+}
+
+export function SettingsView({ onSettingsChange }: SettingsViewProps) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -34,6 +47,7 @@ export function SettingsView() {
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [voicesError, setVoicesError] = useState<string | null>(null);
+  const [selectedVoiceLanguage, setSelectedVoiceLanguage] = useState<string>("de");
 
   useEffect(() => {
     loadSettings();
@@ -105,6 +119,8 @@ export function SettingsView() {
     setIsSaving(true);
     try {
       await invoke("save_settings", { settings });
+      // Notify parent of settings change
+      onSettingsChange?.(settings);
     } catch (err) {
       console.error("Failed to save settings:", err);
     } finally {
@@ -449,9 +465,9 @@ export function SettingsView() {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-3">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Default Voice (Practice)
+                      Per-Language Voice Settings
                     </label>
                     <button
                       onClick={loadTtsVoices}
@@ -462,7 +478,7 @@ export function SettingsView() {
                     </button>
                   </div>
                   {voicesError && (
-                    <p className="text-sm text-red-500 mb-1">{voicesError}</p>
+                    <p className="text-sm text-red-500 mb-2">{voicesError}</p>
                   )}
                   {voicesLoading ? (
                     <div className="flex items-center gap-2 py-2 text-slate-500">
@@ -470,71 +486,126 @@ export function SettingsView() {
                       <span className="text-sm">Loading voices...</span>
                     </div>
                   ) : ttsVoices.length > 0 ? (
-                    <select
-                      value={settings.ttsVoiceId}
-                      onChange={(e) => updateSetting("ttsVoiceId", e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                    >
-                      <option value="">Select a voice...</option>
-                      {ttsVoices.map((voice) => (
-                        <option key={voice.voiceId} value={voice.voiceId}>
-                          {voice.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="space-y-4">
+                      {/* Language tabs */}
+                      <div className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-700 pb-2">
+                        {VOICE_LANGUAGES.map((lang) => (
+                          <button
+                            key={lang.code}
+                            onClick={() => setSelectedVoiceLanguage(lang.code)}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-t-lg transition-colors ${
+                              selectedVoiceLanguage === lang.code
+                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-b-2 border-blue-500"
+                                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                            }`}
+                          >
+                            {lang.name}
+                            {settings.ttsVoicesPerLanguage[lang.code]?.default && (
+                              <span className="ml-1 w-2 h-2 inline-block bg-green-500 rounded-full" title="Configured" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Voice settings for selected language */}
+                      <div className="space-y-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4">
+                        <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          {VOICE_LANGUAGES.find(l => l.code === selectedVoiceLanguage)?.name} Voices
+                        </h4>
+
+                        {/* Default Voice */}
+                        <div>
+                          <label className="block text-sm text-slate-600 dark:text-slate-400 mb-1">
+                            Default Voice (Practice)
+                          </label>
+                          <select
+                            value={settings.ttsVoicesPerLanguage[selectedVoiceLanguage]?.default || ""}
+                            onChange={(e) => {
+                              const current = settings.ttsVoicesPerLanguage[selectedVoiceLanguage] || { default: "", voiceA: "", voiceB: "" };
+                              const updated: LanguageVoiceSettings = { ...current, default: e.target.value };
+                              updateSetting("ttsVoicesPerLanguage", {
+                                ...settings.ttsVoicesPerLanguage,
+                                [selectedVoiceLanguage]: updated,
+                              });
+                            }}
+                            className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
+                          >
+                            <option value="">Select a voice...</option>
+                            {ttsVoices.map((voice) => (
+                              <option key={voice.voiceId} value={voice.voiceId}>
+                                {voice.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Conversation Voices */}
+                        <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
+                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                            Conversation Voices (alternating)
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
+                                Voice A
+                              </label>
+                              <select
+                                value={settings.ttsVoicesPerLanguage[selectedVoiceLanguage]?.voiceA || ""}
+                                onChange={(e) => {
+                                  const current = settings.ttsVoicesPerLanguage[selectedVoiceLanguage] || { default: "", voiceA: "", voiceB: "" };
+                                  const updated: LanguageVoiceSettings = { ...current, voiceA: e.target.value };
+                                  updateSetting("ttsVoicesPerLanguage", {
+                                    ...settings.ttsVoicesPerLanguage,
+                                    [selectedVoiceLanguage]: updated,
+                                  });
+                                }}
+                                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm"
+                              >
+                                <option value="">Use default</option>
+                                {ttsVoices.map((voice) => (
+                                  <option key={voice.voiceId} value={voice.voiceId}>
+                                    {voice.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
+                                Voice B
+                              </label>
+                              <select
+                                value={settings.ttsVoicesPerLanguage[selectedVoiceLanguage]?.voiceB || ""}
+                                onChange={(e) => {
+                                  const current = settings.ttsVoicesPerLanguage[selectedVoiceLanguage] || { default: "", voiceA: "", voiceB: "" };
+                                  const updated: LanguageVoiceSettings = { ...current, voiceB: e.target.value };
+                                  updateSetting("ttsVoicesPerLanguage", {
+                                    ...settings.ttsVoicesPerLanguage,
+                                    [selectedVoiceLanguage]: updated,
+                                  });
+                                }}
+                                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm"
+                              >
+                                <option value="">Use default</option>
+                                {ttsVoices.map((voice) => (
+                                  <option key={voice.voiceId} value={voice.voiceId}>
+                                    {voice.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                            Alternate between Voice A and Voice B when playing conversation messages
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   ) : (
                     <p className="text-sm text-slate-500 dark:text-slate-400 py-2">
                       Save settings first, then click "Refresh voices"
                     </p>
                   )}
                 </div>
-
-                {ttsVoices.length > 0 && (
-                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                      Conversation Voices (alternating)
-                    </p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm text-slate-600 dark:text-slate-400 mb-1">
-                          Voice A
-                        </label>
-                        <select
-                          value={settings.ttsVoiceIdA}
-                          onChange={(e) => updateSetting("ttsVoiceIdA", e.target.value)}
-                          className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                        >
-                          <option value="">Use default</option>
-                          {ttsVoices.map((voice) => (
-                            <option key={voice.voiceId} value={voice.voiceId}>
-                              {voice.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-slate-600 dark:text-slate-400 mb-1">
-                          Voice B
-                        </label>
-                        <select
-                          value={settings.ttsVoiceIdB}
-                          onChange={(e) => updateSetting("ttsVoiceIdB", e.target.value)}
-                          className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                        >
-                          <option value="">Use default</option>
-                          {ttsVoices.map((voice) => (
-                            <option key={voice.voiceId} value={voice.voiceId}>
-                              {voice.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                      Alternate between Voice A and Voice B when playing conversation messages
-                    </p>
-                  </div>
-                )}
 
                 <div className="flex items-center gap-4">
                   <button
@@ -554,11 +625,25 @@ export function SettingsView() {
           </div>
         </section>
 
-        {/* Language Settings */}
-        <section className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
-            Language
-          </h2>
+        {/* Active Language Settings */}
+        <section className="bg-white dark:bg-slate-800 rounded-lg border-2 border-blue-200 dark:border-blue-800 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="text-2xl">
+              {settings.targetLanguage === "de" && "🇩🇪"}
+              {settings.targetLanguage === "en" && "🇬🇧"}
+              {settings.targetLanguage === "fr" && "🇫🇷"}
+              {settings.targetLanguage === "es" && "🇪🇸"}
+              {settings.targetLanguage === "it" && "🇮🇹"}
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
+                Active Language
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Your current focus language for learning
+              </p>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -566,7 +651,11 @@ export function SettingsView() {
               </label>
               <select
                 value={settings.targetLanguage}
-                onChange={(e) => updateSetting("targetLanguage", e.target.value)}
+                onChange={(e) => {
+                  updateSetting("targetLanguage", e.target.value);
+                  // Auto-select TTS voice tab for new language
+                  setSelectedVoiceLanguage(e.target.value);
+                }}
                 className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               >
                 {LANGUAGE_OPTIONS.map((lang) => (
@@ -593,6 +682,9 @@ export function SettingsView() {
               </select>
             </div>
           </div>
+          <p className="mt-3 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg">
+            New conversations and practice sessions will use these languages. You can also quickly switch languages using the dropdown in the sidebar.
+          </p>
         </section>
 
         {/* Learning Settings */}

@@ -2,18 +2,25 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTTS } from "../hooks/useTTS";
 import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
-import type { PhraseWithProgress, CreatePhraseRequest, LearningStats, Phrase, UpdatePhraseRequest } from "../types";
+import type { PhraseWithProgress, CreatePhraseRequest, LearningStats, Phrase, UpdatePhraseRequest, AppSettings } from "../types";
+import { LANGUAGE_OPTIONS } from "../types";
 
 type FilterStatus = "all" | "new" | "learning" | "learned";
 type ExcludedFilter = "active" | "excluded" | "all";
+type LanguageFilter = "all" | string;
 
-export function PhraseLibraryView() {
+interface PhraseLibraryViewProps {
+  settings: AppSettings | null;
+}
+
+export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
   const [phrases, setPhrases] = useState<PhraseWithProgress[]>([]);
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>("active");
+  const [languageFilter, setLanguageFilter] = useState<LanguageFilter>("current");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -75,7 +82,7 @@ export function PhraseLibraryView() {
   // Load phrases when filters change
   useEffect(() => {
     loadPhrases();
-  }, [showStarredOnly, excludedFilter, filterStatus, debouncedSearch]);
+  }, [showStarredOnly, excludedFilter, filterStatus, debouncedSearch, languageFilter, settings?.targetLanguage]);
 
   const loadStats = async () => {
     try {
@@ -89,9 +96,18 @@ export function PhraseLibraryView() {
   const loadPhrases = async () => {
     setIsLoading(true);
     try {
+      // Determine the target language filter value
+      let targetLang: string | null = null;
+      if (languageFilter === "current" && settings?.targetLanguage) {
+        targetLang = settings.targetLanguage;
+      } else if (languageFilter !== "all" && languageFilter !== "current") {
+        targetLang = languageFilter;
+      }
+
       const data = await invoke<PhraseWithProgress[]>("get_phrases", {
         starredOnly: showStarredOnly || null,
         excludedOnly: excludedFilter === "all" ? null : excludedFilter === "excluded",
+        targetLanguage: targetLang,
         status: filterStatus !== "all" ? filterStatus : null,
         searchQuery: debouncedSearch || null,
       });
@@ -149,7 +165,8 @@ export function PhraseLibraryView() {
         await tts.speak(
           phrase.phrase.answer,
           phrase.phrase.id,
-          phrase.phrase.audioPath || undefined
+          phrase.phrase.audioPath || undefined,
+          phrase.phrase.targetLanguage
         );
         console.log("[TTS] speak completed");
       } catch (err) {
@@ -298,6 +315,25 @@ export function PhraseLibraryView() {
               {filter === "active" ? "Active" : filter === "excluded" ? "Excluded" : "All"}
             </button>
           ))}
+        </div>
+
+        {/* Language filter */}
+        <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-4">
+          <select
+            value={languageFilter}
+            onChange={(e) => setLanguageFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+          >
+            <option value="current">
+              {LANGUAGE_OPTIONS.find(l => l.code === settings?.targetLanguage)?.name || "Current"} only
+            </option>
+            <option value="all">All languages</option>
+            {LANGUAGE_OPTIONS.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex-1 max-w-md">

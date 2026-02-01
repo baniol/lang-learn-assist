@@ -220,10 +220,14 @@ pub fn init_whisper(app: tauri::AppHandle, state: State<'_, AppState>) -> Result
 }
 
 /// Transcribe audio file and return text
+///
+/// The `prompt` parameter provides hints to Whisper about expected words/phrases,
+/// which significantly improves accuracy for specific vocabulary (e.g., French phrases).
 #[tauri::command]
 pub fn transcribe_audio(
     audio_path: String,
     language: Option<String>,
+    prompt: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let path = PathBuf::from(&audio_path);
@@ -334,6 +338,11 @@ pub fn transcribe_audio(
     params.set_print_progress(false);
     params.set_print_realtime(false);
     params.set_print_timestamps(false);
+
+    // Set initial prompt to guide transcription toward expected words/phrases
+    if let Some(ref hint) = prompt {
+        params.set_initial_prompt(hint);
+    }
 
     whisper_state
         .full(params, &samples)

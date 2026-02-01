@@ -1,8 +1,13 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { LearningStats, SrsStats, PracticeSession } from "../types";
+import type { LearningStats, SrsStats, PracticeSession, AppSettings } from "../types";
+import { LANGUAGE_OPTIONS } from "../types";
 
-export function StatsView() {
+interface StatsViewProps {
+  settings: AppSettings | null;
+}
+
+export function StatsView({ settings }: StatsViewProps) {
   const [learningStats, setLearningStats] = useState<LearningStats | null>(null);
   const [srsStats, setSrsStats] = useState<SrsStats | null>(null);
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
@@ -10,14 +15,15 @@ export function StatsView() {
 
   useEffect(() => {
     loadAllStats();
-  }, []);
+  }, [settings?.targetLanguage]);
 
   const loadAllStats = async () => {
     setIsLoading(true);
     try {
+      const targetLang = settings?.targetLanguage || null;
       const [learning, srs, sessionList] = await Promise.all([
-        invoke<LearningStats>("get_learning_stats", {}),
-        invoke<SrsStats>("get_srs_stats"),
+        invoke<LearningStats>("get_learning_stats", { targetLanguage: targetLang }),
+        invoke<SrsStats>("get_srs_stats", { targetLanguage: targetLang }),
         invoke<PracticeSession[]>("get_practice_sessions", { limit: 20 }),
       ]);
       setLearningStats(learning);
@@ -29,6 +35,8 @@ export function StatsView() {
       setIsLoading(false);
     }
   };
+
+  const currentLangName = LANGUAGE_OPTIONS.find(l => l.code === settings?.targetLanguage)?.name || "All Languages";
 
   if (isLoading) {
     return (
@@ -67,7 +75,12 @@ export function StatsView() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">Statistics</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Statistics</h1>
+        <span className="text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+          {currentLangName}
+        </span>
+      </div>
 
       {/* Overview Cards */}
       {learningStats && (

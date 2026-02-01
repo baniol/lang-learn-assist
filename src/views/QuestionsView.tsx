@@ -15,7 +15,11 @@ import type {
   AppSettings,
 } from "../types";
 
-export function QuestionsView() {
+interface QuestionsViewProps {
+  settings: AppSettings | null;
+}
+
+export function QuestionsView({ settings: parentSettings }: QuestionsViewProps) {
   const [threads, setThreads] = useState<QuestionThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<QuestionThread | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,9 +31,16 @@ export function QuestionsView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (parentSettings) {
+      setSettings(parentSettings);
+    } else {
+      loadSettings();
+    }
+  }, [parentSettings]);
+
+  useEffect(() => {
     loadThreads();
-    loadSettings();
-  }, []);
+  }, [settings?.targetLanguage]);
 
   useEffect(() => {
     scrollToBottom();
@@ -51,7 +62,7 @@ export function QuestionsView() {
   const loadThreads = async () => {
     setIsLoading(true);
     try {
-      const data = await getQuestionThreads();
+      const data = await getQuestionThreads(settings?.targetLanguage);
       setThreads(data);
     } catch (err) {
       console.error("Failed to load threads:", err);

@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { QuestionThread, GrammarQuestionResponse } from "../types";
 
-export async function getQuestionThreads(): Promise<QuestionThread[]> {
-  return invoke<QuestionThread[]>("get_question_threads");
+export async function getQuestionThreads(targetLanguage?: string): Promise<QuestionThread[]> {
+  return invoke<QuestionThread[]>("get_question_threads", {
+    targetLanguage: targetLanguage || null,
+  });
 }
 
 export async function getQuestionThread(id: number): Promise<QuestionThread> {

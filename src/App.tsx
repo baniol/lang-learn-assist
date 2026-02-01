@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { Layout } from "./components/Layout";
 import { DashboardView } from "./views/DashboardView";
 import { ConversationView } from "./views/ConversationView";
@@ -8,7 +9,7 @@ import { LearnView } from "./views/LearnView";
 import { StatsView } from "./views/StatsView";
 import { QuestionsView } from "./views/QuestionsView";
 import { SettingsView } from "./views/SettingsView";
-import type { ViewType } from "./types";
+import type { ViewType, AppSettings } from "./types";
 
 interface ViewState {
   type: ViewType;
@@ -17,6 +18,20 @@ interface ViewState {
 
 function App() {
   const [viewState, setViewState] = useState<ViewState>({ type: "dashboard" });
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+
+  // Load settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const data = await invoke<AppSettings>("get_settings");
+        setSettings(data);
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const handleNavigate = useCallback((view: ViewType, data?: unknown) => {
     setViewState({ type: view, data: data as Record<string, unknown> | undefined });
@@ -25,7 +40,7 @@ function App() {
   const renderView = () => {
     switch (viewState.type) {
       case "dashboard":
-        return <DashboardView onNavigate={handleNavigate} />;
+        return <DashboardView onNavigate={handleNavigate} settings={settings} />;
       case "conversation":
         return (
           <ConversationView
@@ -41,22 +56,27 @@ function App() {
           />
         );
       case "phrase-library":
-        return <PhraseLibraryView />;
+        return <PhraseLibraryView settings={settings} />;
       case "learn":
-        return <LearnView />;
+        return <LearnView settings={settings} />;
       case "stats":
-        return <StatsView />;
+        return <StatsView settings={settings} />;
       case "questions":
-        return <QuestionsView />;
+        return <QuestionsView settings={settings} />;
       case "settings":
-        return <SettingsView />;
+        return <SettingsView onSettingsChange={setSettings} />;
       default:
-        return <DashboardView onNavigate={handleNavigate} />;
+        return <DashboardView onNavigate={handleNavigate} settings={settings} />;
     }
   };
 
   return (
-    <Layout currentView={viewState.type} onNavigate={handleNavigate}>
+    <Layout
+      currentView={viewState.type}
+      onNavigate={handleNavigate}
+      settings={settings}
+      onSettingsChange={setSettings}
+    >
       {renderView()}
     </Layout>
   );

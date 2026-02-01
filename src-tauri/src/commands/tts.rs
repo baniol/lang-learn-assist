@@ -96,12 +96,42 @@ async fn get_elevenlabs_voices(api_key: &str) -> Result<Vec<TtsVoice>, String> {
         .collect())
 }
 
+/// Resolves the voice ID to use based on priority:
+/// 1. Explicit voice_id parameter
+/// 2. Per-language default voice (if language provided)
+/// 3. Legacy global voice (tts_voice_id)
+fn resolve_voice_id(
+    explicit_voice_id: Option<&String>,
+    language: Option<&String>,
+    settings: &crate::models::AppSettings,
+) -> String {
+    // Priority 1: Explicit voice_id
+    if let Some(voice_id) = explicit_voice_id {
+        if !voice_id.is_empty() {
+            return voice_id.clone();
+        }
+    }
+
+    // Priority 2: Per-language default voice
+    if let Some(lang) = language {
+        if let Some(lang_settings) = settings.tts_voices_per_language.get(lang) {
+            if !lang_settings.default.is_empty() {
+                return lang_settings.default.clone();
+            }
+        }
+    }
+
+    // Priority 3: Legacy global voice
+    settings.tts_voice_id.clone()
+}
+
 #[tauri::command]
 pub async fn generate_tts(
     state: State<'_, AppState>,
     text: String,
     phrase_id: Option<i64>,
     voice_id: Option<String>,
+    language: Option<String>,
 ) -> Result<String, String> {
     let settings = {
         let guard = state
@@ -111,10 +141,8 @@ pub async fn generate_tts(
         guard.clone()
     };
 
-    // Use provided voice_id or fall back to default
-    let effective_voice_id = voice_id
-        .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| settings.tts_voice_id.clone());
+    // Resolve voice ID with priority: explicit > per-language > legacy global
+    let effective_voice_id = resolve_voice_id(voice_id.as_ref(), language.as_ref(), &settings);
 
     match settings.tts_provider.as_str() {
         "elevenlabs" => {
@@ -124,6 +152,43 @@ pub async fn generate_tts(
         "none" | "" => Err("TTS not configured".to_string()),
         _ => Err(format!("Unknown TTS provider: {}", settings.tts_provider)),
     }
+}
+
+/// Get voice ID for a specific language and voice type (default, voiceA, or voiceB)
+/// Used by conversation playback to get per-language voices A/B
+#[tauri::command]
+pub fn get_voice_for_language(
+    state: State<'_, AppState>,
+    language: String,
+    voice_type: String,
+) -> Result<String, String> {
+    let settings = state
+        .settings
+        .lock()
+        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+
+    // Get per-language settings if available
+    if let Some(lang_settings) = settings.tts_voices_per_language.get(&language) {
+        let voice = match voice_type.as_str() {
+            "default" => &lang_settings.default,
+            "voiceA" => &lang_settings.voice_a,
+            "voiceB" => &lang_settings.voice_b,
+            _ => &lang_settings.default,
+        };
+        if !voice.is_empty() {
+            return Ok(voice.clone());
+        }
+    }
+
+    // Fall back to legacy global voices
+    let fallback = match voice_type.as_str() {
+        "default" => &settings.tts_voice_id,
+        "voiceA" => &settings.tts_voice_id_a,
+        "voiceB" => &settings.tts_voice_id_b,
+        _ => &settings.tts_voice_id,
+    };
+
+    Ok(fallback.clone())
 }
 
 async fn generate_elevenlabs_tts(

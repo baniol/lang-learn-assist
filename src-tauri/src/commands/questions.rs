@@ -24,19 +24,33 @@ fn row_to_question_thread(row: &rusqlite::Row) -> Result<QuestionThread, rusqlit
 }
 
 #[tauri::command]
-pub fn get_question_threads() -> Result<Vec<QuestionThread>, String> {
+pub fn get_question_threads(target_language: Option<String>) -> Result<Vec<QuestionThread>, String> {
     let conn = get_conn()?;
 
-    let mut stmt = conn
-        .prepare(
+    let (query, params): (String, Vec<Box<dyn rusqlite::ToSql>>) = match target_language {
+        Some(ref lang) => (
             "SELECT id, title, target_language, native_language, messages_json, created_at, updated_at
              FROM question_threads
-             ORDER BY updated_at DESC",
-        )
+             WHERE target_language = ?1
+             ORDER BY updated_at DESC".to_string(),
+            vec![Box::new(lang.clone()) as Box<dyn rusqlite::ToSql>],
+        ),
+        None => (
+            "SELECT id, title, target_language, native_language, messages_json, created_at, updated_at
+             FROM question_threads
+             ORDER BY updated_at DESC".to_string(),
+            vec![],
+        ),
+    };
+
+    let mut stmt = conn
+        .prepare(&query)
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
+    let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
     let threads = stmt
-        .query_map([], row_to_question_thread)
+        .query_map(param_refs.as_slice(), row_to_question_thread)
         .map_err(|e| format!("Failed to query threads: {}", e))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect threads: {}", e))?;

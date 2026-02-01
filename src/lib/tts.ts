@@ -8,9 +8,10 @@ export async function getAvailableVoices(): Promise<TtsVoice[]> {
 export async function generateTts(
   text: string,
   phraseId?: number,
-  voiceId?: string
+  voiceId?: string,
+  language?: string
 ): Promise<string> {
-  return invoke<string>("generate_tts", { text, phraseId, voiceId });
+  return invoke<string>("generate_tts", { text, phraseId, voiceId, language });
 }
 
 export async function testTtsConnection(): Promise<string> {
@@ -19,4 +20,17 @@ export async function testTtsConnection(): Promise<string> {
 
 export async function getAudioBase64(path: string): Promise<string> {
   return invoke<string>("get_audio_base64", { path });
+}
+
+/**
+ * Get voice ID for a specific language and voice type
+ * @param language The target language code (e.g., "de", "en")
+ * @param voiceType The voice type: "default", "voiceA", or "voiceB"
+ * @returns The voice ID (may be empty string if not configured)
+ */
+export async function getVoiceForLanguage(
+  language: string,
+  voiceType: "default" | "voiceA" | "voiceB"
+): Promise<string> {
+  return invoke<string>("get_voice_for_language", { language, voiceType });
 }

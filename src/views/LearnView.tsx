@@ -6,7 +6,11 @@ import { useVoiceRecording } from "../hooks/useVoiceRecording";
 import { useTTS } from "../hooks/useTTS";
 import type { PhraseWithProgress, LearningStats, ExerciseMode, PracticeSession, AppSettings, Phrase, UpdatePhraseRequest } from "../types";
 
-export function LearnView() {
+interface LearnViewProps {
+  settings: AppSettings | null;
+}
+
+export function LearnView({ settings: initialSettings }: LearnViewProps) {
   const [mode, setMode] = useState<ExerciseMode>("manual");
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [currentPhrase, setCurrentPhrase] = useState<PhraseWithProgress | null>(null);
@@ -62,9 +66,14 @@ export function LearnView() {
     onAudioGenerated: handleAudioGenerated,
   });
 
+  // Use the current phrase's language or settings language for voice recording
+  const voiceLanguage = currentPhrase?.phrase.targetLanguage || settings?.targetLanguage || "de";
+
   const voiceRecording = useVoiceRecording({
     enabled: mode === "speaking",
-    language: "de",
+    language: voiceLanguage,
+    // Pass expected phrase as hint to Whisper for better transcription accuracy
+    prompt: currentPhrase?.phrase.answer,
     onTranscription: (text) => {
       setInputAnswer(text);
       handleCheckAnswer(text);
@@ -92,23 +101,32 @@ export function LearnView() {
   }, []);
 
   useEffect(() => {
-    loadStats();
-    // Load settings to get default exercise mode
+    // Load settings to get default exercise mode (if not passed from parent)
     const loadSettings = async () => {
       try {
         const loadedSettings = await invoke<AppSettings>("get_settings");
         setSettings(loadedSettings);
         setMode(loadedSettings.defaultExerciseMode);
+        // Load stats with the loaded settings language
+        loadStats(loadedSettings.targetLanguage);
       } catch (err) {
         console.error("Failed to load settings:", err);
       }
     };
-    loadSettings();
-  }, []);
+    if (initialSettings) {
+      setSettings(initialSettings);
+      setMode(initialSettings.defaultExerciseMode);
+      loadStats(initialSettings.targetLanguage);
+    } else {
+      loadSettings();
+    }
+  }, [initialSettings]);
 
-  const loadStats = async () => {
+  const loadStats = async (targetLanguage?: string) => {
     try {
-      const data = await invoke<LearningStats>("get_learning_stats", {});
+      const data = await invoke<LearningStats>("get_learning_stats", {
+        targetLanguage: targetLanguage || settings?.targetLanguage || null,
+      });
       setStats(data);
     } catch (err) {
       console.error("Failed to load stats:", err);
@@ -160,6 +178,7 @@ export function LearnView() {
 
     try {
       const phrase = await invoke<PhraseWithProgress | null>("get_next_phrase", {
+        targetLanguage: currentSettings?.targetLanguage || null,
         excludeIds: excludeIds.length > 0 ? excludeIds : null,
         newPhraseCount: currentNewCount,
         newPhraseLimit: currentSettings?.newPhrasesPerSession ?? 0,
@@ -364,7 +383,12 @@ export function LearnView() {
 
   const handlePlayAnswer = useCallback(() => {
     if (!currentPhrase) return;
-    tts.speak(currentPhrase.phrase.answer, currentPhrase.phrase.id, currentPhrase.phrase.audioPath || undefined);
+    tts.speak(
+      currentPhrase.phrase.answer,
+      currentPhrase.phrase.id,
+      currentPhrase.phrase.audioPath || undefined,
+      currentPhrase.phrase.targetLanguage
+    );
   }, [currentPhrase, tts]);
 
   const handleProceedToNext = useCallback(() => {
@@ -403,6 +427,7 @@ export function LearnView() {
     if (session) {
       await invoke("finish_practice_session", { sessionId: session.id });
     }
+    const targetLang = settings?.targetLanguage;
     setSession(null);
     setCurrentPhrase(null);
     setSeenPhraseIds([]);
@@ -414,7 +439,7 @@ export function LearnView() {
     setAwaitingProceed(false);
     setNewPhraseCount(0);
     setSettings(null);
-    loadStats();
+    loadStats(targetLang);
   };
 
   // Not in a session - show stats and start options

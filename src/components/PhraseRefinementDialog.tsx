@@ -334,8 +334,8 @@ export function PhraseRefinementDialog({
     setError(null);
 
     try {
-      // Use current edited answer for regeneration
-      const newPath = await generateTts(editedAnswer, phrase.id);
+      // Use current edited answer for regeneration, with phrase's target language
+      const newPath = await generateTts(editedAnswer, phrase.id, undefined, phrase.targetLanguage);
       setAudioPath(newPath);
 
       // Update in database

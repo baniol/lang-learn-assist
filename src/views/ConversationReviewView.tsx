@@ -8,7 +8,6 @@ import type {
   SuggestedPhrase,
   CreatePhraseRequest,
   ViewType,
-  AppSettings,
 } from "../types";
 
 interface ConversationReviewViewProps {
@@ -34,26 +33,14 @@ export function ConversationReviewView({
   const [suggestedPhrases, setSuggestedPhrases] = useState<SuggestedPhrase[]>([]);
   const [selectedPhrases, setSelectedPhrases] = useState<Set<number>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
 
   const audioPlayback = useAudioPlayback({
-    voiceA: settings?.ttsVoiceIdA,
-    voiceB: settings?.ttsVoiceIdB,
+    language: conversation?.targetLanguage,
   });
 
   useEffect(() => {
     loadAndProcess();
-    loadSettings();
   }, [conversationId]);
-
-  const loadSettings = async () => {
-    try {
-      const data = await invoke<AppSettings>("get_settings");
-      setSettings(data);
-    } catch (err) {
-      console.error("Failed to load settings:", err);
-    }
-  };
 
   const loadAndProcess = async () => {
     try {

@@ -11,7 +11,7 @@ interface UseTTSResult {
   isPlaying: boolean;
   isLoading: boolean;
   error: string | null;
-  speak: (text: string, phraseId?: number, cachedPath?: string) => Promise<void>;
+  speak: (text: string, phraseId?: number, cachedPath?: string, language?: string) => Promise<void>;
   stop: () => void;
 }
 
@@ -31,7 +31,7 @@ export function useTTS({ enabled, onError, onAudioGenerated }: UseTTSOptions): U
   }, []);
 
   const speak = useCallback(
-    async (text: string, phraseId?: number, cachedPath?: string) => {
+    async (text: string, phraseId?: number, cachedPath?: string, language?: string) => {
       if (!enabled) return;
 
       stop();
@@ -43,7 +43,7 @@ export function useTTS({ enabled, onError, onAudioGenerated }: UseTTSOptions): U
         let wasGenerated = false;
 
         if (!audioPath) {
-          audioPath = await generateTts(text, phraseId);
+          audioPath = await generateTts(text, phraseId, undefined, language);
           wasGenerated = true;
         }
 
@@ -53,7 +53,7 @@ export function useTTS({ enabled, onError, onAudioGenerated }: UseTTSOptions): U
           audioUrl = await getAudioBase64(audioPath);
         } catch {
           // Cached file doesn't exist, regenerate
-          audioPath = await generateTts(text, phraseId);
+          audioPath = await generateTts(text, phraseId, undefined, language);
           audioUrl = await getAudioBase64(audioPath);
           wasGenerated = true;
         }

@@ -3,7 +3,9 @@ use crate::models::{
     CreatePhraseRequest, Phrase, PhraseProgress, PhraseThread, PhraseThreadMessage,
     PhraseWithProgress, UpdatePhraseRequest,
 };
+use crate::state::AppState;
 use rusqlite::params;
+use tauri::State;
 
 fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
     let accepted_json: String = row.get(4)?;
@@ -188,18 +190,27 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
 }
 
 #[tauri::command]
-pub fn create_phrase(request: CreatePhraseRequest) -> Result<Phrase, String> {
+pub fn create_phrase(
+    state: State<'_, AppState>,
+    request: CreatePhraseRequest,
+) -> Result<Phrase, String> {
     let conn = get_conn()?;
 
     let accepted_json = serde_json::to_string(&request.accepted.unwrap_or_default())
         .map_err(|e| format!("Failed to serialize accepted: {}", e))?;
 
+    // Get default languages from settings if not provided in request
+    let settings = state
+        .settings
+        .lock()
+        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+
     let target_lang = request
         .target_language
-        .unwrap_or_else(|| "de".to_string());
+        .unwrap_or_else(|| settings.target_language.clone());
     let native_lang = request
         .native_language
-        .unwrap_or_else(|| "pl".to_string());
+        .unwrap_or_else(|| settings.native_language.clone());
 
     conn.execute(
         "INSERT INTO phrases (conversation_id, prompt, answer, accepted_json, target_language, native_language, notes)
@@ -228,8 +239,20 @@ pub fn create_phrase(request: CreatePhraseRequest) -> Result<Phrase, String> {
 }
 
 #[tauri::command]
-pub fn create_phrases_batch(phrases: Vec<CreatePhraseRequest>) -> Result<Vec<Phrase>, String> {
+pub fn create_phrases_batch(
+    state: State<'_, AppState>,
+    phrases: Vec<CreatePhraseRequest>,
+) -> Result<Vec<Phrase>, String> {
     let mut conn = get_conn()?;
+
+    // Get default languages from settings
+    let settings = state
+        .settings
+        .lock()
+        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+    let default_target_lang = settings.target_language.clone();
+    let default_native_lang = settings.native_language.clone();
+    drop(settings); // Release lock before transaction
 
     // Use transaction for atomicity - all phrases created or none
     let tx = conn
@@ -245,11 +268,11 @@ pub fn create_phrases_batch(phrases: Vec<CreatePhraseRequest>) -> Result<Vec<Phr
         let target_lang = request
             .target_language
             .clone()
-            .unwrap_or_else(|| "de".to_string());
+            .unwrap_or_else(|| default_target_lang.clone());
         let native_lang = request
             .native_language
             .clone()
-            .unwrap_or_else(|| "pl".to_string());
+            .unwrap_or_else(|| default_native_lang.clone());
 
         tx.execute(
             "INSERT INTO phrases (conversation_id, prompt, answer, accepted_json, target_language, native_language, notes)

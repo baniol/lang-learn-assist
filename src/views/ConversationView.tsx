@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Conversation, ChatMessage, ViewType, AppSettings } from "../types";
+import type { Conversation, ChatMessage, ViewType } from "../types";
 import { ConversationMessage } from "../components/ConversationMessage";
 import { VoiceButton } from "../components/VoiceButton";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
@@ -21,7 +21,6 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
   const [inputMode, setInputMode] = useState<InputMode>("voice");
   const [pendingVoiceText, setPendingVoiceText] = useState("");
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { messages, isLoading, error, sendMessage, loadMessages, clearError, deleteMessage } = useConversation({
@@ -29,8 +28,7 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
   });
 
   const audioPlayback = useAudioPlayback({
-    voiceA: settings?.ttsVoiceIdA,
-    voiceB: settings?.ttsVoiceIdB,
+    language: conversation?.targetLanguage,
   });
 
   const voiceRecording = useVoiceRecording({
@@ -52,17 +50,7 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
 
   useEffect(() => {
     loadConversation();
-    loadSettings();
   }, [conversationId]);
-
-  const loadSettings = async () => {
-    try {
-      const data = await invoke<AppSettings>("get_settings");
-      setSettings(data);
-    } catch (err) {
-      console.error("Failed to load settings:", err);
-    }
-  };
 
   useEffect(() => {
     loadMessages();

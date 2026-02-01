@@ -1,10 +1,14 @@
-import { useState, useCallback, useRef } from "react";
-import { generateTts, getAudioBase64 } from "../lib/tts";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { generateTts, getAudioBase64, getVoiceForLanguage } from "../lib/tts";
 import type { ChatMessage } from "../types";
 
 interface UseAudioPlaybackOptions {
+  /** Explicit voice A ID (legacy) */
   voiceA?: string;
+  /** Explicit voice B ID (legacy) */
   voiceB?: string;
+  /** Language code to look up per-language voices (takes precedence) */
+  language?: string;
 }
 
 interface UseAudioPlaybackResult {
@@ -18,17 +22,43 @@ interface UseAudioPlaybackResult {
 }
 
 export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudioPlaybackResult {
-  const { voiceA, voiceB } = options;
+  const { voiceA: explicitVoiceA, voiceB: explicitVoiceB, language } = options;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Per-language voices (loaded when language is provided)
+  const [languageVoiceA, setLanguageVoiceA] = useState<string | undefined>(undefined);
+  const [languageVoiceB, setLanguageVoiceB] = useState<string | undefined>(undefined);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Cache key includes voice ID to handle different voices for same text
   const audioCache = useRef<Map<string, string>>(new Map());
   const stopRequestedRef = useRef(false);
+
+  // Load per-language voices when language changes
+  useEffect(() => {
+    if (language) {
+      Promise.all([
+        getVoiceForLanguage(language, "voiceA"),
+        getVoiceForLanguage(language, "voiceB"),
+      ]).then(([a, b]) => {
+        setLanguageVoiceA(a || undefined);
+        setLanguageVoiceB(b || undefined);
+      }).catch((err) => {
+        console.error("Failed to load per-language voices:", err);
+      });
+    } else {
+      setLanguageVoiceA(undefined);
+      setLanguageVoiceB(undefined);
+    }
+  }, [language]);
+
+  // Use per-language voices if language is set, otherwise fall back to explicit options
+  const voiceA = language ? languageVoiceA : explicitVoiceA;
+  const voiceB = language ? languageVoiceB : explicitVoiceB;
 
   const getVoiceForIndex = useCallback(
     (index: number): string | undefined => {

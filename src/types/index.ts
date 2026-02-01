@@ -77,6 +77,12 @@ export type ExerciseMode = "speaking" | "typing" | "manual";
 export type LlmProvider = "openai" | "anthropic" | "none";
 export type TtsProvider = "elevenlabs" | "google" | "azure" | "none";
 
+export interface LanguageVoiceSettings {
+  default: string;
+  voiceA: string;
+  voiceB: string;
+}
+
 export interface AppSettings {
   llmProvider: LlmProvider;
   llmApiKey: string;
@@ -84,9 +90,12 @@ export interface AppSettings {
   activeWhisperModel: string;
   ttsProvider: TtsProvider;
   ttsApiKey: string;
+  // Legacy voice settings (kept for migration)
   ttsVoiceId: string;
   ttsVoiceIdA: string;
   ttsVoiceIdB: string;
+  // Per-language voice settings
+  ttsVoicesPerLanguage: Record<string, LanguageVoiceSettings>;
   targetLanguage: string;
   nativeLanguage: string;
   requiredStreak: number;

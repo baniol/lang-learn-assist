@@ -15,6 +15,8 @@ export type RecordingStatus = "idle" | "recording" | "transcribing" | "error";
 interface UseVoiceRecordingOptions {
   enabled: boolean;
   language?: string;
+  /** Hint to Whisper about expected phrase - improves accuracy significantly */
+  prompt?: string;
   onTranscription: (text: string) => void;
   onError?: (error: string) => void;
   disableSpaceKey?: boolean;
@@ -31,6 +33,7 @@ interface UseVoiceRecordingResult {
 export function useVoiceRecording({
   enabled,
   language,
+  prompt,
   onTranscription,
   onError,
   disableSpaceKey = false,
@@ -116,8 +119,8 @@ export function useVoiceRecording({
         return;
       }
 
-      // Transcribe the audio
-      const transcription = await transcribeAudio(audioPath, language);
+      // Transcribe the audio (prompt hints at expected phrase for better accuracy)
+      const transcription = await transcribeAudio(audioPath, language, prompt);
       setStatus("idle");
 
       if (transcription && transcription.trim()) {
@@ -133,7 +136,7 @@ export function useVoiceRecording({
       // Reset to idle after error
       setTimeout(() => setStatus("idle"), 2000);
     }
-  }, [onTranscription, onError]);
+  }, [language, prompt, onTranscription, onError]);
 
   // Handle Space key events for voice recording
   useEffect(() => {

@@ -477,7 +477,7 @@ pub fn reset_progress(phrase_id: Option<i64>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_srs_stats() -> Result<SrsStats, String> {
+pub fn get_srs_stats(target_language: Option<String>) -> Result<SrsStats, String> {
     let conn = get_conn()?;
     let now = chrono::Utc::now().naive_utc();
     let today_end = now.date().and_hms_opt(23, 59, 59).unwrap();
@@ -489,100 +489,177 @@ pub fn get_srs_stats() -> Result<SrsStats, String> {
     let tomorrow_str = tomorrow_end.format("%Y-%m-%d %H:%M:%S").to_string();
     let week_str = week_end.format("%Y-%m-%d %H:%M:%S").to_string();
 
+    // Build language filter clause
+    let (lang_join, lang_filter) = match &target_language {
+        Some(_) => (
+            "INNER JOIN phrases p ON pp.phrase_id = p.id",
+            "AND p.target_language = ?",
+        ),
+        None => ("", ""),
+    };
+
     // Due now (overdue)
-    let overdue: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at < ?1",
-            params![now_str],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let overdue: i32 = {
+        let query = format!(
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at < ?1 {}",
+            lang_join, lang_filter
+        );
+        match &target_language {
+            Some(lang) => conn
+                .query_row(&query, params![now_str, lang], |row| row.get(0))
+                .unwrap_or(0),
+            None => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at < ?1",
+                    params![now_str],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0),
+        }
+    };
 
     // Due today (including overdue)
-    let due_today: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at <= ?1",
-            params![today_str],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let due_today: i32 = {
+        let query = format!(
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at <= ?1 {}",
+            lang_join, lang_filter
+        );
+        match &target_language {
+            Some(lang) => conn
+                .query_row(&query, params![today_str, lang], |row| row.get(0))
+                .unwrap_or(0),
+            None => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at <= ?1",
+                    params![today_str],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0),
+        }
+    };
 
     // Due tomorrow
-    let due_tomorrow: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at > ?1 AND next_review_at <= ?2",
-            params![today_str, tomorrow_str],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let due_tomorrow: i32 = {
+        let query = format!(
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at > ?1 AND pp.next_review_at <= ?2 {}",
+            lang_join, lang_filter
+        );
+        match &target_language {
+            Some(lang) => conn
+                .query_row(&query, params![today_str, tomorrow_str, lang], |row| row.get(0))
+                .unwrap_or(0),
+            None => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at > ?1 AND next_review_at <= ?2",
+                    params![today_str, tomorrow_str],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0),
+        }
+    };
 
     // Due this week
-    let due_this_week: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at > ?1 AND next_review_at <= ?2",
-            params![today_str, week_str],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let due_this_week: i32 = {
+        let query = format!(
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at > ?1 AND pp.next_review_at <= ?2 {}",
+            lang_join, lang_filter
+        );
+        match &target_language {
+            Some(lang) => conn
+                .query_row(&query, params![today_str, week_str, lang], |row| row.get(0))
+                .unwrap_or(0),
+            None => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at > ?1 AND next_review_at <= ?2",
+                    params![today_str, week_str],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0),
+        }
+    };
 
     // Total phrases with reviews scheduled
-    let total_reviews: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at IS NOT NULL",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let total_reviews: i32 = {
+        let query = format!(
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at IS NOT NULL {}",
+            lang_join,
+            if target_language.is_some() {
+                "AND p.target_language = ?1"
+            } else {
+                ""
+            }
+        );
+        match &target_language {
+            Some(lang) => conn
+                .query_row(&query, params![lang], |row| row.get(0))
+                .unwrap_or(0),
+            None => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at IS NOT NULL",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0),
+        }
+    };
 
     // Average ease factor
-    let average_ease_factor: f64 = conn
-        .query_row(
-            "SELECT COALESCE(AVG(ease_factor), 2.5) FROM phrase_progress",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(2.5);
+    let average_ease_factor: f64 = {
+        let query = format!(
+            "SELECT COALESCE(AVG(pp.ease_factor), 2.5) FROM phrase_progress pp {} {}",
+            lang_join,
+            if target_language.is_some() {
+                "WHERE p.target_language = ?1"
+            } else {
+                ""
+            }
+        );
+        match &target_language {
+            Some(lang) => conn
+                .query_row(&query, params![lang], |row| row.get(0))
+                .unwrap_or(2.5),
+            None => conn
+                .query_row(
+                    "SELECT COALESCE(AVG(ease_factor), 2.5) FROM phrase_progress",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(2.5),
+        }
+    };
 
-    // Interval distribution
-    let one_day: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days = 1",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    // Interval distribution - helper macro
+    let interval_count = |condition: &str| -> i32 {
+        let query = format!(
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE {} {}",
+            lang_join,
+            condition,
+            if target_language.is_some() {
+                "AND p.target_language = ?1"
+            } else {
+                ""
+            }
+        );
+        match &target_language {
+            Some(lang) => conn
+                .query_row(&query, params![lang], |row| row.get(0))
+                .unwrap_or(0),
+            None => {
+                let simple_query = format!(
+                    "SELECT COUNT(*) FROM phrase_progress WHERE {}",
+                    condition
+                );
+                conn.query_row(&simple_query, [], |row| row.get(0))
+                    .unwrap_or(0)
+            }
+        }
+    };
 
-    let two_to_three_days: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days >= 2 AND interval_days <= 3",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
-
-    let four_to_seven_days: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days >= 4 AND interval_days <= 7",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
-
-    let one_to_two_weeks: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days >= 8 AND interval_days <= 14",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
-
-    let two_weeks_plus: i32 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM phrase_progress WHERE interval_days > 14",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(0);
+    let one_day = interval_count("pp.interval_days = 1");
+    let two_to_three_days = interval_count("pp.interval_days >= 2 AND pp.interval_days <= 3");
+    let four_to_seven_days = interval_count("pp.interval_days >= 4 AND pp.interval_days <= 7");
+    let one_to_two_weeks = interval_count("pp.interval_days >= 8 AND pp.interval_days <= 14");
+    let two_weeks_plus = interval_count("pp.interval_days > 14");
 
     Ok(SrsStats {
         due_now: overdue,
