@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { testLlmConnection } from "../lib/llm";
 import { testTtsConnection, getAvailableVoices } from "../lib/tts";
 import { getAvailableModels, getModelStatus, downloadModel, deleteModel } from "../lib/audio";
+import { ToggleSwitch } from "../components/ToggleSwitch";
 import type { AppSettings, WhisperModel, TtsVoice, LlmProvider, TtsProvider, ExerciseMode, LanguageVoiceSettings } from "../types";
 import { LANGUAGE_OPTIONS, NATIVE_LANGUAGE_OPTIONS } from "../types";
 
@@ -776,29 +777,48 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
               </select>
             </div>
 
-            <label className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={settings.immediateRetry}
-                onChange={(e) => updateSetting("immediateRetry", e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
-              />
+            <div className="flex items-center justify-between">
               <span className="text-sm text-slate-700 dark:text-slate-300">
                 Immediate retry on wrong answer (require 2 correct in a row)
               </span>
-            </label>
-
-            <label className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={settings.fuzzyMatching}
-                onChange={(e) => updateSetting("fuzzyMatching", e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
+              <ToggleSwitch
+                checked={settings.immediateRetry}
+                onChange={(checked) => updateSetting("immediateRetry", checked)}
               />
+            </div>
+
+            <div className="flex items-center justify-between">
               <span className="text-sm text-slate-700 dark:text-slate-300">
                 Fuzzy matching (accept small transcription errors like "Parkpläzze" for "Parkplätze")
               </span>
-            </label>
+              <ToggleSwitch
+                checked={settings.fuzzyMatching}
+                onChange={(checked) => updateSetting("fuzzyMatching", checked)}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Notes Settings */}
+        <section className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
+            Notes
+          </h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm text-slate-700 dark:text-slate-300">
+                  Enable Notes feature
+                </span>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Add quick notes and reminders accessible from the sidebar
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={settings.notesEnabled}
+                onChange={(checked) => updateSetting("notesEnabled", checked)}
+              />
+            </div>
           </div>
         </section>
       </div>

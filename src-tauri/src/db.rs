@@ -207,6 +207,17 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Notes table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+
     // Create indexes for performance
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_phrases_conversation ON phrases(conversation_id)",

@@ -9,6 +9,8 @@ import { LearnView } from "./views/LearnView";
 import { StatsView } from "./views/StatsView";
 import { QuestionsView } from "./views/QuestionsView";
 import { SettingsView } from "./views/SettingsView";
+import { NotesView } from "./views/NotesView";
+import { QuickNotePopup } from "./components/QuickNotePopup";
 import type { ViewType, AppSettings } from "./types";
 
 interface ViewState {
@@ -19,6 +21,7 @@ interface ViewState {
 function App() {
   const [viewState, setViewState] = useState<ViewState>({ type: "dashboard" });
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [isQuickNoteOpen, setIsQuickNoteOpen] = useState(false);
 
   // Load settings on mount
   useEffect(() => {
@@ -65,20 +68,29 @@ function App() {
         return <QuestionsView settings={settings} />;
       case "settings":
         return <SettingsView onSettingsChange={setSettings} />;
+      case "notes":
+        return <NotesView />;
       default:
         return <DashboardView onNavigate={handleNavigate} settings={settings} />;
     }
   };
 
   return (
-    <Layout
-      currentView={viewState.type}
-      onNavigate={handleNavigate}
-      settings={settings}
-      onSettingsChange={setSettings}
-    >
-      {renderView()}
-    </Layout>
+    <>
+      <Layout
+        currentView={viewState.type}
+        onNavigate={handleNavigate}
+        settings={settings}
+        onSettingsChange={setSettings}
+        onQuickNoteOpen={() => setIsQuickNoteOpen(true)}
+      >
+        {renderView()}
+      </Layout>
+      <QuickNotePopup
+        isOpen={isQuickNoteOpen}
+        onClose={() => setIsQuickNoteOpen(false)}
+      />
+    </>
   );
 }
 

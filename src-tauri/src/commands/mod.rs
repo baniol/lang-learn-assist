@@ -2,6 +2,7 @@ pub mod audio;
 pub mod conversations;
 pub mod learning;
 pub mod llm;
+pub mod notes;
 pub mod phrases;
 pub mod questions;
 pub mod settings;

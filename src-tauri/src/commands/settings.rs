@@ -52,6 +52,15 @@ fn load_settings_from_db(conn: &Connection) -> AppSettings {
             "session_phrase_limit" => {
                 settings.session_phrase_limit = value.parse().unwrap_or(20);
             }
+            "new_phrases_per_session" => {
+                settings.new_phrases_per_session = value.parse().unwrap_or(2);
+            }
+            "fuzzy_matching" => {
+                settings.fuzzy_matching = value == "true";
+            }
+            "notes_enabled" => {
+                settings.notes_enabled = value == "true";
+            }
             _ => {}
         }
     }
@@ -109,6 +118,12 @@ fn save_settings_to_db(conn: &Connection, settings: &AppSettings) -> Result<(), 
             "session_phrase_limit",
             settings.session_phrase_limit.to_string(),
         ),
+        (
+            "new_phrases_per_session",
+            settings.new_phrases_per_session.to_string(),
+        ),
+        ("fuzzy_matching", settings.fuzzy_matching.to_string()),
+        ("notes_enabled", settings.notes_enabled.to_string()),
     ];
 
     for (key, value) in pairs {

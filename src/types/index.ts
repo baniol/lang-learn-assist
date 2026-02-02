@@ -6,7 +6,8 @@ export type ViewType =
   | "learn"
   | "stats"
   | "questions"
-  | "settings";
+  | "settings"
+  | "notes";
 
 export type ConversationStatus = "draft" | "finalized" | "archived";
 
@@ -117,6 +118,7 @@ export interface AppSettings {
   sessionPhraseLimit: number;
   newPhrasesPerSession: number;
   fuzzyMatching: boolean;
+  notesEnabled: boolean;
 }
 
 export interface WhisperModel {
@@ -290,4 +292,21 @@ export interface QuestionExample {
 export interface GrammarQuestionResponse {
   explanation: string;
   examples: QuestionExample[];
+}
+
+// Notes
+
+export interface Note {
+  id: number;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateNoteRequest {
+  content: string;
+}
+
+export interface UpdateNoteRequest {
+  content: string;
 }

@@ -150,6 +150,7 @@ pub struct AppSettings {
     pub session_phrase_limit: i32,
     pub new_phrases_per_session: i32,
     pub fuzzy_matching: bool,
+    pub notes_enabled: bool,
 }
 
 impl AppSettings {
@@ -174,8 +175,32 @@ impl AppSettings {
             session_phrase_limit: 20,
             new_phrases_per_session: 2,
             fuzzy_matching: true,
+            notes_enabled: false,
         }
     }
+}
+
+// Notes
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Note {
+    pub id: i64,
+    pub content: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateNoteRequest {
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateNoteRequest {
+    pub content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
