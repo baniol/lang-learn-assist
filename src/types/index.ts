@@ -70,6 +70,18 @@ export interface PracticeSession {
   totalPhrases: number;
   correctAnswers: number;
   exerciseMode: ExerciseMode;
+  state: SessionState | null;
+}
+
+export interface SessionState {
+  seenPhraseIds: number[];
+  sessionStreaks: Record<number, number>;
+  sessionLearnedIds: number[];
+  newPhraseCount: number;
+  currentPhraseId: number | null;
+  inRetryMode: boolean;
+  retryCount: number;
+  requiresRetry: boolean;
 }
 
 export type ExerciseMode = "speaking" | "typing" | "manual";
@@ -104,6 +116,7 @@ export interface AppSettings {
   failureRepetitions: number;
   sessionPhraseLimit: number;
   newPhrasesPerSession: number;
+  fuzzyMatching: boolean;
 }
 
 export interface WhisperModel {

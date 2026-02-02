@@ -787,6 +787,18 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                 Immediate retry on wrong answer (require 2 correct in a row)
               </span>
             </label>
+
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={settings.fuzzyMatching}
+                onChange={(e) => updateSetting("fuzzyMatching", e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                Fuzzy matching (accept small transcription errors like "Parkpläzze" for "Parkplätze")
+              </span>
+            </label>
           </div>
         </section>
       </div>

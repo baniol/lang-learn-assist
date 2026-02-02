@@ -31,12 +31,9 @@ export function DashboardView({ onNavigate, settings }: DashboardViewProps) {
   };
 
   const handleCreateConversation = async () => {
-    const now = new Date();
-    const title = `Conversation ${now.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
-
     try {
       const conversation = await invoke<Conversation>("create_conversation", {
-        request: { title, subject: "" },
+        request: { title: "New Conversation", subject: "" },
       });
       onNavigate("conversation", { conversationId: conversation.id });
     } catch (err) {
@@ -60,16 +57,6 @@ export function DashboardView({ onNavigate, settings }: DashboardViewProps) {
     } finally {
       setDeleteConfirmId(null);
     }
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -147,12 +134,11 @@ export function DashboardView({ onNavigate, settings }: DashboardViewProps) {
                       {conversation.status}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {conversation.subject}
-                  </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-                    {formatDate(conversation.updatedAt)}
-                  </p>
+                  {conversation.subject && (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {conversation.subject}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={(e) => handleDeleteClick(conversation.id, e)}

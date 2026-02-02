@@ -62,6 +62,9 @@ pub fn run() {
             learning::start_practice_session,
             learning::update_practice_session,
             learning::finish_practice_session,
+            learning::save_session_state,
+            learning::get_active_session,
+            learning::reset_learning_phrases,
             learning::reset_progress,
             learning::validate_answer,
             // LLM
@@ -70,6 +73,7 @@ pub fn run() {
             llm::extract_phrases_from_conversation,
             llm::test_llm_connection,
             llm::refine_phrase,
+            llm::generate_title,
             // Audio
             audio::get_available_models,
             audio::get_model_status,
@@ -90,6 +94,7 @@ pub fn run() {
             questions::get_question_thread,
             questions::create_question_thread,
             questions::delete_question_thread,
+            questions::update_question_thread_title,
             questions::ask_grammar_question,
         ])
         .run(tauri::generate_context!())

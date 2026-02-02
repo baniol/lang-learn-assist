@@ -111,6 +111,19 @@ pub fn delete_question_thread(id: i64) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn update_question_thread_title(id: i64, title: String) -> Result<(), String> {
+    let conn = get_conn()?;
+
+    conn.execute(
+        "UPDATE question_threads SET title = ?1, updated_at = datetime('now') WHERE id = ?2",
+        params![title, id],
+    )
+    .map_err(|e| format!("Failed to update thread title: {}", e))?;
+
+    Ok(())
+}
+
 fn update_thread_messages(thread_id: i64, messages: &[QuestionMessage]) -> Result<(), String> {
     let conn = get_conn()?;
 
@@ -134,17 +147,19 @@ fn build_grammar_system_prompt(target_lang: &str, native_lang: &str) -> String {
         r#"You are a language learning assistant helping a {} speaker learn {}.
 Answer questions about grammar, vocabulary, style, and usage.
 
+IMPORTANT: Write ALL explanations and notes in {} language. Only example sentences should be in {}.
+
 Format your response as JSON:
 {{
-  "explanation": "Your detailed explanation here...",
+  "explanation": "Your detailed explanation in {}...",
   "examples": [
-    {{"sentence": "Example in {}", "translation": "Translation in {}", "notes": "Optional grammar note"}}
+    {{"sentence": "Example in {}", "translation": "Translation in {}", "notes": "Grammar note in {}"}}
   ]
 }}
 
 Provide 2-5 practical example sentences when relevant. Use B1-B2 vocabulary level.
 Keep explanations clear and concise. Focus on practical usage."#,
-        native_name, target_name, target_name, native_name
+        native_name, target_name, native_name, target_name, native_name, target_name, native_name, native_name
     )
 }
 

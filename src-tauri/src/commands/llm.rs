@@ -325,7 +325,7 @@ pub async fn suggest_conversation_cleanup(
     let prompt = format!(
         r#"Analyze this {} learning conversation and provide:
 1. A cleaned final conversation containing only the accepted {} phrases
-2. A suggested title
+2. A suggested title in {} language
 3. Useful phrases for the student to learn
 
 Conversation (user messages are requests in {}, assistant messages are {} phrase suggestions):
@@ -335,25 +335,43 @@ Conversation (user messages are requests in {}, assistant messages are {} phrase
 
 Respond ONLY with valid JSON in this exact format:
 {{
-  "title": "Short descriptive title",
+  "title": "Short descriptive title in {}",
   "cleanedMessages": [
     {{"id": "unique-id", "role": "assistant", "content": "{} phrase text"}}
   ],
   "suggestedPhrases": [
-    {{"prompt": "{} translation", "answer": "{} phrase", "accepted": ["alternative spellings"]}}
+    {{"prompt": "{} translation", "answer": "{} phrase", "accepted": ["alternative forms"]}}
   ]
 }}
 
-Rules:
-- cleanedMessages should only contain the {} phrases from assistant messages (no user requests)
-- Extract 5-10 most useful phrases from the conversation
-- Phrases should be practical vocabulary for the student to learn
-- "prompt" is in {} (native), "answer" is in {} (target)"#,
+Rules for cleanedMessages:
+- Only include {} phrases from assistant messages (no user requests)
+
+Rules for suggestedPhrases - VERY IMPORTANT:
+- Create SHORT but COMPLETE sentences (5-12 words) - never single words or fragments
+- Every phrase MUST be a grammatically complete, standalone sentence
+- DO NOT copy long sentences verbatim - simplify them
+- Transform complex sentences into simple, reusable model sentences
+- "prompt" is the {} translation, "answer" is the {} phrase
+- Include 5-10 phrases
+
+CORRECT examples (complete sentences):
+- "Ich möchte einen Tisch reservieren."
+- "Können Sie mir helfen?"
+- "Die Rechnung, bitte."
+- "Wo ist die Toilette?"
+
+WRONG examples (incomplete - DO NOT do this):
+- "die Speisekarte" (just a word)
+- "einen Tisch reservieren" (no subject)
+- "helfen könnten" (fragment)"#,
         target_name,
         target_name,
         native_name,
+        native_name,
         target_name,
         conversation_text,
+        native_name,
         target_name,
         native_name,
         target_name,
@@ -424,7 +442,7 @@ pub async fn extract_phrases_from_conversation(
         .join("\n");
 
     let prompt = format!(
-        r#"Extract useful {} phrases from this conversation for a {} speaker to learn.
+        r#"Extract useful {} vocabulary and phrases from this conversation for a {} speaker to learn.
 
 Conversation:
 ---
@@ -433,14 +451,31 @@ Conversation:
 
 Respond ONLY with valid JSON array:
 [
-  {{"prompt": "{} translation", "answer": "{} phrase", "accepted": ["alternative spellings"]}}
+  {{"prompt": "{} translation", "answer": "{} phrase", "accepted": ["alternative forms"]}}
 ]
 
-Rules:
-- Extract 5-15 most useful, practical phrases
-- Include phrases the student used and important phrases from the tutor
-- "prompt" is the {} translation, "answer" is the {} original
-- "accepted" includes common alternative spellings or forms"#,
+IMPORTANT Rules for phrase extraction:
+- Create SHORT but COMPLETE sentences (5-12 words) - never single words or fragments
+- Every phrase MUST be a grammatically complete, standalone sentence
+- DO NOT copy long sentences verbatim - simplify them
+- Transform complex sentences into simple, reusable model sentences
+- "prompt" is the {} translation, "answer" is the {} phrase
+- "accepted" includes alternative forms (e.g., formal/informal variants)
+- Include 5-15 phrases
+
+CORRECT examples (complete sentences):
+- "Ich möchte bestellen."
+- "Haben Sie die Speisekarte?"
+- "Es tut mir leid."
+- "Ich bin zu spät gekommen."
+
+WRONG examples (DO NOT do this):
+- "die Speisekarte" (just a noun - NOT a sentence)
+- "bestellen" (just a verb - NOT a sentence)
+- "zu spät gekommen" (fragment - NOT a sentence)
+
+Transform long sentences:
+- "Ich würde gerne wissen, ob Sie mir helfen könnten" → "Können Sie mir helfen?""#,
         target_name,
         native_name,
         conversation_text,
@@ -609,4 +644,52 @@ pub async fn refine_phrase(
         .map_err(|e| format!("Failed to parse response: {}. Raw: {}", e, json_str))?;
 
     Ok(parsed.suggestion)
+}
+
+/// Generate a short, meaningful title from content (conversation or question)
+#[tauri::command]
+pub async fn generate_title(
+    state: State<'_, AppState>,
+    content: String,
+    content_type: String, // "conversation" or "question"
+    native_language: Option<String>,
+) -> Result<String, String> {
+    let settings = state.settings.lock().unwrap().clone();
+
+    if settings.llm_provider == "none" || settings.llm_api_key.is_empty() {
+        return Err("LLM not configured".to_string());
+    }
+
+    let lang = native_language.unwrap_or_else(|| settings.native_language.clone());
+    let lang_name = get_language_name(&lang);
+
+    let prompt = format!(
+        r#"Generate a very short title (3-6 words max) for this {} content.
+The title should capture the main topic or theme.
+IMPORTANT: Write the title in {} language.
+Respond with ONLY the title, no quotes, no explanation.
+
+Content:
+{}
+
+Title:"#,
+        content_type, lang_name, content
+    );
+
+    let llm_messages = vec![serde_json::json!({"role": "user", "content": prompt})];
+
+    let response = call_llm(&settings, &llm_messages, None, 50).await?;
+
+    // Clean up the response - remove quotes, newlines, etc.
+    let title = response
+        .content
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .lines()
+        .next()
+        .unwrap_or("Untitled")
+        .to_string();
+
+    Ok(title)
 }

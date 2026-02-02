@@ -31,21 +31,28 @@ pub const AVAILABLE_MODELS: &[WhisperModel] = &[
         file_name: "ggml-tiny.bin",
         size_mb: 75,
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
-        description: "Fastest, lower accuracy",
+        description: "Fastest, poor accuracy for German",
     },
     WhisperModel {
         name: "Base",
         file_name: "ggml-base.bin",
         size_mb: 142,
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
-        description: "Balanced (default)",
+        description: "Fast, limited German accuracy",
     },
     WhisperModel {
         name: "Small",
         file_name: "ggml-small.bin",
         size_mb: 466,
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
-        description: "Better quality, slower",
+        description: "Decent German, some errors",
+    },
+    WhisperModel {
+        name: "Medium",
+        file_name: "ggml-medium.bin",
+        size_mb: 1500,
+        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
+        description: "Best for German (recommended)",
     },
 ];
 

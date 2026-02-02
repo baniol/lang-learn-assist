@@ -1,5 +1,5 @@
 use crate::db::get_conn;
-use crate::models::{IntervalDistribution, LearningStats, PhraseProgress, PhraseWithProgress, PracticeSession, SrsStats};
+use crate::models::{IntervalDistribution, LearningStats, PhraseProgress, PhraseWithProgress, PracticeSession, SessionState, SrsStats};
 use rusqlite::params;
 
 /// Calculate priority for SRS-based scheduling
@@ -167,48 +167,58 @@ pub fn get_next_phrase(
         b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    // First try to get a phrase with priority > 0 (due for review or new)
+    // Only return phrases with priority > 0 (due for review or new)
+    // Phrases not yet due (priority 0) should NOT be shown - that's the point of SRS
     let next_phrase = phrases_with_priority
         .iter()
         .find(|(_, priority)| *priority > 0.0)
         .map(|(phrase, _)| phrase.clone());
 
-    // If nothing is due, fall back to showing any phrase (sorted by soonest review)
-    if next_phrase.is_some() {
-        Ok(next_phrase)
-    } else if !phrases_with_priority.is_empty() {
-        // Return the first available phrase (they're all not due, but user wants to practice)
-        Ok(Some(phrases_with_priority.remove(0).0))
-    } else {
-        Ok(None)
-    }
+    Ok(next_phrase)
 }
 
 /// Calculate next review date using simplified SM-2 algorithm
+/// For learning phase (interval_days == 0), use short intervals (minutes)
+/// For review phase (interval_days >= 1), use SRS with days
 fn calculate_srs(
     is_correct: bool,
     current_ease: f64,
     current_interval: i32,
+    correct_streak: i32,
 ) -> (f64, i32, String) {
     let min_ease = 1.3;
     let now = chrono::Utc::now();
 
+    // Learning phase: streak < 2, use short intervals
+    let is_learning = correct_streak < 2;
+
     if is_correct {
-        // Correct answer: multiply interval by ease factor
-        let new_interval = ((current_interval as f64) * current_ease).round() as i32;
-        // Ensure interval increases by at least 1 day
-        let new_interval = new_interval.max(current_interval + 1);
-        let next_review = now + chrono::Duration::days(new_interval as i64);
-        let next_review_str = next_review.format("%Y-%m-%d %H:%M:%S").to_string();
-
-        (current_ease, new_interval, next_review_str)
+        if is_learning {
+            // Still learning - keep interval at 0 (same session) until streak reaches 2
+            // Then graduate to 1 day
+            let new_interval = if correct_streak + 1 >= 2 { 1 } else { 0 };
+            let next_review = if new_interval == 0 {
+                now + chrono::Duration::minutes(10) // Review again in 10 minutes
+            } else {
+                now + chrono::Duration::days(1) // Graduate to 1 day
+            };
+            let next_review_str = next_review.format("%Y-%m-%d %H:%M:%S").to_string();
+            (current_ease, new_interval, next_review_str)
+        } else {
+            // Review phase: multiply interval by ease factor
+            let new_interval = ((current_interval as f64) * current_ease).round() as i32;
+            // Ensure interval increases by at least 1 day
+            let new_interval = new_interval.max(current_interval + 1);
+            let next_review = now + chrono::Duration::days(new_interval as i64);
+            let next_review_str = next_review.format("%Y-%m-%d %H:%M:%S").to_string();
+            (current_ease, new_interval, next_review_str)
+        }
     } else {
-        // Incorrect answer: reset interval to 1, decrease ease
+        // Incorrect answer: reset to learning phase
         let new_ease = (current_ease - 0.2).max(min_ease);
-        let new_interval = 1;
-        let next_review = now + chrono::Duration::days(1);
+        let new_interval = 0; // Back to learning phase
+        let next_review = now + chrono::Duration::minutes(5); // Review again in 5 minutes
         let next_review_str = next_review.format("%Y-%m-%d %H:%M:%S").to_string();
-
         (new_ease, new_interval, next_review_str)
     }
 }
@@ -220,18 +230,18 @@ pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress,
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Check if progress record exists and get current SRS values
-    let existing: Option<(i64, f64, i32)> = conn
+    let existing: Option<(i64, f64, i32, i32)> = conn
         .query_row(
-            "SELECT id, ease_factor, interval_days FROM phrase_progress WHERE phrase_id = ?1",
+            "SELECT id, ease_factor, interval_days, correct_streak FROM phrase_progress WHERE phrase_id = ?1",
             params![phrase_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .ok();
 
-    if let Some((_, current_ease, current_interval)) = existing {
-        // Calculate new SRS values
+    if let Some((_, current_ease, current_interval, current_streak)) = existing {
+        // Calculate new SRS values (pass current streak for learning vs review phase)
         let (new_ease, new_interval, next_review) =
-            calculate_srs(is_correct, current_ease, current_interval);
+            calculate_srs(is_correct, current_ease, current_interval, current_streak);
 
         // Update existing progress
         if is_correct {
@@ -263,8 +273,8 @@ pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress,
             .map_err(|e| format!("Failed to update progress: {}", e))?;
         }
     } else {
-        // Create new progress record with initial SRS values
-        let (new_ease, new_interval, next_review) = calculate_srs(is_correct, 2.5, 1);
+        // Create new progress record with initial SRS values (streak is 0 for new phrase)
+        let (new_ease, new_interval, next_review) = calculate_srs(is_correct, 2.5, 0, 0);
 
         conn.execute(
             "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at)
@@ -399,10 +409,12 @@ pub fn start_practice_session(exercise_mode: String) -> Result<PracticeSession, 
     let id = conn.last_insert_rowid();
 
     conn.query_row(
-        "SELECT id, started_at, finished_at, total_phrases, correct_answers, exercise_mode
+        "SELECT id, started_at, finished_at, total_phrases, correct_answers, exercise_mode, state_json
          FROM practice_sessions WHERE id = ?1",
         params![id],
         |row| {
+            let state_json: Option<String> = row.get(6)?;
+            let state = state_json.and_then(|json| serde_json::from_str(&json).ok());
             Ok(PracticeSession {
                 id: row.get(0)?,
                 started_at: row.get(1)?,
@@ -410,6 +422,7 @@ pub fn start_practice_session(exercise_mode: String) -> Result<PracticeSession, 
                 total_phrases: row.get(3)?,
                 correct_answers: row.get(4)?,
                 exercise_mode: row.get(5)?,
+                state,
             })
         },
     )
@@ -437,17 +450,20 @@ pub fn update_practice_session(
 pub fn finish_practice_session(session_id: i64) -> Result<PracticeSession, String> {
     let conn = get_conn()?;
 
+    // Clear state and set finished_at
     conn.execute(
-        "UPDATE practice_sessions SET finished_at = datetime('now') WHERE id = ?1",
+        "UPDATE practice_sessions SET finished_at = datetime('now'), state_json = NULL WHERE id = ?1",
         params![session_id],
     )
     .map_err(|e| format!("Failed to finish session: {}", e))?;
 
     conn.query_row(
-        "SELECT id, started_at, finished_at, total_phrases, correct_answers, exercise_mode
+        "SELECT id, started_at, finished_at, total_phrases, correct_answers, exercise_mode, state_json
          FROM practice_sessions WHERE id = ?1",
         params![session_id],
         |row| {
+            let state_json: Option<String> = row.get(6)?;
+            let state = state_json.and_then(|json| serde_json::from_str(&json).ok());
             Ok(PracticeSession {
                 id: row.get(0)?,
                 started_at: row.get(1)?,
@@ -455,10 +471,79 @@ pub fn finish_practice_session(session_id: i64) -> Result<PracticeSession, Strin
                 total_phrases: row.get(3)?,
                 correct_answers: row.get(4)?,
                 exercise_mode: row.get(5)?,
+                state,
             })
         },
     )
     .map_err(|e| format!("Failed to get session: {}", e))
+}
+
+#[tauri::command]
+pub fn save_session_state(session_id: i64, state: SessionState) -> Result<(), String> {
+    let conn = get_conn()?;
+
+    let state_json = serde_json::to_string(&state)
+        .map_err(|e| format!("Failed to serialize state: {}", e))?;
+
+    conn.execute(
+        "UPDATE practice_sessions SET state_json = ?1 WHERE id = ?2",
+        params![state_json, session_id],
+    )
+    .map_err(|e| format!("Failed to save session state: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_active_session(_target_language: Option<String>) -> Result<Option<PracticeSession>, String> {
+    let conn = get_conn()?;
+
+    // Get the most recent unfinished session
+    // If target_language is provided, we should also check if the session was for that language
+    // For now, just get any unfinished session
+    let result = conn.query_row(
+        "SELECT id, started_at, finished_at, total_phrases, correct_answers, exercise_mode, state_json
+         FROM practice_sessions
+         WHERE finished_at IS NULL
+         ORDER BY started_at DESC
+         LIMIT 1",
+        [],
+        |row| {
+            let state_json: Option<String> = row.get(6)?;
+            let state = state_json.and_then(|json| serde_json::from_str(&json).ok());
+            Ok(PracticeSession {
+                id: row.get(0)?,
+                started_at: row.get(1)?,
+                finished_at: row.get(2)?,
+                total_phrases: row.get(3)?,
+                correct_answers: row.get(4)?,
+                exercise_mode: row.get(5)?,
+                state,
+            })
+        },
+    );
+
+    match result {
+        Ok(session) => Ok(Some(session)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(format!("Failed to get active session: {}", e)),
+    }
+}
+
+#[tauri::command]
+pub fn reset_learning_phrases() -> Result<i32, String> {
+    let conn = get_conn()?;
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // Reset all phrases in learning state (correct_streak < 2) to be due now
+    let count = conn
+        .execute(
+            "UPDATE phrase_progress SET next_review_at = ?1, interval_days = 0 WHERE correct_streak < 2",
+            params![now],
+        )
+        .map_err(|e| format!("Failed to reset learning phrases: {}", e))?;
+
+    Ok(count as i32)
 }
 
 #[tauri::command]
@@ -686,7 +771,7 @@ pub fn get_practice_sessions(limit: Option<i32>) -> Result<Vec<PracticeSession>,
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, started_at, finished_at, total_phrases, correct_answers, exercise_mode
+            "SELECT id, started_at, finished_at, total_phrases, correct_answers, exercise_mode, state_json
              FROM practice_sessions
              ORDER BY started_at DESC
              LIMIT ?1",
@@ -695,6 +780,8 @@ pub fn get_practice_sessions(limit: Option<i32>) -> Result<Vec<PracticeSession>,
 
     let sessions = stmt
         .query_map(params![limit], |row| {
+            let state_json: Option<String> = row.get(6)?;
+            let state = state_json.and_then(|json| serde_json::from_str(&json).ok());
             Ok(PracticeSession {
                 id: row.get(0)?,
                 started_at: row.get(1)?,
@@ -702,6 +789,7 @@ pub fn get_practice_sessions(limit: Option<i32>) -> Result<Vec<PracticeSession>,
                 total_phrases: row.get(3)?,
                 correct_answers: row.get(4)?,
                 exercise_mode: row.get(5)?,
+                state,
             })
         })
         .map_err(|e| format!("Failed to query sessions: {}", e))?
@@ -715,6 +803,18 @@ pub fn get_practice_sessions(limit: Option<i32>) -> Result<Vec<PracticeSession>,
 #[tauri::command]
 pub fn validate_answer(phrase_id: i64, input: String) -> Result<bool, String> {
     let conn = get_conn()?;
+
+    // Load settings to check fuzzy_matching flag
+    let fuzzy_matching: bool = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'fuzzy_matching'",
+            [],
+            |row| {
+                let val: String = row.get(0)?;
+                Ok(val == "true")
+            },
+        )
+        .unwrap_or(true); // Default to true if not set
 
     let (answer, accepted_json): (String, String) = conn
         .query_row(
@@ -746,8 +846,48 @@ pub fn validate_answer(phrase_id: i64, input: String) -> Result<bool, String> {
             .collect::<String>()
     };
 
+    // Levenshtein distance for fuzzy matching (handles Whisper transcription errors)
+    fn levenshtein(a: &str, b: &str) -> usize {
+        let a_chars: Vec<char> = a.chars().collect();
+        let b_chars: Vec<char> = b.chars().collect();
+        let a_len = a_chars.len();
+        let b_len = b_chars.len();
+
+        if a_len == 0 { return b_len; }
+        if b_len == 0 { return a_len; }
+
+        let mut matrix = vec![vec![0usize; b_len + 1]; a_len + 1];
+
+        for i in 0..=a_len { matrix[i][0] = i; }
+        for j in 0..=b_len { matrix[0][j] = j; }
+
+        for i in 1..=a_len {
+            for j in 1..=b_len {
+                let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+                matrix[i][j] = (matrix[i - 1][j] + 1)
+                    .min(matrix[i][j - 1] + 1)
+                    .min(matrix[i - 1][j - 1] + cost);
+            }
+        }
+        matrix[a_len][b_len]
+    }
+
+    // Check if fuzzy match (allow small errors for longer strings)
+    // e.g., "Parkpläzze" vs "Parkplätze" = distance 2, length 10 = 20% error = OK
+    fn is_fuzzy_match(input: &str, expected: &str) -> bool {
+        let distance = levenshtein(input, expected);
+        let max_len = input.len().max(expected.len());
+        if max_len == 0 { return true; }
+
+        // Allow up to 20% error rate, minimum 1 char for short words, max 2 chars total
+        let max_distance = (max_len / 5).max(1).min(2);
+        distance <= max_distance
+    }
+
     let normalized_input = normalize(&input);
     let normalized_answer = normalize(&answer);
+    let input_no_spaces = normalize_no_spaces(&input);
+    let answer_no_spaces = normalize_no_spaces(&answer);
 
     // Check main answer (exact match with spaces)
     if normalized_input == normalized_answer {
@@ -755,7 +895,12 @@ pub fn validate_answer(phrase_id: i64, input: String) -> Result<bool, String> {
     }
 
     // Check main answer (without spaces - handles compound words)
-    if normalize_no_spaces(&input) == normalize_no_spaces(&answer) {
+    if input_no_spaces == answer_no_spaces {
+        return Ok(true);
+    }
+
+    // Fuzzy match for Whisper transcription errors (e.g., "Parkpläzze" vs "Parkplätze")
+    if fuzzy_matching && is_fuzzy_match(&input_no_spaces, &answer_no_spaces) {
         return Ok(true);
     }
 
@@ -764,8 +909,12 @@ pub fn validate_answer(phrase_id: i64, input: String) -> Result<bool, String> {
         if normalize(alt) == normalized_input {
             return Ok(true);
         }
-        // Also check without spaces
-        if normalize_no_spaces(alt) == normalize_no_spaces(&input) {
+        let alt_no_spaces = normalize_no_spaces(alt);
+        if alt_no_spaces == input_no_spaces {
+            return Ok(true);
+        }
+        // Fuzzy match alternatives too
+        if fuzzy_matching && is_fuzzy_match(&input_no_spaces, &alt_no_spaces) {
             return Ok(true);
         }
     }

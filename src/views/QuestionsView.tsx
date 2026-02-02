@@ -82,12 +82,9 @@ export function QuestionsView({ settings: parentSettings }: QuestionsViewProps) 
   };
 
   const handleCreateThread = async () => {
-    const now = new Date();
-    const title = `Question ${now.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
-
     try {
       const thread = await createQuestionThread(
-        title,
+        "New Question",
         settings?.targetLanguage,
         settings?.nativeLanguage
       );
@@ -119,6 +116,7 @@ export function QuestionsView({ settings: parentSettings }: QuestionsViewProps) 
     if (!question.trim() || !selectedThread || isSending) return;
 
     const currentQuestion = question;
+    const isFirstQuestion = selectedThread.messages.length === 0;
     setQuestion("");
     setIsSending(true);
 
@@ -127,6 +125,29 @@ export function QuestionsView({ settings: parentSettings }: QuestionsViewProps) 
 
       // Refresh the thread to get updated messages
       const updatedThread = await getQuestionThread(selectedThread.id);
+
+      // Generate meaningful title after first Q&A exchange
+      if (isFirstQuestion && updatedThread.messages.length >= 2) {
+        try {
+          const content = updatedThread.messages
+            .slice(0, 2)
+            .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
+            .join("\n");
+          const newTitle = await invoke<string>("generate_title", {
+            content,
+            contentType: "question",
+            nativeLanguage: settings?.nativeLanguage,
+          });
+          await invoke("update_question_thread_title", {
+            id: updatedThread.id,
+            title: newTitle,
+          });
+          updatedThread.title = newTitle;
+        } catch (err) {
+          console.error("Failed to generate title:", err);
+        }
+      }
+
       setSelectedThread(updatedThread);
 
       // Update thread in list
@@ -248,6 +269,15 @@ export function QuestionsView({ settings: parentSettings }: QuestionsViewProps) 
               <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
                 {selectedThread.title}
               </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {new Date(selectedThread.createdAt).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
             </div>
 
             {/* Messages */}

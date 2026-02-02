@@ -61,6 +61,7 @@ export function useConversation({
     async (content: string) => {
       if (!conversation || !content.trim()) return;
 
+      const isFirstExchange = messages.length === 0;
       setError(null);
       setIsLoading(true);
 
@@ -90,6 +91,24 @@ export function useConversation({
         const finalMessages = [...updatedMessages, assistantMessage];
         setMessages(finalMessages);
         await saveMessages(finalMessages);
+
+        // Generate meaningful title after first exchange
+        if (isFirstExchange) {
+          try {
+            const contentForTitle = `${content}\n${response.content.substring(0, 200)}`;
+            const newTitle = await invoke<string>("generate_title", {
+              content: contentForTitle,
+              contentType: "conversation",
+              nativeLanguage: conversation.nativeLanguage,
+            });
+            await invoke("update_conversation_title", {
+              id: conversation.id,
+              title: newTitle,
+            });
+          } catch (titleErr) {
+            console.error("Failed to generate title:", titleErr);
+          }
+        }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         setError(errorMsg);

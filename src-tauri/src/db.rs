@@ -153,10 +153,29 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             finished_at TEXT,
             total_phrases INTEGER NOT NULL DEFAULT 0,
             correct_answers INTEGER NOT NULL DEFAULT 0,
-            exercise_mode TEXT NOT NULL DEFAULT 'speaking'
+            exercise_mode TEXT NOT NULL DEFAULT 'speaking',
+            state_json TEXT
         )",
         [],
     )?;
+
+    // Migration: Add state_json column to practice_sessions if it doesn't exist
+    let session_columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(practice_sessions)")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    if !session_columns.contains(&"state_json".to_string()) {
+        conn.execute(
+            "ALTER TABLE practice_sessions ADD COLUMN state_json TEXT",
+            [],
+        ).ok();
+    }
 
     // Phrase refinement threads table
     conn.execute(

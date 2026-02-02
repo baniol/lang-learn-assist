@@ -91,6 +91,21 @@ pub struct PracticeSession {
     pub total_phrases: i32,
     pub correct_answers: i32,
     pub exercise_mode: String,
+    pub state: Option<SessionState>,
+}
+
+/// Session state for persistence across app restarts
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionState {
+    pub seen_phrase_ids: Vec<i64>,
+    pub session_streaks: HashMap<i64, i32>,
+    pub session_learned_ids: Vec<i64>,
+    pub new_phrase_count: i32,
+    pub current_phrase_id: Option<i64>,
+    pub in_retry_mode: bool,
+    pub retry_count: i32,
+    pub requires_retry: bool,
 }
 
 /// Voice settings for a specific language (default voice + conversation voices A/B)
@@ -134,6 +149,7 @@ pub struct AppSettings {
     pub failure_repetitions: i32,
     pub session_phrase_limit: i32,
     pub new_phrases_per_session: i32,
+    pub fuzzy_matching: bool,
 }
 
 impl AppSettings {
@@ -157,6 +173,7 @@ impl AppSettings {
             failure_repetitions: 2,
             session_phrase_limit: 20,
             new_phrases_per_session: 2,
+            fuzzy_matching: true,
         }
     }
 }
@@ -208,6 +225,7 @@ pub struct ConversationCleanupResult {
 pub struct SuggestedPhrase {
     pub prompt: String,
     pub answer: String,
+    #[serde(default)]
     pub accepted: Vec<String>,
 }
 

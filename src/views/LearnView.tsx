@@ -82,45 +82,147 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
     disableSpaceKey: awaitingProceed,
   });
 
-  // Track session ID in a ref so cleanup can access it without stale closure
+  // Track state in refs so cleanup can access without stale closures
   const sessionIdRef = useRef<number | null>(null);
+  const stateRef = useRef<{
+    seenPhraseIds: number[];
+    sessionStreaks: Record<number, number>;
+    sessionLearnedIds: number[];
+    newPhraseCount: number;
+    currentPhraseId: number | null;
+    inRetryMode: boolean;
+    retryCount: number;
+    requiresRetry: boolean;
+  } | null>(null);
 
+  // Keep refs in sync with state
   useEffect(() => {
     sessionIdRef.current = session?.id ?? null;
   }, [session?.id]);
 
-  // Cleanup: finish session when navigating away
+  useEffect(() => {
+    if (session) {
+      stateRef.current = {
+        seenPhraseIds,
+        sessionStreaks,
+        sessionLearnedIds: Array.from(sessionLearnedIds),
+        newPhraseCount,
+        currentPhraseId: currentPhrase?.phrase.id ?? null,
+        inRetryMode,
+        retryCount,
+        requiresRetry,
+      };
+    } else {
+      stateRef.current = null;
+    }
+  }, [session, seenPhraseIds, sessionStreaks, sessionLearnedIds, newPhraseCount, currentPhrase, inRetryMode, retryCount, requiresRetry]);
+
+  // Save session state (called when state changes or on unmount)
+  const saveSessionState = useCallback(async () => {
+    if (!sessionIdRef.current || !stateRef.current) return;
+    try {
+      await invoke("save_session_state", {
+        sessionId: sessionIdRef.current,
+        state: stateRef.current,
+      });
+    } catch (err) {
+      console.error("Failed to save session state:", err);
+    }
+  }, []);
+
+  // Cleanup: save session state when navigating away (don't finish it)
   useEffect(() => {
     return () => {
-      if (sessionIdRef.current) {
-        invoke("finish_practice_session", { sessionId: sessionIdRef.current }).catch((err) =>
-          console.error("Failed to finish session on unmount:", err)
-        );
+      if (sessionIdRef.current && stateRef.current) {
+        // Save state synchronously as best effort on unmount
+        invoke("save_session_state", {
+          sessionId: sessionIdRef.current,
+          state: stateRef.current,
+        }).catch((err) => console.error("Failed to save session state on unmount:", err));
       }
     };
   }, []);
 
+  // Auto-save session state when important fields change
   useEffect(() => {
-    // Load settings to get default exercise mode (if not passed from parent)
-    const loadSettings = async () => {
+    if (!session) return;
+
+    // Debounce to avoid too many saves
+    const timeoutId = setTimeout(() => {
+      saveSessionState();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [session, seenPhraseIds, sessionStreaks, sessionLearnedIds, newPhraseCount, currentPhrase?.phrase.id, inRetryMode, retryCount, requiresRetry, saveSessionState]);
+
+  // Restore session from saved state
+  const restoreSession = useCallback(async (activeSession: PracticeSession, loadedSettings: AppSettings) => {
+    const state = activeSession.state;
+    if (!state) {
+      // Session exists but has no state - treat as fresh session
+      setSession(activeSession);
+      setMode(activeSession.exerciseMode as ExerciseMode);
+      await loadNextPhrase([], 0, loadedSettings, activeSession.id);
+      return;
+    }
+
+    // Restore all state from saved session
+    setSession(activeSession);
+    setMode(activeSession.exerciseMode as ExerciseMode);
+    setSeenPhraseIds(state.seenPhraseIds);
+    setSessionStreaks(state.sessionStreaks);
+    setSessionLearnedIds(new Set(state.sessionLearnedIds));
+    setNewPhraseCount(state.newPhraseCount);
+    setInRetryMode(state.inRetryMode);
+    setRetryCount(state.retryCount);
+    setRequiresRetry(state.requiresRetry);
+
+    // Load the current phrase if there was one
+    if (state.currentPhraseId) {
       try {
-        const loadedSettings = await invoke<AppSettings>("get_settings");
+        const phrase = await invoke<PhraseWithProgress | null>("get_next_phrase", {
+          targetLanguage: loadedSettings.targetLanguage || null,
+          excludeIds: state.seenPhraseIds.filter(id => id !== state.currentPhraseId),
+          newPhraseCount: state.newPhraseCount,
+          newPhraseLimit: loadedSettings.newPhrasesPerSession ?? 0,
+        });
+        setCurrentPhrase(phrase);
+      } catch (err) {
+        console.error("Failed to restore current phrase:", err);
+        // Fall back to loading next phrase
+        await loadNextPhrase(state.seenPhraseIds, state.newPhraseCount, loadedSettings, activeSession.id);
+      }
+    } else {
+      // No current phrase, load next one
+      await loadNextPhrase(state.seenPhraseIds, state.newPhraseCount, loadedSettings, activeSession.id);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load settings and check for active session
+    const initialize = async () => {
+      try {
+        const loadedSettings = initialSettings || await invoke<AppSettings>("get_settings");
         setSettings(loadedSettings);
         setMode(loadedSettings.defaultExerciseMode);
-        // Load stats with the loaded settings language
         loadStats(loadedSettings.targetLanguage);
+
+        // Check for active (unfinished) session
+        const activeSession = await invoke<PracticeSession | null>("get_active_session", {
+          targetLanguage: loadedSettings.targetLanguage,
+        });
+
+        if (activeSession) {
+          // Restore the active session
+          await restoreSession(activeSession, loadedSettings);
+        }
       } catch (err) {
-        console.error("Failed to load settings:", err);
+        console.error("Failed to initialize:", err);
       }
     };
-    if (initialSettings) {
-      setSettings(initialSettings);
-      setMode(initialSettings.defaultExerciseMode);
-      loadStats(initialSettings.targetLanguage);
-    } else {
-      loadSettings();
-    }
-  }, [initialSettings]);
+
+    initialize();
+  }, [initialSettings, restoreSession]);
 
   const loadStats = async (targetLanguage?: string) => {
     try {
@@ -160,12 +262,14 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
     }
   };
 
-  const loadNextPhrase = async (excludeIds: number[], currentNewCount: number, currentSettings: AppSettings | null) => {
+  const loadNextPhrase = async (excludeIds: number[], currentNewCount: number, currentSettings: AppSettings | null, sessionId?: number) => {
+    const activeSessionId = sessionId ?? session?.id;
+
     // Check if session limit reached
     if (currentSettings && currentSettings.sessionPhraseLimit > 0 && excludeIds.length >= currentSettings.sessionPhraseLimit) {
       setCurrentPhrase(null);
-      if (session) {
-        await invoke("finish_practice_session", { sessionId: session.id });
+      if (activeSessionId) {
+        await invoke("finish_practice_session", { sessionId: activeSessionId });
       }
       return;
     }
@@ -193,8 +297,8 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
         }
       } else {
         // No more phrases
-        if (session) {
-          await invoke("finish_practice_session", { sessionId: session.id });
+        if (activeSessionId) {
+          await invoke("finish_practice_session", { sessionId: activeSessionId });
         }
       }
     } catch (err) {
@@ -519,17 +623,35 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
 
   // No more phrases
   if (!currentPhrase && !isLoading) {
+    const practicedAny = session.totalPhrases > 0 || seenPhraseIds.length > 0;
+
     return (
       <div className="p-6 max-w-2xl mx-auto text-center">
-        <svg className="w-20 h-20 mx-auto text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
-          Session Complete!
-        </h2>
-        <p className="text-slate-500 dark:text-slate-400 mb-6">
-          You practiced {session.totalPhrases} phrases with {session.correctAnswers} correct answers.
-        </p>
+        {practicedAny ? (
+          <>
+            <svg className="w-20 h-20 mx-auto text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
+              Session Complete!
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">
+              You practiced {session.totalPhrases} phrases with {session.correctAnswers} correct answers.
+            </p>
+          </>
+        ) : (
+          <>
+            <svg className="w-20 h-20 mx-auto text-blue-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
+              All caught up!
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">
+              No phrases are due for review right now. Come back later when your SRS intervals expire.
+            </p>
+          </>
+        )}
         <button
           onClick={endSession}
           className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -807,12 +929,49 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                   Voice recording not available. Download a Whisper model in Settings.
                 </p>
               )}
-              {/* Show Answer button - reveals answer but counts as incorrect */}
+              {/* Show Answer button - reveals answer but counts as incorrect and enters retry mode */}
               {!inRetryMode && !showAnswer && (
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    if (!currentPhrase || !settings) return;
+                    const phraseId = currentPhrase.phrase.id;
+
+                    // Reset session streak for this phrase
+                    setSessionStreaks((prev) => ({ ...prev, [phraseId]: 0 }));
+                    setSessionLearnedIds((prev) => {
+                      const newSet = new Set(prev);
+                      newSet.delete(phraseId);
+                      return newSet;
+                    });
+
+                    // Record as incorrect answer for SRS
+                    await invoke("record_answer", {
+                      phraseId,
+                      isCorrect: false,
+                    });
+
+                    if (session) {
+                      await invoke("update_practice_session", {
+                        sessionId: session.id,
+                        totalPhrases: seenPhraseIds.length + 1,
+                        correctAnswers: session.correctAnswers || 0,
+                      });
+                      setSession((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              totalPhrases: seenPhraseIds.length + 1,
+                            }
+                          : null
+                      );
+                    }
+
+                    // Enter retry mode - force repetition like a wrong answer
                     setShowAnswer(true);
-                    handleManualAnswer(false);
+                    setFeedback("incorrect");
+                    setInRetryMode(true);
+                    setRetryCount(0);
+                    setRequiresRetry(true);
                   }}
                   className="mt-4 px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-sm"
                 >

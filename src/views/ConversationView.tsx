@@ -129,8 +129,14 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
                 <h1 className="font-semibold text-slate-800 dark:text-white">
                   {conversation.title}
                 </h1>
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  Completed
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {new Date(conversation.createdAt).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                  {" • "}
+                  <span className="text-green-600 dark:text-green-400">Completed</span>
                 </p>
               </div>
             </div>
@@ -234,8 +240,13 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
               <h1 className="font-semibold text-slate-800 dark:text-white">
                 {conversation.title}
               </h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {conversation.subject}
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {new Date(conversation.createdAt).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+                {conversation.subject && ` • ${conversation.subject}`}
               </p>
             </div>
           </div>
