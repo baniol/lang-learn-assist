@@ -3,7 +3,7 @@ mod db;
 mod models;
 mod state;
 
-use commands::{audio, conversations, learning, llm, notes, phrases, questions, settings, tts};
+use commands::{audio, conversations, data_export, learning, llm, notes, phrases, questions, settings, tts};
 use db::{get_db_path, init_db};
 use rusqlite::Connection;
 use state::AppState;
@@ -102,6 +102,9 @@ pub fn run() {
             notes::create_note,
             notes::update_note,
             notes::delete_note,
+            // Data Export/Import
+            data_export::export_data,
+            data_export::import_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -353,3 +353,151 @@ pub struct GrammarQuestionResponse {
     pub explanation: String,
     pub examples: Vec<QuestionExample>,
 }
+
+// Export/Import types
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportData {
+    pub version: i32,
+    pub exported_at: String,
+    pub settings: Vec<ExportSetting>,
+    pub conversations: Vec<ExportConversation>,
+    pub phrases: Vec<ExportPhrase>,
+    pub phrase_progress: Vec<ExportPhraseProgress>,
+    pub phrase_threads: Vec<ExportPhraseThread>,
+    pub question_threads: Vec<ExportQuestionThread>,
+    pub notes: Vec<ExportNote>,
+    pub practice_sessions: Vec<ExportPracticeSession>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportSetting {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportConversation {
+    pub id: i64,
+    pub title: String,
+    pub subject: String,
+    pub target_language: String,
+    pub native_language: String,
+    pub status: String,
+    pub raw_messages_json: String,
+    pub final_messages_json: Option<String>,
+    pub llm_summary: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPhrase {
+    pub id: i64,
+    pub conversation_id: Option<i64>,
+    pub prompt: String,
+    pub answer: String,
+    pub accepted_json: String,
+    pub target_language: String,
+    pub native_language: String,
+    pub audio_path: Option<String>,
+    pub notes: Option<String>,
+    pub starred: bool,
+    pub excluded: bool,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPhraseProgress {
+    pub id: i64,
+    pub phrase_id: i64,
+    pub correct_streak: i32,
+    pub total_attempts: i32,
+    pub success_count: i32,
+    pub last_seen: Option<String>,
+    pub ease_factor: f64,
+    pub interval_days: i32,
+    pub next_review_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPhraseThread {
+    pub id: i64,
+    pub phrase_id: i64,
+    pub messages_json: String,
+    pub suggested_prompt: Option<String>,
+    pub suggested_answer: Option<String>,
+    pub suggested_accepted: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportQuestionThread {
+    pub id: i64,
+    pub title: String,
+    pub target_language: String,
+    pub native_language: String,
+    pub messages_json: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportNote {
+    pub id: i64,
+    pub content: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPracticeSession {
+    pub id: i64,
+    pub started_at: String,
+    pub finished_at: Option<String>,
+    pub total_phrases: i32,
+    pub correct_answers: i32,
+    pub exercise_mode: String,
+    pub state_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImportMode {
+    Merge,
+    Overwrite,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    pub success: bool,
+    pub message: String,
+    pub stats: ImportStats,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportStats {
+    pub settings_imported: i32,
+    pub conversations_imported: i32,
+    pub conversations_updated: i32,
+    pub phrases_imported: i32,
+    pub phrases_updated: i32,
+    pub phrase_progress_imported: i32,
+    pub phrase_threads_imported: i32,
+    pub question_threads_imported: i32,
+    pub notes_imported: i32,
+    pub practice_sessions_imported: i32,
+}

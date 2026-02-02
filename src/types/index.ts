@@ -310,3 +310,124 @@ export interface CreateNoteRequest {
 export interface UpdateNoteRequest {
   content: string;
 }
+
+// Export/Import types
+
+export interface ExportData {
+  version: number;
+  exportedAt: string;
+  settings: ExportSetting[];
+  conversations: ExportConversation[];
+  phrases: ExportPhrase[];
+  phraseProgress: ExportPhraseProgress[];
+  phraseThreads: ExportPhraseThread[];
+  questionThreads: ExportQuestionThread[];
+  notes: ExportNote[];
+  practiceSessions: ExportPracticeSession[];
+}
+
+export interface ExportSetting {
+  key: string;
+  value: string;
+}
+
+export interface ExportConversation {
+  id: number;
+  title: string;
+  subject: string;
+  targetLanguage: string;
+  nativeLanguage: string;
+  status: string;
+  rawMessagesJson: string;
+  finalMessagesJson: string | null;
+  llmSummary: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportPhrase {
+  id: number;
+  conversationId: number | null;
+  prompt: string;
+  answer: string;
+  acceptedJson: string;
+  targetLanguage: string;
+  nativeLanguage: string;
+  audioPath: string | null;
+  notes: string | null;
+  starred: boolean;
+  excluded: boolean;
+  createdAt: string;
+}
+
+export interface ExportPhraseProgress {
+  id: number;
+  phraseId: number;
+  correctStreak: number;
+  totalAttempts: number;
+  successCount: number;
+  lastSeen: string | null;
+  easeFactor: number;
+  intervalDays: number;
+  nextReviewAt: string | null;
+}
+
+export interface ExportPhraseThread {
+  id: number;
+  phraseId: number;
+  messagesJson: string;
+  suggestedPrompt: string | null;
+  suggestedAnswer: string | null;
+  suggestedAccepted: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportQuestionThread {
+  id: number;
+  title: string;
+  targetLanguage: string;
+  nativeLanguage: string;
+  messagesJson: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportNote {
+  id: number;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportPracticeSession {
+  id: number;
+  startedAt: string;
+  finishedAt: string | null;
+  totalPhrases: number;
+  correctAnswers: number;
+  exerciseMode: string;
+  stateJson: string | null;
+}
+
+export type ImportMode = "merge" | "overwrite";
+
+export interface ImportResult {
+  success: boolean;
+  message: string;
+  stats: ImportStats;
+}
+
+export interface ImportStats {
+  settingsImported: number;
+  conversationsImported: number;
+  conversationsUpdated: number;
+  phrasesImported: number;
+  phrasesUpdated: number;
+  phraseProgressImported: number;
+  phraseThreadsImported: number;
+  questionThreadsImported: number;
+  notesImported: number;
+  practiceSessionsImported: number;
+}

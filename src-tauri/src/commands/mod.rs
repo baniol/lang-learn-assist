@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod conversations;
+pub mod data_export;
 pub mod learning;
 pub mod llm;
 pub mod notes;
