@@ -2243,6 +2243,7 @@ dependencies = [
  "dirs 5.0.1",
  "futures-util",
  "hound",
+ "regex",
  "reqwest",
  "rusqlite",
  "serde",

@@ -1,8 +1,8 @@
 use crate::db::get_conn;
 use crate::models::{
-    ExportConversation, ExportData, ExportNote, ExportPhrase, ExportPhraseProgress,
-    ExportPhraseThread, ExportPracticeSession, ExportQuestionThread, ExportSetting, ImportMode,
-    ImportResult, ImportStats,
+    ExportConversation, ExportData, ExportMaterial, ExportMaterialThread, ExportNote,
+    ExportPhrase, ExportPhraseProgress, ExportPhraseThread, ExportPracticeSession,
+    ExportQuestionThread, ExportSetting, ImportMode, ImportResult, ImportStats,
 };
 use rusqlite::params;
 use std::collections::HashMap;
@@ -60,7 +60,7 @@ pub fn export_data() -> Result<ExportData, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, conversation_id, prompt, answer, accepted_json, target_language,
-                    native_language, audio_path, notes, starred, excluded, created_at
+                    native_language, audio_path, notes, starred, excluded, created_at, material_id
              FROM phrases",
         )
         .map_err(|e| format!("Failed to prepare phrases query: {}", e))?;
@@ -71,6 +71,7 @@ pub fn export_data() -> Result<ExportData, String> {
             Ok(ExportPhrase {
                 id: row.get(0)?,
                 conversation_id: row.get(1)?,
+                material_id: row.get(12).ok(),
                 prompt: row.get(2)?,
                 answer: row.get(3)?,
                 accepted_json: row.get(4)?,
@@ -210,8 +211,62 @@ pub fn export_data() -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to collect practice_sessions: {}", e))?;
     drop(stmt);
 
+    // Export materials
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, title, material_type, source_url, original_text, segments_json,
+                    target_language, native_language, status, created_at, updated_at
+             FROM materials",
+        )
+        .map_err(|e| format!("Failed to prepare materials query: {}", e))?;
+    let materials = stmt
+        .query_map([], |row| {
+            Ok(ExportMaterial {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                material_type: row.get(2)?,
+                source_url: row.get(3)?,
+                original_text: row.get(4)?,
+                segments_json: row.get(5)?,
+                target_language: row.get(6)?,
+                native_language: row.get(7)?,
+                status: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query materials: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect materials: {}", e))?;
+    drop(stmt);
+
+    // Export material threads
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, material_id, segment_index, messages_json, suggested_phrases_json,
+                    created_at, updated_at
+             FROM material_threads",
+        )
+        .map_err(|e| format!("Failed to prepare material_threads query: {}", e))?;
+    let material_threads = stmt
+        .query_map([], |row| {
+            Ok(ExportMaterialThread {
+                id: row.get(0)?,
+                material_id: row.get(1)?,
+                segment_index: row.get(2)?,
+                messages_json: row.get(3)?,
+                suggested_phrases_json: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query material_threads: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect material_threads: {}", e))?;
+    drop(stmt);
+
     Ok(ExportData {
-        version: 1,
+        version: 2,
         exported_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         settings,
         conversations,
@@ -221,6 +276,8 @@ pub fn export_data() -> Result<ExportData, String> {
         question_threads,
         notes,
         practice_sessions,
+        materials,
+        material_threads,
     })
 }
 
@@ -229,7 +286,7 @@ pub fn import_data(data: ExportData, mode: ImportMode) -> Result<ImportResult, S
     let mut conn = get_conn()?;
 
     // Check version compatibility
-    if data.version > 1 {
+    if data.version > 2 {
         return Err(format!(
             "Export version {} is not supported. Please update the application.",
             data.version
@@ -255,8 +312,12 @@ pub fn import_data(data: ExportData, mode: ImportMode) -> Result<ImportResult, S
                 .map_err(|e| format!("Failed to delete phrase_threads: {}", e))?;
             tx.execute("DELETE FROM phrase_progress", [])
                 .map_err(|e| format!("Failed to delete phrase_progress: {}", e))?;
+            tx.execute("DELETE FROM material_threads", [])
+                .map_err(|e| format!("Failed to delete material_threads: {}", e))?;
             tx.execute("DELETE FROM phrases", [])
                 .map_err(|e| format!("Failed to delete phrases: {}", e))?;
+            tx.execute("DELETE FROM materials", [])
+                .map_err(|e| format!("Failed to delete materials: {}", e))?;
             tx.execute("DELETE FROM conversations", [])
                 .map_err(|e| format!("Failed to delete conversations: {}", e))?;
             tx.execute("DELETE FROM settings", [])
@@ -418,6 +479,51 @@ pub fn import_data(data: ExportData, mode: ImportMode) -> Result<ImportResult, S
                 )
                 .map_err(|e| format!("Failed to import practice_session: {}", e))?;
                 stats.practice_sessions_imported += 1;
+            }
+
+            // Import materials with original IDs
+            for material in &data.materials {
+                tx.execute(
+                    "INSERT INTO materials (id, title, material_type, source_url, original_text,
+                                           segments_json, target_language, native_language, status,
+                                           created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                    params![
+                        material.id,
+                        material.title,
+                        material.material_type,
+                        material.source_url,
+                        material.original_text,
+                        material.segments_json,
+                        material.target_language,
+                        material.native_language,
+                        material.status,
+                        material.created_at,
+                        material.updated_at
+                    ],
+                )
+                .map_err(|e| format!("Failed to import material: {}", e))?;
+                stats.materials_imported += 1;
+            }
+
+            // Import material threads with original IDs
+            for thread in &data.material_threads {
+                tx.execute(
+                    "INSERT INTO material_threads (id, material_id, segment_index, messages_json,
+                                                  suggested_phrases_json, created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        thread.id,
+                        thread.material_id,
+                        thread.segment_index,
+                        thread.messages_json,
+                        thread.suggested_phrases_json,
+                        thread.created_at,
+                        thread.updated_at
+                    ],
+                )
+                .map_err(|e| format!("Failed to import material_thread: {}", e))?;
+                stats.material_threads_imported += 1;
             }
         }
         ImportMode::Merge => {
@@ -676,6 +782,79 @@ pub fn import_data(data: ExportData, mode: ImportMode) -> Result<ImportResult, S
                     )
                     .map_err(|e| format!("Failed to import practice_session: {}", e))?;
                     stats.practice_sessions_imported += 1;
+                }
+            }
+
+            // Build material ID mapping for relationships
+            let mut material_id_map: HashMap<i64, i64> = HashMap::new();
+
+            // Import materials (check by created_at + title)
+            for material in &data.materials {
+                let existing: Option<i64> = tx
+                    .query_row(
+                        "SELECT id FROM materials WHERE created_at = ?1 AND title = ?2",
+                        params![material.created_at, material.title],
+                        |row| row.get(0),
+                    )
+                    .ok();
+
+                if let Some(existing_id) = existing {
+                    material_id_map.insert(material.id, existing_id);
+                } else {
+                    tx.execute(
+                        "INSERT INTO materials (title, material_type, source_url, original_text,
+                                               segments_json, target_language, native_language, status,
+                                               created_at, updated_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                        params![
+                            material.title,
+                            material.material_type,
+                            material.source_url,
+                            material.original_text,
+                            material.segments_json,
+                            material.target_language,
+                            material.native_language,
+                            material.status,
+                            material.created_at,
+                            material.updated_at
+                        ],
+                    )
+                    .map_err(|e| format!("Failed to import material: {}", e))?;
+                    let new_id = tx.last_insert_rowid();
+                    material_id_map.insert(material.id, new_id);
+                    stats.materials_imported += 1;
+                }
+            }
+
+            // Import material threads (linked to materials)
+            for thread in &data.material_threads {
+                if let Some(&new_material_id) = material_id_map.get(&thread.material_id) {
+                    // Check if thread exists for this material + segment
+                    let existing: Option<i64> = tx
+                        .query_row(
+                            "SELECT id FROM material_threads WHERE material_id = ?1 AND segment_index = ?2",
+                            params![new_material_id, thread.segment_index],
+                            |row| row.get(0),
+                        )
+                        .ok();
+
+                    if existing.is_none() {
+                        tx.execute(
+                            "INSERT INTO material_threads (material_id, segment_index, messages_json,
+                                                          suggested_phrases_json, created_at, updated_at)
+                             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                            params![
+                                new_material_id,
+                                thread.segment_index,
+                                thread.messages_json,
+                                thread.suggested_phrases_json,
+                                thread.created_at,
+                                thread.updated_at
+                            ],
+                        )
+                        .map_err(|e| format!("Failed to import material_thread: {}", e))?;
+                        stats.material_threads_imported += 1;
+                    }
                 }
             }
         }

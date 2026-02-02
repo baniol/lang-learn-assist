@@ -80,7 +80,7 @@ pub fn get_next_phrase(
 
     let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at
          FROM phrases p
@@ -104,6 +104,7 @@ pub fn get_next_phrase(
             let phrase = crate::models::Phrase {
                 id: row.get(0)?,
                 conversation_id: row.get(1)?,
+                material_id: row.get(12).ok(),
                 prompt: row.get(2)?,
                 answer: row.get(3)?,
                 accepted,
@@ -116,17 +117,17 @@ pub fn get_next_phrase(
                 created_at: row.get(11)?,
             };
 
-            let progress: Option<PhraseProgress> = row.get::<_, Option<i64>>(12)?.map(|progress_id| {
+            let progress: Option<PhraseProgress> = row.get::<_, Option<i64>>(13)?.map(|progress_id| {
                 PhraseProgress {
                     id: progress_id,
                     phrase_id: phrase.id,
-                    correct_streak: row.get(13).unwrap_or(0),
-                    total_attempts: row.get(14).unwrap_or(0),
-                    success_count: row.get(15).unwrap_or(0),
-                    last_seen: row.get(16).ok(),
-                    ease_factor: row.get(17).unwrap_or(2.5),
-                    interval_days: row.get(18).unwrap_or(1),
-                    next_review_at: row.get(19).ok(),
+                    correct_streak: row.get(14).unwrap_or(0),
+                    total_attempts: row.get(15).unwrap_or(0),
+                    success_count: row.get(16).unwrap_or(0),
+                    last_seen: row.get(17).ok(),
+                    ease_factor: row.get(18).unwrap_or(2.5),
+                    interval_days: row.get(19).unwrap_or(1),
+                    next_review_at: row.get(20).ok(),
                 }
             });
 

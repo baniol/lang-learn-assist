@@ -3,7 +3,7 @@ mod db;
 mod models;
 mod state;
 
-use commands::{audio, conversations, data_export, learning, llm, notes, phrases, questions, settings, tts};
+use commands::{audio, conversations, data_export, learning, llm, materials, notes, phrases, questions, settings, tts};
 use db::{get_db_path, init_db};
 use rusqlite::Connection;
 use state::AppState;
@@ -74,6 +74,20 @@ pub fn run() {
             llm::test_llm_connection,
             llm::refine_phrase,
             llm::generate_title,
+            llm::process_material,
+            llm::estimate_material_tokens,
+            llm::ask_about_sentence,
+            // Materials
+            materials::create_material,
+            materials::get_materials,
+            materials::get_material,
+            materials::update_material,
+            materials::delete_material,
+            materials::get_material_thread,
+            materials::create_material_thread,
+            materials::update_material_thread,
+            materials::delete_material_thread,
+            materials::get_material_thread_indices,
             // Audio
             audio::get_available_models,
             audio::get_model_status,

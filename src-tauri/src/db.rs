@@ -145,6 +145,14 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         ).ok();
     }
 
+    // Migration: Add material_id column to phrases if it doesn't exist
+    if !phrase_columns.contains(&"material_id".to_string()) {
+        conn.execute(
+            "ALTER TABLE phrases ADD COLUMN material_id INTEGER REFERENCES materials(id) ON DELETE SET NULL",
+            [],
+        ).ok();
+    }
+
     // Practice sessions table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS practice_sessions (
@@ -218,6 +226,24 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Materials table (for YouTube transcripts, articles, etc.)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS materials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            material_type TEXT NOT NULL,
+            source_url TEXT,
+            original_text TEXT NOT NULL,
+            segments_json TEXT,
+            target_language TEXT NOT NULL DEFAULT 'de',
+            native_language TEXT NOT NULL DEFAULT 'pl',
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+
     // Create indexes for performance
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_phrases_conversation ON phrases(conversation_id)",
@@ -239,6 +265,54 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_phrase_threads_phrase ON phrase_threads(phrase_id)",
         [],
     )?;
+    // Material threads table (for sentence Q&A)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS material_threads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            material_id INTEGER NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+            segment_index INTEGER NOT NULL,
+            messages_json TEXT NOT NULL DEFAULT '[]',
+            suggested_phrases_json TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_material_threads_material ON material_threads(material_id)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_materials_type ON materials(material_type)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_materials_status ON materials(status)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_phrases_material ON phrases(material_id)",
+        [],
+    )?;
+
+    // Migration: Add processed_chunks column to materials if it doesn't exist
+    let material_columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(materials)")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    if !material_columns.contains(&"processed_chunks".to_string()) {
+        conn.execute(
+            "ALTER TABLE materials ADD COLUMN processed_chunks INTEGER NOT NULL DEFAULT 0",
+            [],
+        ).ok();
+    }
 
     Ok(())
 }

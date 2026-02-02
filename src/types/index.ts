@@ -7,7 +7,10 @@ export type ViewType =
   | "stats"
   | "questions"
   | "settings"
-  | "notes";
+  | "notes"
+  | "materials"
+  | "material-create"
+  | "material-review";
 
 export type ConversationStatus = "draft" | "finalized" | "archived";
 
@@ -34,6 +37,7 @@ export interface ChatMessage {
 export interface Phrase {
   id: number;
   conversationId: number | null;
+  materialId: number | null;
   prompt: string;
   answer: string;
   accepted: string[];
@@ -185,6 +189,7 @@ export interface CreateConversationRequest {
 
 export interface CreatePhraseRequest {
   conversationId?: number;
+  materialId?: number;
   prompt: string;
   answer: string;
   accepted?: string[];
@@ -324,6 +329,8 @@ export interface ExportData {
   questionThreads: ExportQuestionThread[];
   notes: ExportNote[];
   practiceSessions: ExportPracticeSession[];
+  materials: ExportMaterial[];
+  materialThreads: ExportMaterialThread[];
 }
 
 export interface ExportSetting {
@@ -348,6 +355,7 @@ export interface ExportConversation {
 export interface ExportPhrase {
   id: number;
   conversationId: number | null;
+  materialId: number | null;
   prompt: string;
   answer: string;
   acceptedJson: string;
@@ -430,4 +438,104 @@ export interface ImportStats {
   questionThreadsImported: number;
   notesImported: number;
   practiceSessionsImported: number;
+  materialsImported: number;
+  materialThreadsImported: number;
+}
+
+export interface ExportMaterial {
+  id: number;
+  title: string;
+  materialType: string;
+  sourceUrl: string | null;
+  originalText: string;
+  segmentsJson: string | null;
+  targetLanguage: string;
+  nativeLanguage: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportMaterialThread {
+  id: number;
+  materialId: number;
+  segmentIndex: number;
+  messagesJson: string;
+  suggestedPhrasesJson: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Materials (YouTube transcripts, articles, etc.)
+
+export type MaterialType = "transcript" | "text";
+export type MaterialStatus = "pending" | "processing" | "ready" | "error";
+
+export interface Material {
+  id: number;
+  title: string;
+  materialType: MaterialType;
+  sourceUrl: string | null;
+  originalText: string;
+  segmentsJson: string | null;
+  targetLanguage: string;
+  nativeLanguage: string;
+  status: MaterialStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TextSegment {
+  text: string;
+  translation: string;
+  timestamp?: string;
+}
+
+export interface CreateMaterialRequest {
+  title: string;
+  materialType: MaterialType;
+  sourceUrl?: string;
+  originalText: string;
+  targetLanguage?: string;
+  nativeLanguage?: string;
+}
+
+export interface UpdateMaterialRequest {
+  title?: string;
+  segmentsJson?: string;
+  status?: MaterialStatus;
+}
+
+export interface MaterialThread {
+  id: number;
+  materialId: number;
+  segmentIndex: number;
+  messages: MaterialThreadMessage[];
+  suggestedPhrases: SuggestedPhrase[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MaterialThreadMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AskAboutSentenceResponse {
+  explanation: string;
+  phrases: SuggestedPhrase[];
+}
+
+export interface TokenEstimate {
+  estimatedTokens: number;
+  chunkCount: number;
+  estimatedCostUsd: number;
+}
+
+export interface MaterialProcessingProgress {
+  materialId: number;
+  currentChunk: number;
+  totalChunks: number;
+  percent: number;
 }

@@ -3,6 +3,7 @@ pub mod conversations;
 pub mod data_export;
 pub mod learning;
 pub mod llm;
+pub mod materials;
 pub mod notes;
 pub mod phrases;
 pub mod questions;

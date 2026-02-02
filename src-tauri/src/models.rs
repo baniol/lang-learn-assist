@@ -48,6 +48,7 @@ pub struct ChatMessage {
 pub struct Phrase {
     pub id: i64,
     pub conversation_id: Option<i64>,
+    pub material_id: Option<i64>,
     pub prompt: String,
     pub answer: String,
     pub accepted: Vec<String>,
@@ -267,6 +268,7 @@ pub struct CreateConversationRequest {
 #[serde(rename_all = "camelCase")]
 pub struct CreatePhraseRequest {
     pub conversation_id: Option<i64>,
+    pub material_id: Option<i64>,
     pub prompt: String,
     pub answer: String,
     pub accepted: Option<Vec<String>>,
@@ -369,6 +371,10 @@ pub struct ExportData {
     pub question_threads: Vec<ExportQuestionThread>,
     pub notes: Vec<ExportNote>,
     pub practice_sessions: Vec<ExportPracticeSession>,
+    #[serde(default)]
+    pub materials: Vec<ExportMaterial>,
+    #[serde(default)]
+    pub material_threads: Vec<ExportMaterialThread>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -399,6 +405,7 @@ pub struct ExportConversation {
 pub struct ExportPhrase {
     pub id: i64,
     pub conversation_id: Option<i64>,
+    pub material_id: Option<i64>,
     pub prompt: String,
     pub answer: String,
     pub accepted_json: String,
@@ -500,4 +507,107 @@ pub struct ImportStats {
     pub question_threads_imported: i32,
     pub notes_imported: i32,
     pub practice_sessions_imported: i32,
+    pub materials_imported: i32,
+    pub material_threads_imported: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportMaterial {
+    pub id: i64,
+    pub title: String,
+    pub material_type: String,
+    pub source_url: Option<String>,
+    pub original_text: String,
+    pub segments_json: Option<String>,
+    pub target_language: String,
+    pub native_language: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportMaterialThread {
+    pub id: i64,
+    pub material_id: i64,
+    pub segment_index: i32,
+    pub messages_json: String,
+    pub suggested_phrases_json: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// Materials (YouTube transcripts, articles, etc.)
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Material {
+    pub id: i64,
+    pub title: String,
+    pub material_type: String,
+    pub source_url: Option<String>,
+    pub original_text: String,
+    pub segments_json: Option<String>,
+    pub target_language: String,
+    pub native_language: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateMaterialRequest {
+    pub title: String,
+    pub material_type: String,
+    pub source_url: Option<String>,
+    pub original_text: String,
+    pub target_language: Option<String>,
+    pub native_language: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateMaterialRequest {
+    pub title: Option<String>,
+    pub segments_json: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextSegment {
+    pub text: String,
+    pub translation: String,
+    #[serde(default)]
+    pub timestamp: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaterialThread {
+    pub id: i64,
+    pub material_id: i64,
+    pub segment_index: i32,
+    pub messages: Vec<MaterialThreadMessage>,
+    pub suggested_phrases: Option<Vec<SuggestedPhrase>>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaterialThreadMessage {
+    pub id: String,
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AskAboutSentenceResponse {
+    pub explanation: String,
+    pub phrases: Vec<SuggestedPhrase>,
 }

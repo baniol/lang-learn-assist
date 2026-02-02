@@ -1,0 +1,371 @@
+use crate::db::get_conn;
+use crate::models::{CreateMaterialRequest, Material, MaterialThread, MaterialThreadMessage, SuggestedPhrase, TextSegment, UpdateMaterialRequest};
+use crate::state::AppState;
+use rusqlite::params;
+use tauri::State;
+use regex::Regex;
+
+fn row_to_material(row: &rusqlite::Row) -> Result<Material, rusqlite::Error> {
+    Ok(Material {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        material_type: row.get(2)?,
+        source_url: row.get(3)?,
+        original_text: row.get(4)?,
+        segments_json: row.get(5)?,
+        target_language: row.get(6)?,
+        native_language: row.get(7)?,
+        status: row.get(8)?,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+    })
+}
+
+#[tauri::command]
+pub fn create_material(
+    state: State<'_, AppState>,
+    request: CreateMaterialRequest,
+) -> Result<Material, String> {
+    let conn = get_conn()?;
+
+    // Get default languages from settings if not provided
+    let settings = state
+        .settings
+        .lock()
+        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+
+    let target_lang = request
+        .target_language
+        .unwrap_or_else(|| settings.target_language.clone());
+    let native_lang = request
+        .native_language
+        .unwrap_or_else(|| settings.native_language.clone());
+
+    conn.execute(
+        "INSERT INTO materials (title, material_type, source_url, original_text, target_language, native_language, status)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'pending')",
+        params![
+            request.title,
+            request.material_type,
+            request.source_url,
+            request.original_text,
+            target_lang,
+            native_lang,
+        ],
+    )
+    .map_err(|e| format!("Failed to create material: {}", e))?;
+
+    let id = conn.last_insert_rowid();
+
+    conn.query_row(
+        "SELECT id, title, material_type, source_url, original_text, segments_json,
+                target_language, native_language, status, created_at, updated_at
+         FROM materials WHERE id = ?1",
+        params![id],
+        row_to_material,
+    )
+    .map_err(|e| format!("Failed to retrieve created material: {}", e))
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_materials(
+    targetLanguage: Option<String>,
+    materialType: Option<String>,
+) -> Result<Vec<Material>, String> {
+    let conn = get_conn()?;
+
+    let mut conditions = Vec::new();
+    let mut param_values: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(ref lang) = targetLanguage {
+        conditions.push("target_language = ?");
+        param_values.push(Box::new(lang.clone()));
+    }
+
+    if let Some(ref mtype) = materialType {
+        conditions.push("material_type = ?");
+        param_values.push(Box::new(mtype.clone()));
+    }
+
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", conditions.join(" AND "))
+    };
+
+    let query = format!(
+        "SELECT id, title, material_type, source_url, original_text, segments_json,
+                target_language, native_language, status, created_at, updated_at
+         FROM materials{}
+         ORDER BY created_at DESC",
+        where_clause
+    );
+
+    let mut stmt = conn
+        .prepare(&query)
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let params: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+    let materials = stmt
+        .query_map(params.as_slice(), row_to_material)
+        .map_err(|e| format!("Failed to query materials: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect materials: {}", e))?;
+
+    Ok(materials)
+}
+
+/// Parse timestamps from original transcript text
+fn parse_timestamps_from_original(text: &str) -> Vec<String> {
+    let ts_re = Regex::new(r"^\[?(\d+:\d+(?::\d+)?)\]?\s*$").unwrap();
+    let mut timestamps = Vec::new();
+
+    for line in text.lines() {
+        let line = line.trim();
+        if let Some(caps) = ts_re.captures(line) {
+            if let Some(ts) = caps.get(1) {
+                timestamps.push(ts.as_str().to_string());
+            }
+        }
+    }
+
+    timestamps
+}
+
+/// Enrich segments with timestamps from original text if missing
+fn enrich_segments_with_timestamps(segments_json: &str, original_text: &str, material_type: &str) -> String {
+    if material_type != "transcript" {
+        return segments_json.to_string();
+    }
+
+    let mut segments: Vec<TextSegment> = match serde_json::from_str(segments_json) {
+        Ok(s) => s,
+        Err(_) => return segments_json.to_string(),
+    };
+
+    // Check if any segment already has a timestamp
+    if segments.iter().any(|s| s.timestamp.is_some()) {
+        return segments_json.to_string();
+    }
+
+    // Parse timestamps from original
+    let timestamps = parse_timestamps_from_original(original_text);
+
+    // Assign timestamps to segments (best effort - distribute evenly if counts don't match)
+    if !timestamps.is_empty() {
+        let seg_len = segments.len();
+        let ts_len = timestamps.len();
+        for (i, segment) in segments.iter_mut().enumerate() {
+            // Map segment index to timestamp index
+            let ts_idx = if ts_len >= seg_len {
+                // More timestamps than segments - use proportional mapping
+                (i * ts_len) / seg_len
+            } else {
+                // Fewer timestamps - use modulo or just first ones
+                i.min(ts_len - 1)
+            };
+            segment.timestamp = Some(timestamps[ts_idx].clone());
+        }
+    }
+
+    serde_json::to_string(&segments).unwrap_or_else(|_| segments_json.to_string())
+}
+
+#[tauri::command]
+pub fn get_material(id: i64) -> Result<Material, String> {
+    let conn = get_conn()?;
+
+    let mut material = conn.query_row(
+        "SELECT id, title, material_type, source_url, original_text, segments_json,
+                target_language, native_language, status, created_at, updated_at
+         FROM materials WHERE id = ?1",
+        params![id],
+        row_to_material,
+    )
+    .map_err(|e| format!("Material not found: {}", e))?;
+
+    // Enrich segments with timestamps if missing
+    if let Some(ref segments_json) = material.segments_json {
+        material.segments_json = Some(enrich_segments_with_timestamps(
+            segments_json,
+            &material.original_text,
+            &material.material_type,
+        ));
+    }
+
+    Ok(material)
+}
+
+#[tauri::command]
+pub fn update_material(id: i64, request: UpdateMaterialRequest) -> Result<Material, String> {
+    let conn = get_conn()?;
+
+    if let Some(title) = &request.title {
+        conn.execute(
+            "UPDATE materials SET title = ?1, updated_at = datetime('now') WHERE id = ?2",
+            params![title, id],
+        )
+        .map_err(|e| format!("Failed to update title: {}", e))?;
+    }
+
+    if let Some(segments_json) = &request.segments_json {
+        conn.execute(
+            "UPDATE materials SET segments_json = ?1, updated_at = datetime('now') WHERE id = ?2",
+            params![segments_json, id],
+        )
+        .map_err(|e| format!("Failed to update segments: {}", e))?;
+    }
+
+    if let Some(status) = &request.status {
+        conn.execute(
+            "UPDATE materials SET status = ?1, updated_at = datetime('now') WHERE id = ?2",
+            params![status, id],
+        )
+        .map_err(|e| format!("Failed to update status: {}", e))?;
+    }
+
+    conn.query_row(
+        "SELECT id, title, material_type, source_url, original_text, segments_json,
+                target_language, native_language, status, created_at, updated_at
+         FROM materials WHERE id = ?1",
+        params![id],
+        row_to_material,
+    )
+    .map_err(|e| format!("Material not found: {}", e))
+}
+
+#[tauri::command]
+pub fn delete_material(id: i64) -> Result<(), String> {
+    let conn = get_conn()?;
+
+    conn.execute("DELETE FROM materials WHERE id = ?1", params![id])
+        .map_err(|e| format!("Failed to delete material: {}", e))?;
+
+    Ok(())
+}
+
+// Material Threads
+
+fn row_to_material_thread(row: &rusqlite::Row) -> Result<MaterialThread, rusqlite::Error> {
+    let messages_json: String = row.get(3)?;
+    let messages: Vec<MaterialThreadMessage> = serde_json::from_str(&messages_json).unwrap_or_default();
+    let suggested_phrases_json: Option<String> = row.get(4)?;
+    let suggested_phrases: Option<Vec<SuggestedPhrase>> = suggested_phrases_json
+        .and_then(|j| serde_json::from_str(&j).ok());
+
+    Ok(MaterialThread {
+        id: row.get(0)?,
+        material_id: row.get(1)?,
+        segment_index: row.get(2)?,
+        messages,
+        suggested_phrases,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
+    })
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_material_thread(materialId: i64, segmentIndex: i32) -> Result<Option<MaterialThread>, String> {
+    let conn = get_conn()?;
+
+    let result = conn.query_row(
+        "SELECT id, material_id, segment_index, messages_json, suggested_phrases_json, created_at, updated_at
+         FROM material_threads
+         WHERE material_id = ?1 AND segment_index = ?2
+         ORDER BY created_at DESC
+         LIMIT 1",
+        params![materialId, segmentIndex],
+        row_to_material_thread,
+    );
+
+    match result {
+        Ok(thread) => Ok(Some(thread)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(format!("Failed to get material thread: {}", e)),
+    }
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn create_material_thread(materialId: i64, segmentIndex: i32) -> Result<MaterialThread, String> {
+    let conn = get_conn()?;
+
+    conn.execute(
+        "INSERT INTO material_threads (material_id, segment_index, messages_json, created_at, updated_at)
+         VALUES (?1, ?2, '[]', datetime('now'), datetime('now'))",
+        params![materialId, segmentIndex],
+    )
+    .map_err(|e| format!("Failed to create material thread: {}", e))?;
+
+    let id = conn.last_insert_rowid();
+
+    conn.query_row(
+        "SELECT id, material_id, segment_index, messages_json, suggested_phrases_json, created_at, updated_at
+         FROM material_threads WHERE id = ?1",
+        params![id],
+        row_to_material_thread,
+    )
+    .map_err(|e| format!("Failed to retrieve created thread: {}", e))
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn update_material_thread(
+    threadId: i64,
+    messages: Vec<MaterialThreadMessage>,
+    suggestedPhrases: Option<Vec<SuggestedPhrase>>,
+) -> Result<MaterialThread, String> {
+    let conn = get_conn()?;
+
+    let messages_json = serde_json::to_string(&messages)
+        .map_err(|e| format!("Failed to serialize messages: {}", e))?;
+    let phrases_json = suggestedPhrases
+        .map(|p| serde_json::to_string(&p).unwrap_or_else(|_| "[]".to_string()));
+
+    conn.execute(
+        "UPDATE material_threads
+         SET messages_json = ?1, suggested_phrases_json = ?2, updated_at = datetime('now')
+         WHERE id = ?3",
+        params![messages_json, phrases_json, threadId],
+    )
+    .map_err(|e| format!("Failed to update material thread: {}", e))?;
+
+    conn.query_row(
+        "SELECT id, material_id, segment_index, messages_json, suggested_phrases_json, created_at, updated_at
+         FROM material_threads WHERE id = ?1",
+        params![threadId],
+        row_to_material_thread,
+    )
+    .map_err(|e| format!("Failed to retrieve updated thread: {}", e))
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn delete_material_thread(threadId: i64) -> Result<(), String> {
+    let conn = get_conn()?;
+
+    conn.execute("DELETE FROM material_threads WHERE id = ?1", params![threadId])
+        .map_err(|e| format!("Failed to delete material thread: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_material_thread_indices(materialId: i64) -> Result<Vec<(i32, String)>, String> {
+    let conn = get_conn()?;
+
+    let mut stmt = conn
+        .prepare("SELECT segment_index, created_at FROM material_threads WHERE material_id = ?1")
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let indices = stmt
+        .query_map(params![materialId], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| format!("Failed to query thread indices: {}", e))?
+        .collect::<Result<Vec<(i32, String)>, _>>()
+        .map_err(|e| format!("Failed to collect indices: {}", e))?;
+
+    Ok(indices)
+}

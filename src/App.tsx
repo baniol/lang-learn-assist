@@ -10,6 +10,9 @@ import { StatsView } from "./views/StatsView";
 import { QuestionsView } from "./views/QuestionsView";
 import { SettingsView } from "./views/SettingsView";
 import { NotesView } from "./views/NotesView";
+import { MaterialsView } from "./views/MaterialsView";
+import { MaterialCreateView } from "./views/MaterialCreateView";
+import { MaterialReviewView } from "./views/MaterialReviewView";
 import { QuickNotePopup } from "./components/QuickNotePopup";
 import type { ViewType, AppSettings } from "./types";
 
@@ -70,6 +73,17 @@ function App() {
         return <SettingsView onSettingsChange={setSettings} />;
       case "notes":
         return <NotesView />;
+      case "materials":
+        return <MaterialsView onNavigate={handleNavigate} settings={settings} />;
+      case "material-create":
+        return <MaterialCreateView onNavigate={handleNavigate} settings={settings} />;
+      case "material-review":
+        return (
+          <MaterialReviewView
+            materialId={viewState.data?.materialId as number}
+            onNavigate={handleNavigate}
+          />
+        );
       default:
         return <DashboardView onNavigate={handleNavigate} settings={settings} />;
     }

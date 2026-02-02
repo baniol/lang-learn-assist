@@ -16,6 +16,7 @@ fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
     Ok(Phrase {
         id: row.get(0)?,
         conversation_id: row.get(1)?,
+        material_id: row.get(12).ok(),
         prompt: row.get(2)?,
         answer: row.get(3)?,
         accepted,
@@ -107,7 +108,7 @@ pub fn get_phrases(
 
     let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at
          FROM phrases p
@@ -126,17 +127,17 @@ pub fn get_phrases(
         .query_map(params.as_slice(), |row| {
             let phrase = row_to_phrase(row)?;
 
-            let progress = if let Ok(progress_id) = row.get::<_, i64>(12) {
+            let progress = if let Ok(progress_id) = row.get::<_, i64>(13) {
                 Some(PhraseProgress {
                     id: progress_id,
                     phrase_id: phrase.id,
-                    correct_streak: row.get(13)?,
-                    total_attempts: row.get(14)?,
-                    success_count: row.get(15)?,
-                    last_seen: row.get(16)?,
-                    ease_factor: row.get(17).unwrap_or(2.5),
-                    interval_days: row.get(18).unwrap_or(1),
-                    next_review_at: row.get(19).ok(),
+                    correct_streak: row.get(14)?,
+                    total_attempts: row.get(15)?,
+                    success_count: row.get(16)?,
+                    last_seen: row.get(17)?,
+                    ease_factor: row.get(18).unwrap_or(2.5),
+                    interval_days: row.get(19).unwrap_or(1),
+                    next_review_at: row.get(20).ok(),
                 })
             } else {
                 None
@@ -157,7 +158,7 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
 
     conn.query_row(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at
          FROM phrases p
@@ -167,17 +168,17 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
         |row| {
             let phrase = row_to_phrase(row)?;
 
-            let progress = if let Ok(progress_id) = row.get::<_, i64>(12) {
+            let progress = if let Ok(progress_id) = row.get::<_, i64>(13) {
                 Some(PhraseProgress {
                     id: progress_id,
                     phrase_id: phrase.id,
-                    correct_streak: row.get(13)?,
-                    total_attempts: row.get(14)?,
-                    success_count: row.get(15)?,
-                    last_seen: row.get(16)?,
-                    ease_factor: row.get(17).unwrap_or(2.5),
-                    interval_days: row.get(18).unwrap_or(1),
-                    next_review_at: row.get(19).ok(),
+                    correct_streak: row.get(14)?,
+                    total_attempts: row.get(15)?,
+                    success_count: row.get(16)?,
+                    last_seen: row.get(17)?,
+                    ease_factor: row.get(18).unwrap_or(2.5),
+                    interval_days: row.get(19).unwrap_or(1),
+                    next_review_at: row.get(20).ok(),
                 })
             } else {
                 None
@@ -213,10 +214,11 @@ pub fn create_phrase(
         .unwrap_or_else(|| settings.native_language.clone());
 
     conn.execute(
-        "INSERT INTO phrases (conversation_id, prompt, answer, accepted_json, target_language, native_language, notes)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO phrases (conversation_id, material_id, prompt, answer, accepted_json, target_language, native_language, notes)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             request.conversation_id,
+            request.material_id,
             request.prompt,
             request.answer,
             accepted_json,
@@ -230,7 +232,7 @@ pub fn create_phrase(
     let id = conn.last_insert_rowid();
 
     conn.query_row(
-        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at
+        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,
@@ -275,10 +277,11 @@ pub fn create_phrases_batch(
             .unwrap_or_else(|| default_native_lang.clone());
 
         tx.execute(
-            "INSERT INTO phrases (conversation_id, prompt, answer, accepted_json, target_language, native_language, notes)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO phrases (conversation_id, material_id, prompt, answer, accepted_json, target_language, native_language, notes)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 request.conversation_id,
+                request.material_id,
                 request.prompt,
                 request.answer,
                 accepted_json,
@@ -297,7 +300,7 @@ pub fn create_phrases_batch(
     for id in &created_ids {
         let phrase = tx
             .query_row(
-                "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at
+                "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id
                  FROM phrases WHERE id = ?1",
                 params![id],
                 row_to_phrase,
@@ -359,7 +362,7 @@ pub fn update_phrase(id: i64, request: UpdatePhraseRequest) -> Result<Phrase, St
     }
 
     conn.query_row(
-        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at
+        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,
