@@ -6,6 +6,17 @@ import { VoiceButton } from "../components/VoiceButton";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
 import { useConversation } from "../hooks/useConversation";
 import { useAudioPlayback } from "../hooks/useAudioPlayback";
+import { Button, Spinner } from "../components/ui";
+import {
+  ChevronLeftIcon,
+  PlayIcon,
+  StopIcon,
+  CheckIcon,
+  SendIcon,
+  CloseIcon,
+  MicrophoneIcon,
+  EditIcon,
+} from "../components/icons";
 
 type InputMode = "text" | "voice";
 
@@ -14,7 +25,10 @@ interface ConversationViewProps {
   onNavigate: (view: ViewType, data?: unknown) => void;
 }
 
-export function ConversationView({ conversationId, onNavigate }: ConversationViewProps) {
+export function ConversationView({
+  conversationId,
+  onNavigate,
+}: ConversationViewProps) {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [inputText, setInputText] = useState("");
   const [isFinalizing, setIsFinalizing] = useState(false);
@@ -23,7 +37,15 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { messages, isLoading, error, sendMessage, loadMessages, clearError, deleteMessage } = useConversation({
+  const {
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    loadMessages,
+    clearError,
+    deleteMessage,
+  } = useConversation({
     conversation,
   });
 
@@ -62,7 +84,9 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
 
   const loadConversation = async () => {
     try {
-      const data = await invoke<Conversation>("get_conversation", { id: conversationId });
+      const data = await invoke<Conversation>("get_conversation", {
+        id: conversationId,
+      });
       setConversation(data);
     } catch (err) {
       console.error("Failed to load conversation:", err);
@@ -98,7 +122,7 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
   if (!conversation) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -106,9 +130,10 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
   const isFinalized = conversation.status === "finalized";
 
   // For finalized conversations, show only German phrases
-  const finalMessages: ChatMessage[] = isFinalized && conversation.finalMessagesJson
-    ? JSON.parse(conversation.finalMessagesJson)
-    : [];
+  const finalMessages: ChatMessage[] =
+    isFinalized && conversation.finalMessagesJson
+      ? JSON.parse(conversation.finalMessagesJson)
+      : [];
 
   // Finalized view - read only, German only
   if (isFinalized) {
@@ -117,56 +142,52 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 onClick={() => onNavigate("dashboard")}
-                className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                variant="ghost"
+                size="sm"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
+                <ChevronLeftIcon size="sm" />
+              </Button>
               <div>
                 <h1 className="font-semibold text-slate-800 dark:text-white">
                   {conversation.title}
                 </h1>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {new Date(conversation.createdAt).toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {new Date(conversation.createdAt).toLocaleDateString(
+                    undefined,
+                    {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    },
+                  )}
                   {" • "}
-                  <span className="text-green-600 dark:text-green-400">Completed</span>
+                  <span className="text-green-600 dark:text-green-400">
+                    Completed
+                  </span>
                 </p>
               </div>
             </div>
             {finalMessages.length > 0 && (
-              <button
-                onClick={() => audioPlayback.isPlaying ? audioPlayback.stop() : audioPlayback.playAll(finalMessages)}
+              <Button
+                onClick={() =>
+                  audioPlayback.isPlaying
+                    ? audioPlayback.stop()
+                    : audioPlayback.playAll(finalMessages)
+                }
                 disabled={audioPlayback.isLoading}
-                className={`
-                  px-4 py-2 rounded-lg transition-colors flex items-center gap-2
-                  ${audioPlayback.isPlaying
-                    ? "bg-red-500 text-white hover:bg-red-600"
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
-                  }
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                `}
+                variant={audioPlayback.isPlaying ? "danger" : "secondary"}
               >
                 {audioPlayback.isLoading ? (
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" />
                 ) : audioPlayback.isPlaying ? (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <rect x="6" y="5" width="4" height="14" rx="1" />
-                    <rect x="14" y="5" width="4" height="14" rx="1" />
-                  </svg>
+                  <StopIcon size="sm" />
                 ) : (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
+                  <PlayIcon size="sm" />
                 )}
                 {audioPlayback.isPlaying ? "Stop" : "Play All"}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -175,40 +196,43 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
           <div className="max-w-2xl mx-auto space-y-3">
             {finalMessages.map((msg, i) => {
               const messageId = msg.id || `final-${i}`;
-              const isCurrentPlaying = audioPlayback.currentlyPlayingId === messageId && audioPlayback.isPlaying;
-              const isCurrentLoading = audioPlayback.currentlyPlayingId === messageId && audioPlayback.isLoading;
+              const isCurrentPlaying =
+                audioPlayback.currentlyPlayingId === messageId &&
+                audioPlayback.isPlaying;
+              const isCurrentLoading =
+                audioPlayback.currentlyPlayingId === messageId &&
+                audioPlayback.isLoading;
               return (
                 <div
                   key={i}
                   className="px-4 py-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
                 >
                   <div className="flex items-center gap-3">
-                    <p className="text-lg text-slate-800 dark:text-white flex-1">{msg.content}</p>
+                    <p className="text-lg text-slate-800 dark:text-white flex-1">
+                      {msg.content}
+                    </p>
                     <button
-                      onClick={() => audioPlayback.playMessage(msg.content, messageId, i)}
+                      onClick={() =>
+                        audioPlayback.playMessage(msg.content, messageId, i)
+                      }
                       disabled={isCurrentLoading}
                       className={`
                         flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors
-                        ${isCurrentPlaying
-                          ? "bg-blue-500 text-white"
-                          : "bg-slate-100 dark:bg-slate-600 text-slate-500 dark:text-slate-300 hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-600 dark:hover:text-blue-400"
+                        ${
+                          isCurrentPlaying
+                            ? "bg-blue-500 text-white"
+                            : "bg-slate-100 dark:bg-slate-600 text-slate-500 dark:text-slate-300 hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-600 dark:hover:text-blue-400"
                         }
                         disabled:opacity-50
                       `}
                       title={isCurrentPlaying ? "Stop" : "Play"}
                     >
                       {isCurrentLoading ? (
-                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <Spinner size="sm" />
                       ) : isCurrentPlaying ? (
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <rect x="6" y="5" width="4" height="14" rx="1" />
-                          <rect x="14" y="5" width="4" height="14" rx="1" />
-                        </svg>
+                        <StopIcon size="xs" />
                       ) : (
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M15.528 8.47l-4.604-2.654A1 1 0 009.5 6.684v5.632a1 1 0 001.424.868l4.604-2.654a1 1 0 000-1.736z" />
-                          <path fillRule="evenodd" d="M1 12C1 5.925 5.925 1 12 1s11 4.925 11 11-4.925 11-11 11S1 18.075 1 12zm11-9a9 9 0 100 18 9 9 0 000-18z" clipRule="evenodd" />
-                        </svg>
+                        <PlayIcon size="xs" />
                       )}
                     </button>
                   </div>
@@ -228,67 +252,59 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
       <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
+            <Button
               onClick={() => onNavigate("dashboard")}
-              className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              variant="ghost"
+              size="sm"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
+              <ChevronLeftIcon size="sm" />
+            </Button>
             <div>
               <h1 className="font-semibold text-slate-800 dark:text-white">
                 {conversation.title}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {new Date(conversation.createdAt).toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
+                {new Date(conversation.createdAt).toLocaleDateString(
+                  undefined,
+                  {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  },
+                )}
                 {conversation.subject && ` • ${conversation.subject}`}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {messages.some((m) => m.role === "assistant") && (
-              <button
-                onClick={() => audioPlayback.isPlaying ? audioPlayback.stop() : audioPlayback.playAll(messages)}
+              <Button
+                onClick={() =>
+                  audioPlayback.isPlaying
+                    ? audioPlayback.stop()
+                    : audioPlayback.playAll(messages)
+                }
                 disabled={audioPlayback.isLoading}
-                className={`
-                  px-4 py-2 rounded-lg transition-colors flex items-center gap-2
-                  ${audioPlayback.isPlaying
-                    ? "bg-red-500 text-white hover:bg-red-600"
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
-                  }
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                `}
+                variant={audioPlayback.isPlaying ? "danger" : "secondary"}
               >
                 {audioPlayback.isLoading ? (
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" />
                 ) : audioPlayback.isPlaying ? (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <rect x="6" y="5" width="4" height="14" rx="1" />
-                    <rect x="14" y="5" width="4" height="14" rx="1" />
-                  </svg>
+                  <StopIcon size="sm" />
                 ) : (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
+                  <PlayIcon size="sm" />
                 )}
                 {audioPlayback.isPlaying ? "Stop" : "Play All"}
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               onClick={handleFinalize}
               disabled={messages.length === 0 || isFinalizing}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              variant="success"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <CheckIcon size="sm" />
               Finish & Extract
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -309,15 +325,31 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
             {(() => {
               let assistantIndex = 0;
               return messages.map((message) => {
-                const currentAssistantIndex = message.role === "assistant" ? assistantIndex++ : -1;
+                const currentAssistantIndex =
+                  message.role === "assistant" ? assistantIndex++ : -1;
                 return (
                   <ConversationMessage
                     key={message.id}
                     message={message}
                     onDelete={deleteMessage}
-                    onPlay={message.role === "assistant" ? () => audioPlayback.playMessage(message.content, message.id, currentAssistantIndex) : undefined}
-                    isPlaying={audioPlayback.currentlyPlayingId === message.id && audioPlayback.isPlaying}
-                    isLoading={audioPlayback.currentlyPlayingId === message.id && audioPlayback.isLoading}
+                    onPlay={
+                      message.role === "assistant"
+                        ? () =>
+                            audioPlayback.playMessage(
+                              message.content,
+                              message.id,
+                              currentAssistantIndex,
+                            )
+                        : undefined
+                    }
+                    isPlaying={
+                      audioPlayback.currentlyPlayingId === message.id &&
+                      audioPlayback.isPlaying
+                    }
+                    isLoading={
+                      audioPlayback.currentlyPlayingId === message.id &&
+                      audioPlayback.isLoading
+                    }
                   />
                 );
               });
@@ -327,8 +359,14 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
                 <div className="bg-white dark:bg-slate-700 rounded-2xl px-4 py-3 border border-slate-200 dark:border-slate-600">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                    <div
+                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.1s" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    />
                   </div>
                 </div>
               </div>
@@ -343,10 +381,11 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
         <div className="px-4 py-2 bg-red-50 dark:bg-red-900/30 border-t border-red-200 dark:border-red-800">
           <div className="flex items-center justify-between">
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-            <button onClick={clearError} className="text-red-600 dark:text-red-400">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <button
+              onClick={clearError}
+              className="text-red-600 dark:text-red-400"
+            >
+              <CloseIcon size="xs" />
             </button>
           </div>
         </div>
@@ -361,15 +400,14 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
             onClick={() => setInputMode("voice")}
             className={`
               px-3 py-1.5 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors
-              ${inputMode === "voice"
-                ? "bg-blue-500 text-white"
-                : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
+              ${
+                inputMode === "voice"
+                  ? "bg-blue-500 text-white"
+                  : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
               }
             `}
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-            </svg>
+            <MicrophoneIcon size="xs" />
             Voice
           </button>
           <button
@@ -377,15 +415,14 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
             onClick={() => setInputMode("text")}
             className={`
               px-3 py-1.5 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors
-              ${inputMode === "text"
-                ? "bg-blue-500 text-white"
-                : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
+              ${
+                inputMode === "text"
+                  ? "bg-blue-500 text-white"
+                  : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
               }
             `}
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
+            <EditIcon size="xs" />
             Text
           </button>
         </div>
@@ -404,27 +441,31 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
 
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-3">
                 {voiceRecording.status === "recording" ? (
-                  <span className="text-red-500 animate-pulse">Recording... Release to stop</span>
+                  <span className="text-red-500 animate-pulse">
+                    Recording... Release to stop
+                  </span>
                 ) : voiceRecording.status === "transcribing" ? (
                   <span className="text-amber-500">Transcribing...</span>
                 ) : voiceRecording.isAvailable ? (
                   "Hold Space or click & hold to speak in Polish"
                 ) : (
-                  <span className="text-red-500">Whisper not available. Check settings.</span>
+                  <span className="text-red-500">
+                    Whisper not available. Check settings.
+                  </span>
                 )}
               </p>
 
               {voiceError && (
                 <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm text-red-600 dark:text-red-400">{voiceError}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      {voiceError}
+                    </p>
                     <button
                       onClick={() => setVoiceError(null)}
                       className="text-red-600 dark:text-red-400 ml-2"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <CloseIcon size="xs" />
                     </button>
                   </div>
                 </div>
@@ -433,26 +474,25 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
 
             {pendingVoiceText && (
               <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-                <p className="text-slate-800 dark:text-white mb-2">{pendingVoiceText}</p>
+                <p className="text-slate-800 dark:text-white mb-2">
+                  {pendingVoiceText}
+                </p>
                 <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
+                  <Button
                     onClick={handleClearVoiceText}
-                    className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    variant="ghost"
+                    size="sm"
                   >
                     Clear
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
                     onClick={handleVoiceSend}
                     disabled={isLoading}
-                    className="px-4 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                    size="sm"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
+                    <SendIcon size="xs" />
                     Send
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -472,15 +512,9 @@ export function ConversationView({ conversationId, onNavigate }: ConversationVie
                 className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               />
             </div>
-            <button
-              type="submit"
-              disabled={!inputText.trim() || isLoading}
-              className="p-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
+            <Button type="submit" disabled={!inputText.trim() || isLoading}>
+              <SendIcon size="sm" />
+            </Button>
           </form>
         )}
       </div>

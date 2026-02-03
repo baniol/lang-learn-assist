@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Material,
@@ -14,6 +14,8 @@ import {
   updateMaterialThread,
   askAboutSentence,
 } from "../lib/materials";
+import { AIChatPanel } from "./ui";
+import { CloseIcon, CheckIcon } from "./icons";
 
 interface SentenceThreadDialogProps {
   material: Material;
@@ -34,15 +36,10 @@ export function SentenceThreadDialog({
   const [inputValue, setInputValue] = useState("");
   const [pendingPhrases, setPendingPhrases] = useState<SuggestedPhrase[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadThread();
   }, [material.id, segmentIndex]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [thread?.messages]);
 
   const loadThread = async () => {
     setIsLoading(true);
@@ -71,14 +68,12 @@ export function SentenceThreadDialog({
     setInputValue("");
 
     try {
-      // Create thread if doesn't exist
       let currentThread = thread;
       if (!currentThread) {
         currentThread = await createMaterialThread(material.id, segmentIndex);
         setThread(currentThread);
       }
 
-      // Add user message to UI immediately
       const userMessage: MaterialThreadMessage = {
         id: crypto.randomUUID(),
         role: "user",
@@ -87,17 +82,15 @@ export function SentenceThreadDialog({
       const updatedMessages = [...currentThread.messages, userMessage];
       setThread({ ...currentThread, messages: updatedMessages });
 
-      // Call LLM
       const response = await askAboutSentence(
         segment.text,
         segment.translation,
         question,
         currentThread.messages,
         material.targetLanguage,
-        material.nativeLanguage
+        material.nativeLanguage,
       );
 
-      // Add assistant message
       const assistantMessage: MaterialThreadMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -105,19 +98,19 @@ export function SentenceThreadDialog({
       };
       const finalMessages = [...updatedMessages, assistantMessage];
 
-      // Update pending phrases
       const newPhrases = [...pendingPhrases, ...response.phrases];
       setPendingPhrases(newPhrases);
 
-      // Save to database
       const savedThread = await updateMaterialThread(
         currentThread.id,
         finalMessages,
-        newPhrases.length > 0 ? newPhrases : null
+        newPhrases.length > 0 ? newPhrases : null,
       );
       setThread(savedThread);
     } catch (err) {
-      setError(`Failed to get response: ${err instanceof Error ? err.message : String(err)}`);
+      setError(
+        `Failed to get response: ${err instanceof Error ? err.message : String(err)}`,
+      );
     } finally {
       setIsSending(false);
     }
@@ -136,13 +129,15 @@ export function SentenceThreadDialog({
 
       await invoke("create_phrase", { request });
 
-      // Remove from pending
       const updated = pendingPhrases.filter((_, i) => i !== index);
       setPendingPhrases(updated);
 
-      // Update thread in DB
       if (thread) {
-        await updateMaterialThread(thread.id, thread.messages, updated.length > 0 ? updated : null);
+        await updateMaterialThread(
+          thread.id,
+          thread.messages,
+          updated.length > 0 ? updated : null,
+        );
       }
     } catch (err) {
       setError(`Failed to save phrase: ${err}`);
@@ -153,20 +148,16 @@ export function SentenceThreadDialog({
     const updated = pendingPhrases.filter((_, i) => i !== index);
     setPendingPhrases(updated);
 
-    // Update thread in DB
     if (thread) {
       try {
-        await updateMaterialThread(thread.id, thread.messages, updated.length > 0 ? updated : null);
+        await updateMaterialThread(
+          thread.id,
+          thread.messages,
+          updated.length > 0 ? updated : null,
+        );
       } catch (err) {
         console.error("Failed to update thread:", err);
       }
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
     }
   };
 
@@ -183,9 +174,7 @@ export function SentenceThreadDialog({
               onClick={onClose}
               className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <CloseIcon size="sm" />
             </button>
           </div>
         </div>
@@ -238,18 +227,14 @@ export function SentenceThreadDialog({
                       className="p-1.5 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
                       title="Add to phrases"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                      <CheckIcon size="sm" />
                     </button>
                     <button
                       onClick={() => handleRejectPhrase(i)}
                       className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
                       title="Dismiss"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <CloseIcon size="sm" />
                     </button>
                   </div>
                 </div>
@@ -258,44 +243,18 @@ export function SentenceThreadDialog({
           </div>
         )}
 
-        {/* Messages area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[100px] max-h-[300px]">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-            </div>
-          ) : (!thread || thread.messages.length === 0) ? (
-            <div className="py-4" />
-          ) : (
-            thread.messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-2 ${
-                    msg.role === "user"
-                      ? "bg-blue-500 text-white"
-                      : "bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
-                </div>
-              </div>
-            ))
-          )}
-          {isSending && (
-            <div className="flex justify-start">
-              <div className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-2xl px-4 py-2">
-                <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-500" />
-                  <span className="text-sm">Thinking...</span>
-                </div>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+        {/* Chat */}
+        <AIChatPanel
+          messages={thread?.messages || []}
+          inputValue={inputValue}
+          onInputChange={setInputValue}
+          onSend={handleSend}
+          isLoading={isLoading}
+          isSending={isSending}
+          placeholder="Ask about vocabulary, grammar, usage..."
+          variant="amber"
+          className="flex-1 min-h-[200px] max-h-[400px]"
+        />
 
         {/* Error display */}
         {error && (
@@ -303,30 +262,6 @@ export function SentenceThreadDialog({
             {error}
           </div>
         )}
-
-        {/* Input area */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask about vocabulary, grammar, usage..."
-              disabled={isLoading || isSending}
-              className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 disabled:opacity-50 text-sm"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!inputValue.trim() || isLoading || isSending}
-              className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

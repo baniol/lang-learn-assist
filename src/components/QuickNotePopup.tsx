@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createNote } from "../lib/notes";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
+import { CloseIcon, MicrophoneOutlineIcon } from "./icons";
 
 interface QuickNotePopupProps {
   isOpen: boolean;
@@ -95,9 +96,7 @@ export function QuickNotePopup({ isOpen, onClose, onNoteCreated }: QuickNotePopu
             onClick={onClose}
             className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <CloseIcon size="md" />
           </button>
         </div>
 
@@ -141,9 +140,7 @@ export function QuickNotePopup({ isOpen, onClose, onNoteCreated }: QuickNotePopu
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
+                    <MicrophoneOutlineIcon size="sm" />
                     <span className="text-sm">Hold to record</span>
                   </>
                 )}

@@ -2,25 +2,44 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTTS } from "../hooks/useTTS";
 import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
-import type { PhraseWithProgress, CreatePhraseRequest, LearningStats, Phrase, UpdatePhraseRequest, AppSettings } from "../types";
+import { Button, Spinner, Dialog, ConfirmDialog } from "../components/ui";
+import { EmptyState } from "../components/shared";
+import {
+  PlusIcon,
+  CloseIcon,
+  StarIcon,
+  PlayIcon,
+  PauseIcon,
+  BookIcon,
+  LightbulbIcon,
+  CheckCircleIcon,
+  ExcludeIcon,
+} from "../components/icons";
+import { useSettings } from "../contexts/SettingsContext";
+import type {
+  PhraseWithProgress,
+  CreatePhraseRequest,
+  LearningStats,
+  Phrase,
+  UpdatePhraseRequest,
+} from "../types";
 import { LANGUAGE_OPTIONS } from "../types";
 
 type FilterStatus = "all" | "new" | "learning" | "learned";
 type ExcludedFilter = "active" | "excluded" | "all";
 type LanguageFilter = "all" | string;
 
-interface PhraseLibraryViewProps {
-  settings: AppSettings | null;
-}
-
-export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
+export function PhraseLibraryView() {
+  const { settings } = useSettings();
   const [phrases, setPhrases] = useState<PhraseWithProgress[]>([]);
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [showStarredOnly, setShowStarredOnly] = useState(false);
-  const [excludedFilter, setExcludedFilter] = useState<ExcludedFilter>("active");
-  const [languageFilter, setLanguageFilter] = useState<LanguageFilter>("current");
+  const [excludedFilter, setExcludedFilter] =
+    useState<ExcludedFilter>("active");
+  const [languageFilter, setLanguageFilter] =
+    useState<LanguageFilter>("current");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -36,22 +55,25 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [refiningPhrase, setRefiningPhrase] = useState<Phrase | null>(null);
 
-  const handleAudioGenerated = useCallback(async (phraseId: number, audioPath: string) => {
-    // Save audio path to database
-    try {
-      await invoke("update_phrase_audio", { id: phraseId, audioPath });
-      // Update local state so next play uses cached path
-      setPhrases((prev) =>
-        prev.map((p) =>
-          p.phrase.id === phraseId
-            ? { ...p, phrase: { ...p.phrase, audioPath } }
-            : p
-        )
-      );
-    } catch (err) {
-      console.error("Failed to save audio path:", err);
-    }
-  }, []);
+  const handleAudioGenerated = useCallback(
+    async (phraseId: number, audioPath: string) => {
+      // Save audio path to database
+      try {
+        await invoke("update_phrase_audio", { id: phraseId, audioPath });
+        // Update local state so next play uses cached path
+        setPhrases((prev) =>
+          prev.map((p) =>
+            p.phrase.id === phraseId
+              ? { ...p, phrase: { ...p.phrase, audioPath } }
+              : p,
+          ),
+        );
+      } catch (err) {
+        console.error("Failed to save audio path:", err);
+      }
+    },
+    [],
+  );
 
   const tts = useTTS({
     enabled: true,
@@ -82,7 +104,14 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
   // Load phrases when filters change
   useEffect(() => {
     loadPhrases();
-  }, [showStarredOnly, excludedFilter, filterStatus, debouncedSearch, languageFilter, settings?.targetLanguage]);
+  }, [
+    showStarredOnly,
+    excludedFilter,
+    filterStatus,
+    debouncedSearch,
+    languageFilter,
+    settings?.targetLanguage,
+  ]);
 
   const loadStats = async () => {
     try {
@@ -106,7 +135,8 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
 
       const data = await invoke<PhraseWithProgress[]>("get_phrases", {
         starredOnly: showStarredOnly || null,
-        excludedOnly: excludedFilter === "all" ? null : excludedFilter === "excluded",
+        excludedOnly:
+          excludedFilter === "all" ? null : excludedFilter === "excluded",
         targetLanguage: targetLang,
         status: filterStatus !== "all" ? filterStatus : null,
         searchQuery: debouncedSearch || null,
@@ -127,8 +157,10 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
       const newStarred = await invoke<boolean>("toggle_starred", { id });
       setPhrases((prev) =>
         prev.map((p) =>
-          p.phrase.id === id ? { ...p, phrase: { ...p.phrase, starred: newStarred } } : p
-        )
+          p.phrase.id === id
+            ? { ...p, phrase: { ...p.phrase, starred: newStarred } }
+            : p,
+        ),
       );
     } catch (err) {
       console.error("Failed to toggle starred:", err);
@@ -140,8 +172,10 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
       const newExcluded = await invoke<boolean>("toggle_excluded", { id });
       setPhrases((prev) =>
         prev.map((p) =>
-          p.phrase.id === id ? { ...p, phrase: { ...p.phrase, excluded: newExcluded } } : p
-        )
+          p.phrase.id === id
+            ? { ...p, phrase: { ...p.phrase, excluded: newExcluded } }
+            : p,
+        ),
       );
     } catch (err) {
       console.error("Failed to toggle excluded:", err);
@@ -150,7 +184,11 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
 
   const handlePlay = useCallback(
     async (phrase: PhraseWithProgress) => {
-      console.log("[TTS] handlePlay called for phrase:", phrase.phrase.id, phrase.phrase.answer);
+      console.log(
+        "[TTS] handlePlay called for phrase:",
+        phrase.phrase.id,
+        phrase.phrase.answer,
+      );
 
       if (tts.isPlaying && playingId === phrase.phrase.id) {
         console.log("[TTS] Stopping playback");
@@ -166,7 +204,7 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
           phrase.phrase.answer,
           phrase.phrase.id,
           phrase.phrase.audioPath || undefined,
-          phrase.phrase.targetLanguage
+          phrase.phrase.targetLanguage,
         );
         console.log("[TTS] speak completed");
       } catch (err) {
@@ -174,7 +212,7 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
       }
       setPlayingId(null);
     },
-    [tts, playingId]
+    [tts, playingId],
   );
 
   const handleDeleteClick = (id: number) => {
@@ -214,7 +252,11 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
     await loadPhrases();
   };
 
-  const handleRefineAccept = async (prompt: string, answer: string, accepted: string[]) => {
+  const handleRefineAccept = async (
+    prompt: string,
+    answer: string,
+    accepted: string[],
+  ) => {
     if (!refiningPhrase) return;
 
     const request: UpdatePhraseRequest = {
@@ -230,8 +272,8 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
       prev.map((p) =>
         p.phrase.id === refiningPhrase.id
           ? { ...p, phrase: { ...p.phrase, prompt, answer, accepted } }
-          : p
-      )
+          : p,
+      ),
     );
   };
 
@@ -244,28 +286,26 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
             Phrase Library
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            {stats ? `${stats.totalPhrases} phrases (${stats.learnedCount} learned, ${stats.learningCount} learning, ${stats.newCount} new)` : "Loading..."}
+            {stats
+              ? `${stats.totalPhrases} phrases (${stats.learnedCount} learned, ${stats.learningCount} learning, ${stats.newCount} new)`
+              : "Loading..."}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddDialog(true)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+        <Button onClick={() => setShowAddDialog(true)}>
+          <PlusIcon size="sm" />
           Add Phrase
-        </button>
+        </Button>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4 mb-6">
         <div className="flex items-center gap-2">
-          {(["all", "new", "learning", "learned"] as FilterStatus[]).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`
+          {(["all", "new", "learning", "learned"] as FilterStatus[]).map(
+            (status) => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`
                 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 ${
                   filterStatus === status
@@ -273,10 +313,11 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
                     : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
                 }
               `}
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
-          ))}
+              >
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </button>
+            ),
+          )}
         </div>
 
         <button
@@ -290,9 +331,7 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
             }
           `}
         >
-          <svg className="w-4 h-4" fill={showStarredOnly ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-          </svg>
+          <StarIcon size="xs" filled={showStarredOnly} />
           Starred
         </button>
 
@@ -312,7 +351,11 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
                 }
               `}
             >
-              {filter === "active" ? "Active" : filter === "excluded" ? "Excluded" : "All"}
+              {filter === "active"
+                ? "Active"
+                : filter === "excluded"
+                  ? "Excluded"
+                  : "All"}
             </button>
           ))}
         </div>
@@ -325,7 +368,9 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
             className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
           >
             <option value="current">
-              {LANGUAGE_OPTIONS.find(l => l.code === settings?.targetLanguage)?.name || "Current"} only
+              {LANGUAGE_OPTIONS.find((l) => l.code === settings?.targetLanguage)
+                ?.name || "Current"}{" "}
+              only
             </option>
             <option value="all">All languages</option>
             {LANGUAGE_OPTIONS.map((lang) => (
@@ -350,27 +395,32 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
       {/* Phrases List */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+          <Spinner size="lg" />
         </div>
       ) : filteredPhrases.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-          <svg className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-          <h3 className="text-lg font-medium text-slate-700 dark:text-slate-200 mb-2">
-            No phrases found
-          </h3>
-          <p className="text-slate-500 dark:text-slate-400">
-            {searchQuery ? "Try a different search" : "Add phrases from conversations or manually"}
-          </p>
-        </div>
+        <EmptyState
+          icon={
+            <BookIcon
+              size="xl"
+              className="text-slate-300 dark:text-slate-600"
+            />
+          }
+          title="No phrases found"
+          description={
+            searchQuery
+              ? "Try a different search"
+              : "Add phrases from conversations or manually"
+          }
+          className="py-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
+        />
       ) : (
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
           {filteredPhrases.map((item) => {
             const p = item.phrase;
             const progress = item.progress;
             const isLearned = progress && progress.correctStreak >= 2;
-            const isLearning = progress && progress.totalAttempts > 0 && !isLearned;
+            const isLearning =
+              progress && progress.totalAttempts > 0 && !isLearned;
 
             return (
               <div
@@ -381,29 +431,35 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
                 <button
                   onClick={() => handleToggleStar(p.id)}
                   className={`p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors flex-shrink-0 ${
-                    p.starred ? "text-yellow-500" : "text-slate-300 dark:text-slate-600"
+                    p.starred
+                      ? "text-yellow-500"
+                      : "text-slate-300 dark:text-slate-600"
                   }`}
                 >
-                  <svg className="w-5 h-5" fill={p.starred ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                  </svg>
+                  <StarIcon size="sm" filled={p.starred} />
                 </button>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{p.prompt}</p>
-                  <p className="text-base font-medium text-slate-800 dark:text-white">{p.answer}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                    {p.prompt}
+                  </p>
+                  <p className="text-base font-medium text-slate-800 dark:text-white">
+                    {p.answer}
+                  </p>
                 </div>
 
                 {/* Status badge with tooltip */}
                 <div className="relative group/status flex-shrink-0">
-                  <span className={`text-xs font-medium px-2 py-1 rounded cursor-help ${
-                    isLearned
-                      ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                      : isLearning
-                      ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                      : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                  }`}>
+                  <span
+                    className={`text-xs font-medium px-2 py-1 rounded cursor-help ${
+                      isLearned
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                        : isLearning
+                          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                          : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
                     {isLearned ? "Learned" : isLearning ? "Learning" : "New"}
                   </span>
                   {/* Tooltip */}
@@ -417,17 +473,36 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
                           </div>
                           <div className="flex justify-between gap-4">
                             <span className="text-slate-400">Success:</span>
-                            <span>{progress.totalAttempts > 0 ? Math.round(progress.successCount / progress.totalAttempts * 100) : 0}% ({progress.successCount}/{progress.totalAttempts})</span>
+                            <span>
+                              {progress.totalAttempts > 0
+                                ? Math.round(
+                                    (progress.successCount /
+                                      progress.totalAttempts) *
+                                      100,
+                                  )
+                                : 0}
+                              % ({progress.successCount}/
+                              {progress.totalAttempts})
+                            </span>
                           </div>
                           {progress.nextReviewAt && (
                             <div className="flex justify-between gap-4">
                               <span className="text-slate-400">Review:</span>
-                              <span>{new Date(progress.nextReviewAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                              <span>
+                                {new Date(
+                                  progress.nextReviewAt,
+                                ).toLocaleDateString(undefined, {
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </span>
                             </div>
                           )}
                         </div>
                       ) : (
-                        <span className="text-slate-400">Not yet practiced</span>
+                        <span className="text-slate-400">
+                          Not yet practiced
+                        </span>
                       )}
                     </div>
                   </div>
@@ -442,18 +517,11 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
                     title="Play"
                   >
                     {tts.isLoading && playingId === p.id ? (
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                      </svg>
+                      <Spinner size="sm" />
                     ) : playingId === p.id ? (
-                      <svg className="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                      </svg>
+                      <PauseIcon size="xs" />
                     ) : (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+                      <PlayIcon size="xs" />
                     )}
                   </button>
                   <button
@@ -461,9 +529,7 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
                     className="p-2 rounded text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors opacity-0 group-hover:opacity-100"
                     title="Refine with AI"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
+                    <LightbulbIcon size="xs" />
                   </button>
                   <button
                     onClick={() => handleToggleExcluded(p.id)}
@@ -472,15 +538,17 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
                         ? "text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
                         : "text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
                     }`}
-                    title={p.excluded ? "Include in learning" : "Exclude from learning"}
+                    title={
+                      p.excluded
+                        ? "Include in learning"
+                        : "Exclude from learning"
+                    }
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      {p.excluded ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      ) : (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                      )}
-                    </svg>
+                    {p.excluded ? (
+                      <CheckCircleIcon size="xs" />
+                    ) : (
+                      <ExcludeIcon size="xs" />
+                    )}
                   </button>
                   <button
                     onClick={(e) => {
@@ -490,9 +558,7 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
                     className="p-2 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors opacity-0 group-hover:opacity-100"
                     title="Delete"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <CloseIcon size="xs" />
                   </button>
                 </div>
               </div>
@@ -502,126 +568,116 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
       )}
 
       {/* Add Phrase Dialog */}
-      {showAddDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-lg mx-4">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-                Add New Phrase
-              </h2>
-            </div>
+      <Dialog
+        isOpen={showAddDialog}
+        onClose={() => {
+          setShowAddDialog(false);
+          setNewPhrase({ prompt: "", answer: "", accepted: [], notes: "" });
+        }}
+        title="Add New Phrase"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Prompt (Polish)
+            </label>
+            <input
+              type="text"
+              value={newPhrase.prompt}
+              onChange={(e) =>
+                setNewPhrase({ ...newPhrase, prompt: e.target.value })
+              }
+              placeholder="What do you want to say..."
+              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+            />
+          </div>
 
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Prompt (Polish)
-                </label>
-                <input
-                  type="text"
-                  value={newPhrase.prompt}
-                  onChange={(e) => setNewPhrase({ ...newPhrase, prompt: e.target.value })}
-                  placeholder="What do you want to say..."
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                />
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Answer (German)
+            </label>
+            <input
+              type="text"
+              value={newPhrase.answer}
+              onChange={(e) =>
+                setNewPhrase({ ...newPhrase, answer: e.target.value })
+              }
+              placeholder="The German translation..."
+              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+            />
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Answer (German)
-                </label>
-                <input
-                  type="text"
-                  value={newPhrase.answer}
-                  onChange={(e) => setNewPhrase({ ...newPhrase, answer: e.target.value })}
-                  placeholder="The German translation..."
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                />
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Accepted Alternatives (comma-separated)
+            </label>
+            <input
+              type="text"
+              value={newPhrase.accepted?.join(", ") || ""}
+              onChange={(e) =>
+                setNewPhrase({
+                  ...newPhrase,
+                  accepted: e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                })
+              }
+              placeholder="variant1, variant2..."
+              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+            />
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Accepted Alternatives (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  value={newPhrase.accepted?.join(", ") || ""}
-                  onChange={(e) =>
-                    setNewPhrase({
-                      ...newPhrase,
-                      accepted: e.target.value
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    })
-                  }
-                  placeholder="variant1, variant2..."
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-                />
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Notes (optional)
+            </label>
+            <textarea
+              value={newPhrase.notes || ""}
+              onChange={(e) =>
+                setNewPhrase({ ...newPhrase, notes: e.target.value })
+              }
+              placeholder="Any helpful notes..."
+              rows={2}
+              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white resize-none"
+            />
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Notes (optional)
-                </label>
-                <textarea
-                  value={newPhrase.notes || ""}
-                  onChange={(e) => setNewPhrase({ ...newPhrase, notes: e.target.value })}
-                  placeholder="Any helpful notes..."
-                  rows={2}
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowAddDialog(false);
-                  setNewPhrase({ prompt: "", answer: "", accepted: [], notes: "" });
-                }}
-                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddPhrase}
-                disabled={!newPhrase.prompt.trim() || !newPhrase.answer.trim()}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Add Phrase
-              </button>
-            </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              onClick={() => {
+                setShowAddDialog(false);
+                setNewPhrase({
+                  prompt: "",
+                  answer: "",
+                  accepted: [],
+                  notes: "",
+                });
+              }}
+              variant="ghost"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddPhrase}
+              disabled={!newPhrase.prompt.trim() || !newPhrase.answer.trim()}
+            >
+              Add Phrase
+            </Button>
           </div>
         </div>
-      )}
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-2">
-              Delete phrase?
-            </h3>
-            <p className="text-slate-500 dark:text-slate-400 mb-6">
-              This will permanently delete this phrase and its progress.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete phrase?"
+        message="This will permanently delete this phrase and its progress."
+        confirmLabel="Delete"
+        variant="danger"
+      />
 
       {/* Phrase Refinement Dialog */}
       {refiningPhrase && (
@@ -635,12 +691,10 @@ export function PhraseLibraryView({ settings }: PhraseLibraryViewProps) {
               prev.map((p) =>
                 p.phrase.id === refiningPhrase.id
                   ? { ...p, phrase: { ...p.phrase, audioPath } }
-                  : p
-              )
+                  : p,
+              ),
             );
-            setRefiningPhrase((prev) =>
-              prev ? { ...prev, audioPath } : null
-            );
+            setRefiningPhrase((prev) => (prev ? { ...prev, audioPath } : null));
           }}
         />
       )}

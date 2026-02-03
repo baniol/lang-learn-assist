@@ -1,16 +1,22 @@
-export type ViewType =
-  | "dashboard"
-  | "conversation"
-  | "conversation-review"
-  | "phrase-library"
-  | "learn"
-  | "stats"
-  | "questions"
-  | "settings"
-  | "notes"
-  | "materials"
-  | "material-create"
-  | "material-review";
+// Re-export navigation types from dedicated module
+export type {
+  ViewType,
+  ViewState,
+  ViewWithData,
+  ViewWithoutData,
+  ViewDataFor,
+  NavigateFn,
+} from "./navigation";
+export {
+  createViewState,
+  isConversationView,
+  isConversationReviewView,
+  isMaterialReviewView,
+  viewRequiresData,
+  getParentView,
+  isSubViewOf,
+  getActiveNavItem,
+} from "./navigation";
 
 export type ConversationStatus = "draft" | "finalized" | "archived";
 

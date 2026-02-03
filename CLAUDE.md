@@ -30,13 +30,36 @@ make test-rust    # Rust tests
 2. Add migration for existing DBs (see `phrase_progress` SRS fields example)
 3. Update models in `src-tauri/src/models.rs`
 
-## Patterns
+## Frontend Conventions
+
+**Icons:** Use centralized icons from `src/components/icons/` - NEVER add inline SVGs
+```tsx
+import { PlusIcon, CloseIcon } from "../components/icons";
+<PlusIcon size="md" className="text-blue-500" />
+```
+
+**UI Components:** Use primitives from `src/components/ui/` for consistency
+```tsx
+import { Button, Dialog, Input, Badge } from "../components/ui";
+```
+
+**Class names:** Use `cn()` utility for conditional classes
+```tsx
+import { cn } from "../lib/utils";
+<div className={cn("base-class", isActive && "active-class")} />
+```
+
+**Settings:** Use `useSettings()` hook from context (not props)
+```tsx
+import { useSettings } from "../contexts/SettingsContext";
+const { settings, updateSettings } = useSettings();
+```
+
+## Backend Patterns
 
 **Navigation:** State-based via `onNavigate(view: ViewType, data?: unknown)` - no router library
 
 **Tauri commands:** Use `#[tauri::command]` + camelCase params (Rust snake_case auto-converts)
-
-**Frontend state:** Local useState per view, invoke Tauri commands directly
 
 **SRS algorithm:** Located in `learning.rs` - simplified SM-2 with ease_factor, interval_days, next_review_at
 
@@ -47,9 +70,11 @@ make test-rust    # Rust tests
 - Tauri command params use camelCase in TypeScript, snake_case in Rust
 - Test with `make type-check` and `cargo build` before considering done
 - Keep components self-contained - avoid prop drilling, use Tauri commands for data
+- See `REFACTORING_GUIDE.md` for ongoing refactoring work and progress
 
 ## Reference
 - `DOCUMENTATION.md` - User-facing feature docs
+- `REFACTORING_GUIDE.md` - Frontend refactoring plan and progress
 - `src-tauri/src/db.rs` - Database schema and migrations
 - `src-tauri/src/models.rs` - All Rust data structures
 - `src/types/index.ts` - All TypeScript interfaces

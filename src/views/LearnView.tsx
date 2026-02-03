@@ -4,32 +4,50 @@ import { VoiceButton } from "../components/VoiceButton";
 import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
 import { useTTS } from "../hooks/useTTS";
-import type { PhraseWithProgress, LearningStats, ExerciseMode, PracticeSession, AppSettings, Phrase, UpdatePhraseRequest } from "../types";
+import { useSettings } from "../contexts/SettingsContext";
+import { Button, Spinner } from "../components/ui";
+import {
+  PlayIcon,
+  CheckCircleIcon,
+  CalendarIcon,
+  ExcludeIcon,
+  LightbulbIcon,
+} from "../components/icons";
+import type {
+  PhraseWithProgress,
+  LearningStats,
+  ExerciseMode,
+  PracticeSession,
+  Phrase,
+  UpdatePhraseRequest,
+} from "../types";
 
-interface LearnViewProps {
-  settings: AppSettings | null;
-}
-
-export function LearnView({ settings: initialSettings }: LearnViewProps) {
+export function LearnView() {
+  const { settings, refreshSettings } = useSettings();
   const [mode, setMode] = useState<ExerciseMode>("manual");
   const [stats, setStats] = useState<LearningStats | null>(null);
-  const [currentPhrase, setCurrentPhrase] = useState<PhraseWithProgress | null>(null);
+  const [currentPhrase, setCurrentPhrase] = useState<PhraseWithProgress | null>(
+    null,
+  );
   const [session, setSession] = useState<PracticeSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
   const [inputAnswer, setInputAnswer] = useState("");
-  const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
+  const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(
+    null,
+  );
   const [seenPhraseIds, setSeenPhraseIds] = useState<number[]>([]);
   const [requiresRetry, setRequiresRetry] = useState(false);
 
-  // Settings for learning
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-
   // Session-based progress per phrase: { phraseId: sessionStreak }
-  const [sessionStreaks, setSessionStreaks] = useState<Record<number, number>>({});
+  const [sessionStreaks, setSessionStreaks] = useState<Record<number, number>>(
+    {},
+  );
 
   // Phrases learned in this session (reached requiredStreak)
-  const [sessionLearnedIds, setSessionLearnedIds] = useState<Set<number>>(new Set());
+  const [sessionLearnedIds, setSessionLearnedIds] = useState<Set<number>>(
+    new Set(),
+  );
 
   // For speak mode retry: how many correct retries done after last failure
   const [retryCount, setRetryCount] = useState(0);
@@ -44,21 +62,27 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
   const [awaitingProceed, setAwaitingProceed] = useState(false);
 
   // For opening the phrase refinement dialog when answer is rejected
-  const [refiningPhrase, setRefiningPhrase] = useState<{ phrase: Phrase; userAnswer: string } | null>(null);
+  const [refiningPhrase, setRefiningPhrase] = useState<{
+    phrase: Phrase;
+    userAnswer: string;
+  } | null>(null);
 
-  const handleAudioGenerated = useCallback(async (phraseId: number, audioPath: string) => {
-    try {
-      await invoke("update_phrase_audio", { id: phraseId, audioPath });
-      // Update current phrase if it matches
-      if (currentPhrase?.phrase.id === phraseId) {
-        setCurrentPhrase((prev) =>
-          prev ? { ...prev, phrase: { ...prev.phrase, audioPath } } : null
-        );
+  const handleAudioGenerated = useCallback(
+    async (phraseId: number, audioPath: string) => {
+      try {
+        await invoke("update_phrase_audio", { id: phraseId, audioPath });
+        // Update current phrase if it matches
+        if (currentPhrase?.phrase.id === phraseId) {
+          setCurrentPhrase((prev) =>
+            prev ? { ...prev, phrase: { ...prev.phrase, audioPath } } : null,
+          );
+        }
+      } catch (err) {
+        console.error("Failed to save audio path:", err);
       }
-    } catch (err) {
-      console.error("Failed to save audio path:", err);
-    }
-  }, [currentPhrase?.phrase.id]);
+    },
+    [currentPhrase?.phrase.id],
+  );
 
   const tts = useTTS({
     enabled: true,
@@ -67,7 +91,8 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
   });
 
   // Use the current phrase's language or settings language for voice recording
-  const voiceLanguage = currentPhrase?.phrase.targetLanguage || settings?.targetLanguage || "de";
+  const voiceLanguage =
+    currentPhrase?.phrase.targetLanguage || settings?.targetLanguage || "de";
 
   const voiceRecording = useVoiceRecording({
     enabled: mode === "speaking",
@@ -115,7 +140,17 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
     } else {
       stateRef.current = null;
     }
-  }, [session, seenPhraseIds, sessionStreaks, sessionLearnedIds, newPhraseCount, currentPhrase, inRetryMode, retryCount, requiresRetry]);
+  }, [
+    session,
+    seenPhraseIds,
+    sessionStreaks,
+    sessionLearnedIds,
+    newPhraseCount,
+    currentPhrase,
+    inRetryMode,
+    retryCount,
+    requiresRetry,
+  ]);
 
   // Save session state (called when state changes or on unmount)
   const saveSessionState = useCallback(async () => {
@@ -138,7 +173,9 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
         invoke("save_session_state", {
           sessionId: sessionIdRef.current,
           state: stateRef.current,
-        }).catch((err) => console.error("Failed to save session state on unmount:", err));
+        }).catch((err) =>
+          console.error("Failed to save session state on unmount:", err),
+        );
       }
     };
   }, []);
@@ -153,68 +190,100 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [session, seenPhraseIds, sessionStreaks, sessionLearnedIds, newPhraseCount, currentPhrase?.phrase.id, inRetryMode, retryCount, requiresRetry, saveSessionState]);
+  }, [
+    session,
+    seenPhraseIds,
+    sessionStreaks,
+    sessionLearnedIds,
+    newPhraseCount,
+    currentPhrase?.phrase.id,
+    inRetryMode,
+    retryCount,
+    requiresRetry,
+    saveSessionState,
+  ]);
 
   // Restore session from saved state
-  const restoreSession = useCallback(async (activeSession: PracticeSession, loadedSettings: AppSettings) => {
-    const state = activeSession.state;
-    if (!state) {
-      // Session exists but has no state - treat as fresh session
+  const restoreSession = useCallback(
+    async (activeSession: PracticeSession) => {
+      if (!settings) return;
+
+      const state = activeSession.state;
+      if (!state) {
+        // Session exists but has no state - treat as fresh session
+        setSession(activeSession);
+        setMode(activeSession.exerciseMode as ExerciseMode);
+        await loadNextPhrase([], 0, activeSession.id);
+        return;
+      }
+
+      // Restore all state from saved session
       setSession(activeSession);
       setMode(activeSession.exerciseMode as ExerciseMode);
-      await loadNextPhrase([], 0, loadedSettings, activeSession.id);
-      return;
-    }
+      setSeenPhraseIds(state.seenPhraseIds);
+      setSessionStreaks(state.sessionStreaks);
+      setSessionLearnedIds(new Set(state.sessionLearnedIds));
+      setNewPhraseCount(state.newPhraseCount);
+      setInRetryMode(state.inRetryMode);
+      setRetryCount(state.retryCount);
+      setRequiresRetry(state.requiresRetry);
 
-    // Restore all state from saved session
-    setSession(activeSession);
-    setMode(activeSession.exerciseMode as ExerciseMode);
-    setSeenPhraseIds(state.seenPhraseIds);
-    setSessionStreaks(state.sessionStreaks);
-    setSessionLearnedIds(new Set(state.sessionLearnedIds));
-    setNewPhraseCount(state.newPhraseCount);
-    setInRetryMode(state.inRetryMode);
-    setRetryCount(state.retryCount);
-    setRequiresRetry(state.requiresRetry);
-
-    // Load the current phrase if there was one
-    if (state.currentPhraseId) {
-      try {
-        const phrase = await invoke<PhraseWithProgress | null>("get_next_phrase", {
-          targetLanguage: loadedSettings.targetLanguage || null,
-          excludeIds: state.seenPhraseIds.filter(id => id !== state.currentPhraseId),
-          newPhraseCount: state.newPhraseCount,
-          newPhraseLimit: loadedSettings.newPhrasesPerSession ?? 0,
-        });
-        setCurrentPhrase(phrase);
-      } catch (err) {
-        console.error("Failed to restore current phrase:", err);
-        // Fall back to loading next phrase
-        await loadNextPhrase(state.seenPhraseIds, state.newPhraseCount, loadedSettings, activeSession.id);
+      // Load the current phrase if there was one
+      if (state.currentPhraseId) {
+        try {
+          const phrase = await invoke<PhraseWithProgress | null>(
+            "get_next_phrase",
+            {
+              targetLanguage: settings.targetLanguage || null,
+              excludeIds: state.seenPhraseIds.filter(
+                (id) => id !== state.currentPhraseId,
+              ),
+              newPhraseCount: state.newPhraseCount,
+              newPhraseLimit: settings.newPhrasesPerSession ?? 0,
+            },
+          );
+          setCurrentPhrase(phrase);
+        } catch (err) {
+          console.error("Failed to restore current phrase:", err);
+          // Fall back to loading next phrase
+          await loadNextPhrase(
+            state.seenPhraseIds,
+            state.newPhraseCount,
+            activeSession.id,
+          );
+        }
+      } else {
+        // No current phrase, load next one
+        await loadNextPhrase(
+          state.seenPhraseIds,
+          state.newPhraseCount,
+          activeSession.id,
+        );
       }
-    } else {
-      // No current phrase, load next one
-      await loadNextPhrase(state.seenPhraseIds, state.newPhraseCount, loadedSettings, activeSession.id);
-    }
-  }, []);
+    },
+    [settings],
+  );
 
   useEffect(() => {
-    // Load settings and check for active session
+    // Initialize when settings are available
+    if (!settings) return;
+
     const initialize = async () => {
       try {
-        const loadedSettings = initialSettings || await invoke<AppSettings>("get_settings");
-        setSettings(loadedSettings);
-        setMode(loadedSettings.defaultExerciseMode);
-        loadStats(loadedSettings.targetLanguage);
+        setMode(settings.defaultExerciseMode);
+        loadStats(settings.targetLanguage);
 
         // Check for active (unfinished) session
-        const activeSession = await invoke<PracticeSession | null>("get_active_session", {
-          targetLanguage: loadedSettings.targetLanguage,
-        });
+        const activeSession = await invoke<PracticeSession | null>(
+          "get_active_session",
+          {
+            targetLanguage: settings.targetLanguage,
+          },
+        );
 
         if (activeSession) {
           // Restore the active session
-          await restoreSession(activeSession, loadedSettings);
+          await restoreSession(activeSession);
         }
       } catch (err) {
         console.error("Failed to initialize:", err);
@@ -222,7 +291,7 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
     };
 
     initialize();
-  }, [initialSettings, restoreSession]);
+  }, [settings, restoreSession]);
 
   const loadStats = async (targetLanguage?: string) => {
     try {
@@ -238,13 +307,15 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
   const startSession = async () => {
     setIsLoading(true);
     try {
-      // Load settings for learning parameters
-      const loadedSettings = await invoke<AppSettings>("get_settings");
-      setSettings(loadedSettings);
+      // Refresh settings to ensure we have latest values
+      await refreshSettings();
 
-      const newSession = await invoke<PracticeSession>("start_practice_session", {
-        exerciseMode: mode,
-      });
+      const newSession = await invoke<PracticeSession>(
+        "start_practice_session",
+        {
+          exerciseMode: mode,
+        },
+      );
       setSession(newSession);
       setSeenPhraseIds([]);
       // Reset session-based state
@@ -254,7 +325,7 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
       setInRetryMode(false);
       setAwaitingProceed(false);
       setNewPhraseCount(0);
-      await loadNextPhrase([], 0, loadedSettings);
+      await loadNextPhrase([], 0);
     } catch (err) {
       console.error("Failed to start session:", err);
     } finally {
@@ -262,11 +333,19 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
     }
   };
 
-  const loadNextPhrase = async (excludeIds: number[], currentNewCount: number, currentSettings: AppSettings | null, sessionId?: number) => {
+  const loadNextPhrase = async (
+    excludeIds: number[],
+    currentNewCount: number,
+    sessionId?: number,
+  ) => {
     const activeSessionId = sessionId ?? session?.id;
 
     // Check if session limit reached
-    if (currentSettings && currentSettings.sessionPhraseLimit > 0 && excludeIds.length >= currentSettings.sessionPhraseLimit) {
+    if (
+      settings &&
+      settings.sessionPhraseLimit > 0 &&
+      excludeIds.length >= settings.sessionPhraseLimit
+    ) {
       setCurrentPhrase(null);
       if (activeSessionId) {
         await invoke("finish_practice_session", { sessionId: activeSessionId });
@@ -281,12 +360,15 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
     setAwaitingProceed(false);
 
     try {
-      const phrase = await invoke<PhraseWithProgress | null>("get_next_phrase", {
-        targetLanguage: currentSettings?.targetLanguage || null,
-        excludeIds: excludeIds.length > 0 ? excludeIds : null,
-        newPhraseCount: currentNewCount,
-        newPhraseLimit: currentSettings?.newPhrasesPerSession ?? 0,
-      });
+      const phrase = await invoke<PhraseWithProgress | null>(
+        "get_next_phrase",
+        {
+          targetLanguage: settings?.targetLanguage || null,
+          excludeIds: excludeIds.length > 0 ? excludeIds : null,
+          newPhraseCount: currentNewCount,
+          newPhraseLimit: settings?.newPhrasesPerSession ?? 0,
+        },
+      );
       setCurrentPhrase(phrase);
 
       if (phrase) {
@@ -298,7 +380,9 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
       } else {
         // No more phrases
         if (activeSessionId) {
-          await invoke("finish_practice_session", { sessionId: activeSessionId });
+          await invoke("finish_practice_session", {
+            sessionId: activeSessionId,
+          });
         }
       }
     } catch (err) {
@@ -375,7 +459,7 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                       totalPhrases: seenPhraseIds.length + 1,
                       correctAnswers: (prev.correctAnswers || 0) + 1,
                     }
-                  : null
+                  : null,
               );
             }
 
@@ -411,7 +495,7 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                     ...prev,
                     totalPhrases: seenPhraseIds.length + 1,
                   }
-                : null
+                : null,
             );
           }
 
@@ -427,7 +511,17 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
         console.error("Failed to check answer:", err);
       }
     },
-    [currentPhrase, inputAnswer, session, seenPhraseIds, settings, mode, inRetryMode, retryCount, sessionStreaks]
+    [
+      currentPhrase,
+      inputAnswer,
+      session,
+      seenPhraseIds,
+      settings,
+      mode,
+      inRetryMode,
+      retryCount,
+      sessionStreaks,
+    ],
   );
 
   const handleManualAnswer = async (isCorrect: boolean) => {
@@ -472,9 +566,10 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
             ? {
                 ...prev,
                 totalPhrases: seenPhraseIds.length + 1,
-                correctAnswers: (prev.correctAnswers || 0) + (isCorrect ? 1 : 0),
+                correctAnswers:
+                  (prev.correctAnswers || 0) + (isCorrect ? 1 : 0),
               }
-            : null
+            : null,
         );
       }
 
@@ -491,7 +586,7 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
       currentPhrase.phrase.answer,
       currentPhrase.phrase.id,
       currentPhrase.phrase.audioPath || undefined,
-      currentPhrase.phrase.targetLanguage
+      currentPhrase.phrase.targetLanguage,
     );
   }, [currentPhrase, tts]);
 
@@ -501,14 +596,17 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
     const newSeenIds = [...seenPhraseIds, phraseId];
     setSeenPhraseIds(newSeenIds);
     setAwaitingProceed(false);
-    loadNextPhrase(newSeenIds, newPhraseCount, settings);
+    loadNextPhrase(newSeenIds, newPhraseCount);
   }, [currentPhrase, awaitingProceed, seenPhraseIds, newPhraseCount, settings]);
 
   // Keyboard listener for Space (proceed) and P (playback)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
@@ -542,7 +640,6 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
     setInRetryMode(false);
     setAwaitingProceed(false);
     setNewPhraseCount(0);
-    setSettings(null);
     loadStats(targetLang);
   };
 
@@ -550,25 +647,41 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
   if (!session) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">Learn</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">
+          Learn
+        </h1>
 
         {/* Stats */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4 text-center">
-              <p className="text-2xl font-bold text-slate-800 dark:text-white">{stats.totalPhrases}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Total</p>
+              <p className="text-2xl font-bold text-slate-800 dark:text-white">
+                {stats.totalPhrases}
+              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Total
+              </p>
             </div>
             <div className="bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-800 p-4 text-center">
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.learnedCount}</p>
-              <p className="text-sm text-green-600 dark:text-green-400">Learned</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {stats.learnedCount}
+              </p>
+              <p className="text-sm text-green-600 dark:text-green-400">
+                Learned
+              </p>
             </div>
             <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-800 p-4 text-center">
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.learningCount}</p>
-              <p className="text-sm text-amber-600 dark:text-amber-400">Learning</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                {stats.learningCount}
+              </p>
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                Learning
+              </p>
             </div>
             <div className="bg-slate-50 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 p-4 text-center">
-              <p className="text-2xl font-bold text-slate-600 dark:text-slate-300">{stats.newCount}</p>
+              <p className="text-2xl font-bold text-slate-600 dark:text-slate-300">
+                {stats.newCount}
+              </p>
               <p className="text-sm text-slate-500 dark:text-slate-400">New</p>
             </div>
           </div>
@@ -580,11 +693,25 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
             Exercise Mode
           </h2>
           <div className="space-y-3">
-            {([
-              { id: "manual", label: "Manual", desc: "Reveal answer and self-grade" },
-              { id: "typing", label: "Typing", desc: "Type the answer in German" },
-              { id: "speaking", label: "Speaking", desc: "Speak the answer (requires Whisper model)" },
-            ] as const).map((option) => (
+            {(
+              [
+                {
+                  id: "manual",
+                  label: "Manual",
+                  desc: "Reveal answer and self-grade",
+                },
+                {
+                  id: "typing",
+                  label: "Typing",
+                  desc: "Type the answer in German",
+                },
+                {
+                  id: "speaking",
+                  label: "Speaking",
+                  desc: "Speak the answer (requires Whisper model)",
+                },
+              ] as const
+            ).map((option) => (
               <button
                 key={option.id}
                 onClick={() => setMode(option.id)}
@@ -597,20 +724,25 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                   }
                 `}
               >
-                <p className="font-medium text-slate-800 dark:text-white">{option.label}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{option.desc}</p>
+                <p className="font-medium text-slate-800 dark:text-white">
+                  {option.label}
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {option.desc}
+                </p>
               </button>
             ))}
           </div>
         </div>
 
-        <button
+        <Button
           onClick={startSession}
           disabled={isLoading || (stats?.totalPhrases ?? 0) === 0}
-          className="w-full py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-lg font-medium"
+          isLoading={isLoading}
+          className="w-full py-4 text-lg"
         >
-          {isLoading ? "Loading..." : "Start Practice"}
-        </button>
+          Start Practice
+        </Button>
 
         {stats?.totalPhrases === 0 && (
           <p className="text-center text-slate-500 dark:text-slate-400 mt-4">
@@ -629,35 +761,31 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
       <div className="p-6 max-w-2xl mx-auto text-center">
         {practicedAny ? (
           <>
-            <svg className="w-20 h-20 mx-auto text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <CheckCircleIcon
+              size="xl"
+              className="mx-auto text-green-500 mb-4"
+            />
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
               Session Complete!
             </h2>
             <p className="text-slate-500 dark:text-slate-400 mb-6">
-              You practiced {session.totalPhrases} phrases with {session.correctAnswers} correct answers.
+              You practiced {session.totalPhrases} phrases with{" "}
+              {session.correctAnswers} correct answers.
             </p>
           </>
         ) : (
           <>
-            <svg className="w-20 h-20 mx-auto text-blue-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+            <CalendarIcon size="xl" className="mx-auto text-blue-500 mb-4" />
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
               All caught up!
             </h2>
             <p className="text-slate-500 dark:text-slate-400 mb-6">
-              No phrases are due for review right now. Come back later when your SRS intervals expire.
+              No phrases are due for review right now. Come back later when your
+              SRS intervals expire.
             </p>
           </>
         )}
-        <button
-          onClick={endSession}
-          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-        >
-          Back to Dashboard
-        </button>
+        <Button onClick={endSession}>Back to Dashboard</Button>
       </div>
     );
   }
@@ -669,20 +797,25 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Practiced: {seenPhraseIds.length}{settings && settings.sessionPhraseLimit > 0 ? `/${settings.sessionPhraseLimit}` : ""} | Correct: {session.correctAnswers} | New: {newPhraseCount}{settings && settings.newPhrasesPerSession > 0 ? `/${settings.newPhrasesPerSession}` : ""} | Learned: {sessionLearnedIds.size}
+            Practiced: {seenPhraseIds.length}
+            {settings && settings.sessionPhraseLimit > 0
+              ? `/${settings.sessionPhraseLimit}`
+              : ""}{" "}
+            | Correct: {session.correctAnswers} | New: {newPhraseCount}
+            {settings && settings.newPhrasesPerSession > 0
+              ? `/${settings.newPhrasesPerSession}`
+              : ""}{" "}
+            | Learned: {sessionLearnedIds.size}
           </p>
         </div>
-        <button
-          onClick={endSession}
-          className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-        >
+        <Button onClick={endSession} variant="ghost">
           End Session
-        </button>
+        </Button>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+          <Spinner size="lg" />
         </div>
       ) : currentPhrase ? (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
@@ -698,12 +831,14 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
             <button
               onClick={async () => {
                 try {
-                  await invoke("toggle_excluded", { id: currentPhrase.phrase.id });
+                  await invoke("toggle_excluded", {
+                    id: currentPhrase.phrase.id,
+                  });
                   // Move to next phrase after excluding
                   const phraseId = currentPhrase.phrase.id;
                   const newSeenIds = [...seenPhraseIds, phraseId];
                   setSeenPhraseIds(newSeenIds);
-                  loadNextPhrase(newSeenIds, newPhraseCount, settings);
+                  loadNextPhrase(newSeenIds, newPhraseCount);
                 } catch (err) {
                   console.error("Failed to exclude phrase:", err);
                 }
@@ -711,9 +846,7 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
               className="absolute right-0 top-0 p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               title="Exclude from learning"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-              </svg>
+              <ExcludeIcon size="sm" />
             </button>
           </div>
 
@@ -744,19 +877,22 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                       className="p-2 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-full transition-colors inline-flex items-center justify-center"
                       title="Listen to pronunciation (P)"
                     >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+                      <PlayIcon size="sm" />
                     </button>
-                    <button
-                      onClick={handleProceedToNext}
-                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
-                    >
+                    <Button onClick={handleProceedToNext} variant="success">
                       Continue
-                    </button>
+                    </Button>
                   </div>
                   <p className="text-sm mt-2 text-green-500 dark:text-green-500">
-                    Press <kbd className="px-1 py-0.5 bg-green-100 dark:bg-green-800 rounded">Space</kbd> to continue, <kbd className="px-1 py-0.5 bg-green-100 dark:bg-green-800 rounded">P</kbd> to play
+                    Press{" "}
+                    <kbd className="px-1 py-0.5 bg-green-100 dark:bg-green-800 rounded">
+                      Space
+                    </kbd>{" "}
+                    to continue,{" "}
+                    <kbd className="px-1 py-0.5 bg-green-100 dark:bg-green-800 rounded">
+                      P
+                    </kbd>{" "}
+                    to play
                   </p>
                 </>
               )}
@@ -768,7 +904,8 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                     </p>
                   )}
                   <p className="text-sm mt-1">
-                    Correct answer: <strong>{currentPhrase.phrase.answer}</strong>
+                    Correct answer:{" "}
+                    <strong>{currentPhrase.phrase.answer}</strong>
                   </p>
                   <div className="flex items-center justify-center gap-3 mt-3">
                     <button
@@ -777,30 +914,32 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                       className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full transition-colors inline-flex items-center justify-center"
                       title="Listen to pronunciation"
                     >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+                      <PlayIcon size="sm" />
                     </button>
                     {mode === "speaking" && (
-                      <button
+                      <Button
                         onClick={() => {
                           // Override: treat as correct answer
                           setFeedback("correct");
                           handleManualAnswer(true);
                         }}
-                        className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"
+                        variant="success"
+                        size="sm"
                       >
                         I said it correctly
-                      </button>
+                      </Button>
                     )}
                     <button
-                      onClick={() => setRefiningPhrase({ phrase: currentPhrase.phrase, userAnswer: inputAnswer })}
+                      onClick={() =>
+                        setRefiningPhrase({
+                          phrase: currentPhrase.phrase,
+                          userAnswer: inputAnswer,
+                        })
+                      }
                       className="px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors text-sm font-medium flex items-center gap-1.5"
                       title="Ask AI if your answer is correct"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
+                      <LightbulbIcon size="xs" />
                       Ask AI
                     </button>
                   </div>
@@ -813,35 +952,40 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
           {inRetryMode && mode === "speaking" && settings && (
             <div className="text-center py-4 mb-6 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
               <p className="text-amber-700 dark:text-amber-400 font-medium">
-                Repeat correctly {settings.failureRepetitions - retryCount} more time{settings.failureRepetitions - retryCount !== 1 ? "s" : ""} to continue
+                Repeat correctly {settings.failureRepetitions - retryCount} more
+                time{settings.failureRepetitions - retryCount !== 1 ? "s" : ""}{" "}
+                to continue
               </p>
             </div>
           )}
 
           {/* Try Again button for incorrect answers (not in speaking retry mode) */}
-          {feedback === "incorrect" && !(inRetryMode && mode === "speaking") && (
-            <button
-              onClick={() => {
-                setShowAnswer(false);
-                setInputAnswer("");
-                setFeedback(null);
-              }}
-              className="w-full py-3 mb-6 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors font-medium"
-            >
-              Try Again
-            </button>
-          )}
+          {feedback === "incorrect" &&
+            !(inRetryMode && mode === "speaking") && (
+              <Button
+                onClick={() => {
+                  setShowAnswer(false);
+                  setInputAnswer("");
+                  setFeedback(null);
+                }}
+                variant="secondary"
+                className="w-full mb-6"
+              >
+                Try Again
+              </Button>
+            )}
 
           {/* Mode-specific UI */}
           {mode === "manual" && (
             <div className="space-y-4">
               {!showAnswer ? (
-                <button
+                <Button
                   onClick={() => setShowAnswer(true)}
-                  className="w-full py-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                  variant="secondary"
+                  className="w-full py-4"
                 >
                   Show Answer
-                </button>
+                </Button>
               ) : (
                 <>
                   <div className="text-center p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
@@ -853,25 +997,25 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                       disabled={tts.isPlaying || tts.isLoading}
                       className="mt-2 p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full transition-colors"
                     >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+                      <PlayIcon size="sm" />
                     </button>
                   </div>
                   {!feedback && (
                     <div className="flex gap-4">
-                      <button
+                      <Button
                         onClick={() => handleManualAnswer(false)}
-                        className="flex-1 py-4 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors font-medium"
+                        variant="danger"
+                        className="flex-1 py-4"
                       >
                         Incorrect
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => handleManualAnswer(true)}
-                        className="flex-1 py-4 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors font-medium"
+                        variant="success"
+                        className="flex-1 py-4"
                       >
                         Correct
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </>
@@ -895,20 +1039,22 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                 autoFocus
                 className="w-full px-4 py-4 text-lg border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white text-center"
               />
-              <button
+              <Button
                 type="submit"
                 disabled={!inputAnswer.trim()}
-                className="w-full py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                className="w-full py-4"
               >
                 Check Answer
-              </button>
+              </Button>
             </form>
           )}
 
           {mode === "speaking" && (!feedback || inRetryMode) && (
             <div className="text-center space-y-4">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {inRetryMode ? "Speak the correct answer" : "Press and hold to record your answer"}
+                {inRetryMode
+                  ? "Speak the correct answer"
+                  : "Press and hold to record your answer"}
               </p>
               <div className="flex justify-center">
                 <VoiceButton
@@ -926,7 +1072,8 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
               )}
               {!voiceRecording.isAvailable && (
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                  Voice recording not available. Download a Whisper model in Settings.
+                  Voice recording not available. Download a Whisper model in
+                  Settings.
                 </p>
               )}
               {/* Show Answer button - reveals answer but counts as incorrect and enters retry mode */}
@@ -962,7 +1109,7 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
                               ...prev,
                               totalPhrases: seenPhraseIds.length + 1,
                             }
-                          : null
+                          : null,
                       );
                     }
 
@@ -982,36 +1129,37 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
           )}
 
           {/* Speaking mode: after showing answer via skip, show Next button */}
-          {mode === "speaking" && showAnswer && feedback === "incorrect" && !inRetryMode && (
-            <div className="text-center space-y-4">
-              <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                <p className="text-xl font-medium text-slate-800 dark:text-white">
-                  {currentPhrase.phrase.answer}
-                </p>
-                <button
-                  onClick={handlePlayAnswer}
-                  disabled={tts.isPlaying || tts.isLoading}
-                  className="mt-2 p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full transition-colors"
+          {mode === "speaking" &&
+            showAnswer &&
+            feedback === "incorrect" &&
+            !inRetryMode && (
+              <div className="text-center space-y-4">
+                <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                  <p className="text-xl font-medium text-slate-800 dark:text-white">
+                    {currentPhrase.phrase.answer}
+                  </p>
+                  <button
+                    onClick={handlePlayAnswer}
+                    disabled={tts.isPlaying || tts.isLoading}
+                    className="mt-2 p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full transition-colors"
+                  >
+                    <PlayIcon size="sm" />
+                  </button>
+                </div>
+                <Button
+                  onClick={() => {
+                    const phraseId = currentPhrase.phrase.id;
+                    const newSeenIds = [...seenPhraseIds, phraseId];
+                    setSeenPhraseIds(newSeenIds);
+                    setShowAnswer(false);
+                    loadNextPhrase(newSeenIds, newPhraseCount);
+                  }}
+                  className="w-full"
                 >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </button>
+                  Next
+                </Button>
               </div>
-              <button
-                onClick={() => {
-                  const phraseId = currentPhrase.phrase.id;
-                  const newSeenIds = [...seenPhraseIds, phraseId];
-                  setSeenPhraseIds(newSeenIds);
-                  setShowAnswer(false);
-                  loadNextPhrase(newSeenIds, newPhraseCount, settings);
-                }}
-                className="w-full py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-              >
-                Next
-              </button>
-            </div>
-          )}
+            )}
 
           {requiresRetry && !feedback && !inRetryMode && (
             <p className="text-center text-sm text-amber-600 dark:text-amber-400 mt-4">
@@ -1037,10 +1185,16 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
               answer,
               accepted,
             };
-            await invoke<Phrase>("update_phrase", { id: refiningPhrase.phrase.id, request });
+            await invoke<Phrase>("update_phrase", {
+              id: refiningPhrase.phrase.id,
+              request,
+            });
 
             // Update current phrase if it's the same one
-            if (currentPhrase && currentPhrase.phrase.id === refiningPhrase.phrase.id) {
+            if (
+              currentPhrase &&
+              currentPhrase.phrase.id === refiningPhrase.phrase.id
+            ) {
               setCurrentPhrase({
                 ...currentPhrase,
                 phrase: { ...currentPhrase.phrase, prompt, answer, accepted },
@@ -1048,7 +1202,10 @@ export function LearnView({ settings: initialSettings }: LearnViewProps) {
             }
           }}
           onAudioRegenerated={(audioPath) => {
-            if (currentPhrase && currentPhrase.phrase.id === refiningPhrase.phrase.id) {
+            if (
+              currentPhrase &&
+              currentPhrase.phrase.id === refiningPhrase.phrase.id
+            ) {
               setCurrentPhrase({
                 ...currentPhrase,
                 phrase: { ...currentPhrase.phrase, audioPath },

@@ -1,22 +1,38 @@
 import { useState, useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { createMaterial, processMaterial, estimateMaterialTokens } from "../lib/materials";
-import type { ViewType, MaterialType, AppSettings, TokenEstimate, MaterialProcessingProgress } from "../types";
+import {
+  createMaterial,
+  processMaterial,
+  estimateMaterialTokens,
+} from "../lib/materials";
+import { Button } from "../components/ui";
+import { ChevronLeftIcon, PlayCircleIcon, NoteIcon } from "../components/icons";
+import { useSettings } from "../contexts/SettingsContext";
+import type {
+  ViewType,
+  MaterialType,
+  TokenEstimate,
+  MaterialProcessingProgress,
+} from "../types";
 
 interface MaterialCreateViewProps {
   onNavigate: (view: ViewType, data?: unknown) => void;
-  settings: AppSettings | null;
 }
 
-export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewProps) {
+export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
+  const { settings } = useSettings();
   const [materialType, setMaterialType] = useState<MaterialType>("transcript");
   const [title, setTitle] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [originalText, setOriginalText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tokenEstimate, setTokenEstimate] = useState<TokenEstimate | null>(null);
-  const [progress, setProgress] = useState<MaterialProcessingProgress | null>(null);
+  const [tokenEstimate, setTokenEstimate] = useState<TokenEstimate | null>(
+    null,
+  );
+  const [progress, setProgress] = useState<MaterialProcessingProgress | null>(
+    null,
+  );
 
   // Debounced token estimation
   useEffect(() => {
@@ -27,7 +43,10 @@ export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewP
 
     const timer = setTimeout(async () => {
       try {
-        const estimate = await estimateMaterialTokens(originalText.trim(), materialType);
+        const estimate = await estimateMaterialTokens(
+          originalText.trim(),
+          materialType,
+        );
         setTokenEstimate(estimate);
       } catch (err) {
         console.error("Failed to estimate tokens:", err);
@@ -39,9 +58,12 @@ export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewP
 
   // Listen for progress events
   useEffect(() => {
-    const unlisten = listen<MaterialProcessingProgress>("material-processing-progress", (event) => {
-      setProgress(event.payload);
-    });
+    const unlisten = listen<MaterialProcessingProgress>(
+      "material-processing-progress",
+      (event) => {
+        setProgress(event.payload);
+      },
+    );
 
     return () => {
       unlisten.then((fn) => fn());
@@ -80,14 +102,18 @@ export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewP
         materialType,
         originalText.trim(),
         settings?.targetLanguage || "de",
-        settings?.nativeLanguage || "pl"
+        settings?.nativeLanguage || "pl",
       );
 
       // Navigate to review
       onNavigate("material-review", { materialId: material.id });
     } catch (err) {
       console.error("Failed to create material:", err);
-      setError(err instanceof Error ? err.message : "Failed to process material. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to process material. Please try again.",
+      );
       setIsProcessing(false);
       setProgress(null);
     }
@@ -98,14 +124,13 @@ export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewP
       {/* Header */}
       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-4">
-          <button
+          <Button
             onClick={() => onNavigate("materials")}
-            className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            variant="ghost"
+            size="sm"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
+            <ChevronLeftIcon size="sm" />
+          </Button>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
             Add Material
           </h1>
@@ -129,13 +154,12 @@ export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewP
                     : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
                 }`}
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <PlayCircleIcon size="lg" />
                 <div className="text-left">
                   <div className="font-medium">YouTube Transcript</div>
-                  <div className="text-xs opacity-75">With timestamps and video embed</div>
+                  <div className="text-xs opacity-75">
+                    With timestamps and video embed
+                  </div>
                 </div>
               </button>
               <button
@@ -146,12 +170,12 @@ export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewP
                     : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
                 }`}
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <NoteIcon size="lg" />
                 <div className="text-left">
                   <div className="font-medium">Article / Text</div>
-                  <div className="text-xs opacity-75">Sentence-by-sentence translation</div>
+                  <div className="text-xs opacity-75">
+                    Sentence-by-sentence translation
+                  </div>
                 </div>
               </button>
             </div>
@@ -185,7 +209,8 @@ export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewP
                 className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                If provided, the video will be embedded for click-to-seek playback.
+                If provided, the video will be embedded for click-to-seek
+                playback.
               </p>
             </div>
           )}
@@ -239,7 +264,10 @@ export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewP
           {isProcessing && progress && progress.totalChunks > 1 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
-                <span>Processing chunk {progress.currentChunk} of {progress.totalChunks}</span>
+                <span>
+                  Processing chunk {progress.currentChunk} of{" "}
+                  {progress.totalChunks}
+                </span>
                 <span>{Math.round(progress.percent)}%</span>
               </div>
               <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -260,32 +288,20 @@ export function MaterialCreateView({ onNavigate, settings }: MaterialCreateViewP
 
           {/* Submit */}
           <div className="flex justify-end gap-3 pt-4">
-            <button
+            <Button
               onClick={() => onNavigate("materials")}
               disabled={isProcessing}
-              className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              variant="ghost"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleSubmit}
               disabled={isProcessing || !originalText.trim() || !title.trim()}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              isLoading={isProcessing}
             >
-              {isProcessing ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Process & Continue
-                </>
-              )}
-            </button>
+              {isProcessing ? "Processing..." : "Process & Continue"}
+            </Button>
           </div>
         </div>
       </div>

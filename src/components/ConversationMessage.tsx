@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../types";
+import { CloseIcon, StopIcon, PlayCircleIcon } from "./icons";
 
 interface ConversationMessageProps {
   message: ChatMessage;
@@ -29,9 +30,7 @@ export function ConversationMessage({
               className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-slate-400 dark:bg-slate-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-500 dark:hover:bg-red-500"
               title="Delete"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <CloseIcon size="xs" />
             </button>
           )}
         </div>
@@ -49,9 +48,7 @@ export function ConversationMessage({
             className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-400 dark:bg-slate-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-500 dark:hover:bg-red-500"
             title="Delete"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <CloseIcon size="xs" />
           </button>
         )}
         <div className="flex items-start gap-2">
@@ -75,15 +72,9 @@ export function ConversationMessage({
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
               ) : isPlaying ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <rect x="6" y="5" width="4" height="14" rx="1" />
-                  <rect x="14" y="5" width="4" height="14" rx="1" />
-                </svg>
+                <StopIcon size="sm" />
               ) : (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M15.528 8.47l-4.604-2.654A1 1 0 009.5 6.684v5.632a1 1 0 001.424.868l4.604-2.654a1 1 0 000-1.736z" />
-                  <path fillRule="evenodd" d="M1 12C1 5.925 5.925 1 12 1s11 4.925 11 11-4.925 11-11 11S1 18.075 1 12zm11-9a9 9 0 100 18 9 9 0 000-18z" clipRule="evenodd" />
-                </svg>
+                <PlayCircleIcon size="sm" />
               )}
             </button>
           )}

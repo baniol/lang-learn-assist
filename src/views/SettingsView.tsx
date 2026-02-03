@@ -1,11 +1,27 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useSettings } from "../contexts/SettingsContext";
 import { testLlmConnection } from "../lib/llm";
 import { testTtsConnection, getAvailableVoices } from "../lib/tts";
-import { getAvailableModels, getModelStatus, downloadModel, deleteModel } from "../lib/audio";
+import {
+  getAvailableModels,
+  getModelStatus,
+  downloadModel,
+  deleteModel,
+} from "../lib/audio";
 import { exportToFile, readFileAsJson, importData } from "../lib/dataExport";
 import { ToggleSwitch } from "../components/ToggleSwitch";
-import type { AppSettings, WhisperModel, TtsVoice, LlmProvider, TtsProvider, ExerciseMode, LanguageVoiceSettings, ImportMode, ImportResult } from "../types";
+import type {
+  AppSettings,
+  WhisperModel,
+  TtsVoice,
+  LlmProvider,
+  TtsProvider,
+  ExerciseMode,
+  LanguageVoiceSettings,
+  ImportMode,
+  ImportResult,
+} from "../types";
 import { LANGUAGE_OPTIONS, NATIVE_LANGUAGE_OPTIONS } from "../types";
 
 // All supported target languages for voice configuration
@@ -33,27 +49,35 @@ const LLM_MODELS = {
   none: [],
 };
 
-interface SettingsViewProps {
-  onSettingsChange?: (settings: AppSettings) => void;
-}
-
-export function SettingsView({ onSettingsChange }: SettingsViewProps) {
+export function SettingsView() {
+  const { updateSettings: updateGlobalSettings, refreshSettings } =
+    useSettings();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [whisperModels, setWhisperModels] = useState<(WhisperModel & { downloaded: boolean })[]>([]);
+  const [whisperModels, setWhisperModels] = useState<
+    (WhisperModel & { downloaded: boolean })[]
+  >([]);
   const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
   const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
-  const [testResults, setTestResults] = useState<{ llm?: string; tts?: string }>({});
+  const [testResults, setTestResults] = useState<{
+    llm?: string;
+    tts?: string;
+  }>({});
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [voicesError, setVoicesError] = useState<string | null>(null);
-  const [selectedVoiceLanguage, setSelectedVoiceLanguage] = useState<string>("de");
+  const [selectedVoiceLanguage, setSelectedVoiceLanguage] =
+    useState<string>("de");
   const [importMode, setImportMode] = useState<ImportMode>("merge");
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [dataOperationResult, setDataOperationResult] = useState<{ type: "success" | "error"; message: string; details?: ImportResult } | null>(null);
+  const [dataOperationResult, setDataOperationResult] = useState<{
+    type: "success" | "error";
+    message: string;
+    details?: ImportResult;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -71,7 +95,7 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
   useEffect(() => {
     if (settings && settings.llmProvider !== "none") {
       const models = LLM_MODELS[settings.llmProvider];
-      const currentModelValid = models.some(m => m.id === settings.llmModel);
+      const currentModelValid = models.some((m) => m.id === settings.llmModel);
       if (!currentModelValid && models.length > 0) {
         updateSetting("llmModel", models[0].id);
       }
@@ -96,7 +120,7 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
         models.map(async (m) => ({
           ...m,
           downloaded: await getModelStatus(m.fileName),
-        }))
+        })),
       );
       setWhisperModels(modelsWithStatus);
     } catch (err) {
@@ -126,8 +150,8 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
     setIsSaving(true);
     try {
       await invoke("save_settings", { settings });
-      // Notify parent of settings change
-      onSettingsChange?.(settings);
+      // Update global settings context
+      await updateGlobalSettings(settings);
     } catch (err) {
       console.error("Failed to save settings:", err);
     } finally {
@@ -145,7 +169,10 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
 
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const estimatedProgress = Math.min(95, (elapsed / estimatedDurationMs) * 100);
+      const estimatedProgress = Math.min(
+        95,
+        (elapsed / estimatedDurationMs) * 100,
+      );
       setDownloadProgress(estimatedProgress);
     }, 200);
 
@@ -229,7 +256,10 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
     }
   };
 
-  const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+  const updateSetting = <K extends keyof AppSettings>(
+    key: K,
+    value: AppSettings[K],
+  ) => {
     setSettings((prev) => (prev ? { ...prev, [key]: value } : null));
   };
 
@@ -279,6 +309,8 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
       });
       // Reload settings after import
       loadSettings();
+      // Also refresh global settings context
+      refreshSettings();
     } catch (err) {
       setDataOperationResult({
         type: "error",
@@ -306,7 +338,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Settings</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
+          Settings
+        </h1>
         <button
           onClick={handleSave}
           disabled={isSaving}
@@ -315,8 +349,18 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
           {isSaving ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
           ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           )}
           Save Settings
@@ -336,7 +380,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
               </label>
               <select
                 value={settings.llmProvider}
-                onChange={(e) => updateSetting("llmProvider", e.target.value as LlmProvider)}
+                onChange={(e) =>
+                  updateSetting("llmProvider", e.target.value as LlmProvider)
+                }
                 className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               >
                 <option value="anthropic">Anthropic (Claude)</option>
@@ -385,7 +431,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                     Test Connection
                   </button>
                   {testResults.llm && (
-                    <p className={`text-sm ${testResults.llm.startsWith("Error") ? "text-red-500" : "text-green-500"}`}>
+                    <p
+                      className={`text-sm ${testResults.llm.startsWith("Error") ? "text-red-500" : "text-green-500"}`}
+                    >
                       {testResults.llm}
                     </p>
                   )}
@@ -408,9 +456,10 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                   key={model.fileName}
                   className={`
                     flex items-center justify-between p-3 rounded-lg border-2 transition-colors
-                    ${isActive && model.downloaded
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                      : "border-transparent bg-slate-50 dark:bg-slate-900"
+                    ${
+                      isActive && model.downloaded
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-transparent bg-slate-50 dark:bg-slate-900"
                     }
                   `}
                 >
@@ -418,15 +467,19 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                     {/* Radio button for selection - only clickable if downloaded */}
                     <button
                       type="button"
-                      onClick={() => model.downloaded && handleSelectActiveModel(model.fileName)}
+                      onClick={() =>
+                        model.downloaded &&
+                        handleSelectActiveModel(model.fileName)
+                      }
                       disabled={!model.downloaded}
                       className={`
                         w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
-                        ${model.downloaded
-                          ? isActive
-                            ? "border-blue-500 bg-blue-500"
-                            : "border-slate-300 dark:border-slate-600 hover:border-blue-400"
-                          : "border-slate-200 dark:border-slate-700 cursor-not-allowed"
+                        ${
+                          model.downloaded
+                            ? isActive
+                              ? "border-blue-500 bg-blue-500"
+                              : "border-slate-300 dark:border-slate-600 hover:border-blue-400"
+                            : "border-slate-200 dark:border-slate-700 cursor-not-allowed"
                         }
                       `}
                     >
@@ -437,7 +490,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
 
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-slate-800 dark:text-white">{model.name}</p>
+                        <p className="font-medium text-slate-800 dark:text-white">
+                          {model.name}
+                        </p>
                         <span className="text-sm text-slate-500 dark:text-slate-400">
                           ({model.sizeMb} MB)
                         </span>
@@ -470,17 +525,31 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                         title="Delete model"
                         className="p-1.5 rounded transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
                         </svg>
                       </button>
                     ) : (
                       <button
-                        onClick={() => handleDownloadModel(model.fileName, model.sizeMb)}
+                        onClick={() =>
+                          handleDownloadModel(model.fileName, model.sizeMb)
+                        }
                         disabled={downloadingModel !== null}
                         className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm font-medium transition-colors"
                       >
-                        {downloadingModel === model.fileName ? "Downloading..." : "Download"}
+                        {downloadingModel === model.fileName
+                          ? "Downloading..."
+                          : "Download"}
                       </button>
                     )}
                   </div>
@@ -508,7 +577,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
               </label>
               <select
                 value={settings.ttsProvider}
-                onChange={(e) => updateSetting("ttsProvider", e.target.value as TtsProvider)}
+                onChange={(e) =>
+                  updateSetting("ttsProvider", e.target.value as TtsProvider)
+                }
                 className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               >
                 <option value="none">None</option>
@@ -567,8 +638,12 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                             }`}
                           >
                             {lang.name}
-                            {settings.ttsVoicesPerLanguage[lang.code]?.default && (
-                              <span className="ml-1 w-2 h-2 inline-block bg-green-500 rounded-full" title="Configured" />
+                            {settings.ttsVoicesPerLanguage[lang.code]
+                              ?.default && (
+                              <span
+                                className="ml-1 w-2 h-2 inline-block bg-green-500 rounded-full"
+                                title="Configured"
+                              />
                             )}
                           </button>
                         ))}
@@ -577,7 +652,12 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                       {/* Voice settings for selected language */}
                       <div className="space-y-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4">
                         <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                          {VOICE_LANGUAGES.find(l => l.code === selectedVoiceLanguage)?.name} Voices
+                          {
+                            VOICE_LANGUAGES.find(
+                              (l) => l.code === selectedVoiceLanguage,
+                            )?.name
+                          }{" "}
+                          Voices
                         </h4>
 
                         {/* Default Voice */}
@@ -586,10 +666,19 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                             Default Voice (Practice)
                           </label>
                           <select
-                            value={settings.ttsVoicesPerLanguage[selectedVoiceLanguage]?.default || ""}
+                            value={
+                              settings.ttsVoicesPerLanguage[
+                                selectedVoiceLanguage
+                              ]?.default || ""
+                            }
                             onChange={(e) => {
-                              const current = settings.ttsVoicesPerLanguage[selectedVoiceLanguage] || { default: "", voiceA: "", voiceB: "" };
-                              const updated: LanguageVoiceSettings = { ...current, default: e.target.value };
+                              const current = settings.ttsVoicesPerLanguage[
+                                selectedVoiceLanguage
+                              ] || { default: "", voiceA: "", voiceB: "" };
+                              const updated: LanguageVoiceSettings = {
+                                ...current,
+                                default: e.target.value,
+                              };
                               updateSetting("ttsVoicesPerLanguage", {
                                 ...settings.ttsVoicesPerLanguage,
                                 [selectedVoiceLanguage]: updated,
@@ -617,10 +706,19 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                                 Voice A
                               </label>
                               <select
-                                value={settings.ttsVoicesPerLanguage[selectedVoiceLanguage]?.voiceA || ""}
+                                value={
+                                  settings.ttsVoicesPerLanguage[
+                                    selectedVoiceLanguage
+                                  ]?.voiceA || ""
+                                }
                                 onChange={(e) => {
-                                  const current = settings.ttsVoicesPerLanguage[selectedVoiceLanguage] || { default: "", voiceA: "", voiceB: "" };
-                                  const updated: LanguageVoiceSettings = { ...current, voiceA: e.target.value };
+                                  const current = settings.ttsVoicesPerLanguage[
+                                    selectedVoiceLanguage
+                                  ] || { default: "", voiceA: "", voiceB: "" };
+                                  const updated: LanguageVoiceSettings = {
+                                    ...current,
+                                    voiceA: e.target.value,
+                                  };
                                   updateSetting("ttsVoicesPerLanguage", {
                                     ...settings.ttsVoicesPerLanguage,
                                     [selectedVoiceLanguage]: updated,
@@ -630,7 +728,10 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                               >
                                 <option value="">Use default</option>
                                 {ttsVoices.map((voice) => (
-                                  <option key={voice.voiceId} value={voice.voiceId}>
+                                  <option
+                                    key={voice.voiceId}
+                                    value={voice.voiceId}
+                                  >
                                     {voice.name}
                                   </option>
                                 ))}
@@ -641,10 +742,19 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                                 Voice B
                               </label>
                               <select
-                                value={settings.ttsVoicesPerLanguage[selectedVoiceLanguage]?.voiceB || ""}
+                                value={
+                                  settings.ttsVoicesPerLanguage[
+                                    selectedVoiceLanguage
+                                  ]?.voiceB || ""
+                                }
                                 onChange={(e) => {
-                                  const current = settings.ttsVoicesPerLanguage[selectedVoiceLanguage] || { default: "", voiceA: "", voiceB: "" };
-                                  const updated: LanguageVoiceSettings = { ...current, voiceB: e.target.value };
+                                  const current = settings.ttsVoicesPerLanguage[
+                                    selectedVoiceLanguage
+                                  ] || { default: "", voiceA: "", voiceB: "" };
+                                  const updated: LanguageVoiceSettings = {
+                                    ...current,
+                                    voiceB: e.target.value,
+                                  };
                                   updateSetting("ttsVoicesPerLanguage", {
                                     ...settings.ttsVoicesPerLanguage,
                                     [selectedVoiceLanguage]: updated,
@@ -654,7 +764,10 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                               >
                                 <option value="">Use default</option>
                                 {ttsVoices.map((voice) => (
-                                  <option key={voice.voiceId} value={voice.voiceId}>
+                                  <option
+                                    key={voice.voiceId}
+                                    value={voice.voiceId}
+                                  >
                                     {voice.name}
                                   </option>
                                 ))}
@@ -662,7 +775,8 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                             </div>
                           </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                            Alternate between Voice A and Voice B when playing conversation messages
+                            Alternate between Voice A and Voice B when playing
+                            conversation messages
                           </p>
                         </div>
                       </div>
@@ -682,7 +796,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                     Test Connection
                   </button>
                   {testResults.tts && (
-                    <p className={`text-sm ${testResults.tts.startsWith("Error") ? "text-red-500" : "text-green-500"}`}>
+                    <p
+                      className={`text-sm ${testResults.tts.startsWith("Error") ? "text-red-500" : "text-green-500"}`}
+                    >
                       {testResults.tts}
                     </p>
                   )}
@@ -738,7 +854,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
               </label>
               <select
                 value={settings.nativeLanguage}
-                onChange={(e) => updateSetting("nativeLanguage", e.target.value)}
+                onChange={(e) =>
+                  updateSetting("nativeLanguage", e.target.value)
+                }
                 className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               >
                 {NATIVE_LANGUAGE_OPTIONS.map((lang) => (
@@ -750,7 +868,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
             </div>
           </div>
           <p className="mt-3 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg">
-            New conversations and practice sessions will use these languages. You can also quickly switch languages using the dropdown in the sidebar.
+            New conversations and practice sessions will use these languages.
+            You can also quickly switch languages using the dropdown in the
+            sidebar.
           </p>
         </section>
 
@@ -765,14 +885,17 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                 Correct answers to mark as learned
               </label>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                Answer a phrase correctly this many times in ONE session to mark it as learned
+                Answer a phrase correctly this many times in ONE session to mark
+                it as learned
               </p>
               <input
                 type="number"
                 min={1}
                 max={10}
                 value={settings.requiredStreak}
-                onChange={(e) => updateSetting("requiredStreak", parseInt(e.target.value) || 2)}
+                onChange={(e) =>
+                  updateSetting("requiredStreak", parseInt(e.target.value) || 2)
+                }
                 className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               />
             </div>
@@ -782,14 +905,20 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                 Required repetitions after failure (speaking mode)
               </label>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                After a wrong answer in speaking mode, repeat correctly this many times to continue
+                After a wrong answer in speaking mode, repeat correctly this
+                many times to continue
               </p>
               <input
                 type="number"
                 min={1}
                 max={5}
                 value={settings.failureRepetitions}
-                onChange={(e) => updateSetting("failureRepetitions", parseInt(e.target.value) || 2)}
+                onChange={(e) =>
+                  updateSetting(
+                    "failureRepetitions",
+                    parseInt(e.target.value) || 2,
+                  )
+                }
                 className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               />
             </div>
@@ -799,14 +928,20 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                 Phrases per session
               </label>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                Maximum number of phrases to practice in one session (0 = unlimited)
+                Maximum number of phrases to practice in one session (0 =
+                unlimited)
               </p>
               <input
                 type="number"
                 min={0}
                 max={100}
                 value={settings.sessionPhraseLimit}
-                onChange={(e) => updateSetting("sessionPhraseLimit", parseInt(e.target.value) || 20)}
+                onChange={(e) =>
+                  updateSetting(
+                    "sessionPhraseLimit",
+                    parseInt(e.target.value) || 20,
+                  )
+                }
                 className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               />
             </div>
@@ -816,14 +951,20 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                 New phrases per session
               </label>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                Maximum new phrases to introduce in one session. Master existing phrases before adding more. (0 = unlimited)
+                Maximum new phrases to introduce in one session. Master existing
+                phrases before adding more. (0 = unlimited)
               </p>
               <input
                 type="number"
                 min={0}
                 max={20}
                 value={settings.newPhrasesPerSession}
-                onChange={(e) => updateSetting("newPhrasesPerSession", parseInt(e.target.value) || 2)}
+                onChange={(e) =>
+                  updateSetting(
+                    "newPhrasesPerSession",
+                    parseInt(e.target.value) || 2,
+                  )
+                }
                 className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               />
             </div>
@@ -834,7 +975,12 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
               </label>
               <select
                 value={settings.defaultExerciseMode}
-                onChange={(e) => updateSetting("defaultExerciseMode", e.target.value as ExerciseMode)}
+                onChange={(e) =>
+                  updateSetting(
+                    "defaultExerciseMode",
+                    e.target.value as ExerciseMode,
+                  )
+                }
                 className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
               >
                 <option value="manual">Manual (Self-grading)</option>
@@ -855,7 +1001,8 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
 
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-700 dark:text-slate-300">
-                Fuzzy matching (accept small transcription errors like "Parkpläzze" for "Parkplätze")
+                Fuzzy matching (accept small transcription errors like
+                "Parkpläzze" for "Parkplätze")
               </span>
               <ToggleSwitch
                 checked={settings.fuzzyMatching}
@@ -895,7 +1042,8 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
           </h2>
           <div className="space-y-4">
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Export all your data (conversations, phrases, progress, settings) to a JSON file for backup or transfer to another device.
+              Export all your data (conversations, phrases, progress, settings)
+              to a JSON file for backup or transfer to another device.
             </p>
 
             {/* Export */}
@@ -908,8 +1056,18 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                 {isExporting ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                 ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                    />
                   </svg>
                 )}
                 Export Data
@@ -933,7 +1091,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                       className="w-4 h-4 text-blue-500"
                     />
                     <div>
-                      <span className="text-sm text-slate-700 dark:text-slate-300">Merge</span>
+                      <span className="text-sm text-slate-700 dark:text-slate-300">
+                        Merge
+                      </span>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         Add new items, update existing if newer
                       </p>
@@ -949,7 +1109,9 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                       className="w-4 h-4 text-blue-500"
                     />
                     <div>
-                      <span className="text-sm text-slate-700 dark:text-slate-300">Overwrite</span>
+                      <span className="text-sm text-slate-700 dark:text-slate-300">
+                        Overwrite
+                      </span>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         Replace all data with imported data
                       </p>
@@ -972,8 +1134,18 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                   {isImporting ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-700 dark:border-white" />
                   ) : (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
                     </svg>
                   )}
                   Import Data
@@ -990,34 +1162,79 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
                     : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400"
                 }`}
               >
-                <p className="text-sm font-medium">{dataOperationResult.message}</p>
+                <p className="text-sm font-medium">
+                  {dataOperationResult.message}
+                </p>
                 {dataOperationResult.details && (
                   <div className="mt-2 text-xs space-y-1">
                     {dataOperationResult.details.stats.settingsImported > 0 && (
-                      <p>Settings: {dataOperationResult.details.stats.settingsImported} imported</p>
-                    )}
-                    {(dataOperationResult.details.stats.conversationsImported > 0 ||
-                      dataOperationResult.details.stats.conversationsUpdated > 0) && (
                       <p>
-                        Conversations: {dataOperationResult.details.stats.conversationsImported} imported
-                        {dataOperationResult.details.stats.conversationsUpdated > 0 &&
+                        Settings:{" "}
+                        {dataOperationResult.details.stats.settingsImported}{" "}
+                        imported
+                      </p>
+                    )}
+                    {(dataOperationResult.details.stats.conversationsImported >
+                      0 ||
+                      dataOperationResult.details.stats.conversationsUpdated >
+                        0) && (
+                      <p>
+                        Conversations:{" "}
+                        {
+                          dataOperationResult.details.stats
+                            .conversationsImported
+                        }{" "}
+                        imported
+                        {dataOperationResult.details.stats
+                          .conversationsUpdated > 0 &&
                           `, ${dataOperationResult.details.stats.conversationsUpdated} updated`}
                       </p>
                     )}
                     {dataOperationResult.details.stats.phrasesImported > 0 && (
-                      <p>Phrases: {dataOperationResult.details.stats.phrasesImported} imported</p>
+                      <p>
+                        Phrases:{" "}
+                        {dataOperationResult.details.stats.phrasesImported}{" "}
+                        imported
+                      </p>
                     )}
-                    {dataOperationResult.details.stats.phraseProgressImported > 0 && (
-                      <p>Progress: {dataOperationResult.details.stats.phraseProgressImported} imported</p>
+                    {dataOperationResult.details.stats.phraseProgressImported >
+                      0 && (
+                      <p>
+                        Progress:{" "}
+                        {
+                          dataOperationResult.details.stats
+                            .phraseProgressImported
+                        }{" "}
+                        imported
+                      </p>
                     )}
                     {dataOperationResult.details.stats.notesImported > 0 && (
-                      <p>Notes: {dataOperationResult.details.stats.notesImported} imported</p>
+                      <p>
+                        Notes: {dataOperationResult.details.stats.notesImported}{" "}
+                        imported
+                      </p>
                     )}
-                    {dataOperationResult.details.stats.questionThreadsImported > 0 && (
-                      <p>Question threads: {dataOperationResult.details.stats.questionThreadsImported} imported</p>
+                    {dataOperationResult.details.stats.questionThreadsImported >
+                      0 && (
+                      <p>
+                        Question threads:{" "}
+                        {
+                          dataOperationResult.details.stats
+                            .questionThreadsImported
+                        }{" "}
+                        imported
+                      </p>
                     )}
-                    {dataOperationResult.details.stats.practiceSessionsImported > 0 && (
-                      <p>Practice sessions: {dataOperationResult.details.stats.practiceSessionsImported} imported</p>
+                    {dataOperationResult.details.stats
+                      .practiceSessionsImported > 0 && (
+                      <p>
+                        Practice sessions:{" "}
+                        {
+                          dataOperationResult.details.stats
+                            .practiceSessionsImported
+                        }{" "}
+                        imported
+                      </p>
                     )}
                   </div>
                 )}
@@ -1025,8 +1242,8 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
             )}
 
             <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-3 py-2 rounded-lg">
-              Note: API keys are included in exports. Keep your export files secure.
-              Audio files are not exported (only file paths).
+              Note: API keys are included in exports. Keep your export files
+              secure. Audio files are not exported (only file paths).
             </p>
           </div>
         </section>
@@ -1040,7 +1257,8 @@ export function SettingsView({ onSettingsChange }: SettingsViewProps) {
               Delete Model?
             </h3>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              Are you sure you want to delete the model "{whisperModels.find(m => m.fileName === deletingModel)?.name}"?
+              Are you sure you want to delete the model "
+              {whisperModels.find((m) => m.fileName === deletingModel)?.name}"?
               You will need to download it again if you want to use it.
             </p>
             <div className="flex justify-end gap-3">
