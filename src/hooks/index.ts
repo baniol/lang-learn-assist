@@ -5,6 +5,9 @@ export type { UseQueryOptions, UseQueryResult } from "./useQuery";
 export { useMutation, useOptimisticMutation } from "./useMutation";
 export type { UseMutationOptions, UseMutationResult } from "./useMutation";
 
+// Navigation
+export { useNavigation } from "./useNavigation";
+
 // Existing hooks - re-export for convenience
 export { useConversation } from "./useConversation";
 export { useVoiceRecording } from "./useVoiceRecording";

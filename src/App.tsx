@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { ErrorBoundary } from "./components/shared";
@@ -17,12 +17,12 @@ import { MaterialCreateView } from "./views/MaterialCreateView";
 import { MaterialReviewView } from "./views/MaterialReviewView";
 import { QuickNotePopup } from "./components/QuickNotePopup";
 import { PageSpinner } from "./components/ui";
-import type { ViewType } from "./types";
-
-interface ViewState {
-  type: ViewType;
-  data?: Record<string, unknown>;
-}
+import { useNavigation } from "./hooks";
+import {
+  isConversationView,
+  isConversationReviewView,
+  isMaterialReviewView,
+} from "./types/navigation";
 
 /**
  * Main application content.
@@ -30,15 +30,21 @@ interface ViewState {
  */
 function AppContent() {
   const { isLoading } = useSettings();
-  const [viewState, setViewState] = useState<ViewState>({ type: "dashboard" });
+  const { viewState, currentView, navigate } = useNavigation();
   const [isQuickNoteOpen, setIsQuickNoteOpen] = useState(false);
 
-  const handleNavigate = useCallback((view: ViewType, data?: unknown) => {
-    setViewState({
-      type: view,
-      data: data as Record<string, unknown> | undefined,
-    });
-  }, []);
+  // Legacy-compatible navigate wrapper for views that haven't been updated yet
+  // TODO: Remove once all views use the type-safe NavigateFn
+  const legacyNavigate = (view: string, data?: unknown) => {
+    if (data && typeof data === "object") {
+      (navigate as (v: string, d: Record<string, unknown>) => void)(
+        view,
+        data as Record<string, unknown>
+      );
+    } else {
+      (navigate as (v: string) => void)(view);
+    }
+  };
 
   // Show loading spinner while settings are being fetched
   if (isLoading) {
@@ -50,23 +56,36 @@ function AppContent() {
   }
 
   const renderView = () => {
-    switch (viewState.type) {
+    // Type-safe view rendering using discriminated unions
+    if (isConversationView(viewState)) {
+      return (
+        <ConversationView
+          conversationId={viewState.conversationId}
+          onNavigate={legacyNavigate}
+        />
+      );
+    }
+    if (isConversationReviewView(viewState)) {
+      return (
+        <ConversationReviewView
+          conversationId={viewState.conversationId}
+          onNavigate={legacyNavigate}
+        />
+      );
+    }
+    if (isMaterialReviewView(viewState)) {
+      return (
+        <MaterialReviewView
+          materialId={viewState.materialId}
+          onNavigate={legacyNavigate}
+        />
+      );
+    }
+
+    // Views without data
+    switch (currentView) {
       case "dashboard":
-        return <DashboardView onNavigate={handleNavigate} />;
-      case "conversation":
-        return (
-          <ConversationView
-            conversationId={viewState.data?.conversationId as number}
-            onNavigate={handleNavigate}
-          />
-        );
-      case "conversation-review":
-        return (
-          <ConversationReviewView
-            conversationId={viewState.data?.conversationId as number}
-            onNavigate={handleNavigate}
-          />
-        );
+        return <DashboardView onNavigate={legacyNavigate} />;
       case "phrase-library":
         return <PhraseLibraryView />;
       case "learn":
@@ -80,30 +99,23 @@ function AppContent() {
       case "notes":
         return <NotesView />;
       case "materials":
-        return <MaterialsView onNavigate={handleNavigate} />;
+        return <MaterialsView onNavigate={legacyNavigate} />;
       case "material-create":
-        return <MaterialCreateView onNavigate={handleNavigate} />;
-      case "material-review":
-        return (
-          <MaterialReviewView
-            materialId={viewState.data?.materialId as number}
-            onNavigate={handleNavigate}
-          />
-        );
+        return <MaterialCreateView onNavigate={legacyNavigate} />;
       default:
-        return <DashboardView onNavigate={handleNavigate} />;
+        return <DashboardView onNavigate={legacyNavigate} />;
     }
   };
 
   return (
     <>
       <Layout
-        currentView={viewState.type}
-        onNavigate={handleNavigate}
+        currentView={currentView}
+        onNavigate={legacyNavigate}
         onQuickNoteOpen={() => setIsQuickNoteOpen(true)}
       >
         <ErrorBoundary
-          onReset={() => setViewState({ type: "dashboard" })}
+          onReset={() => navigate("dashboard")}
           onError={(error) => console.error("View error:", error)}
         >
           {renderView()}

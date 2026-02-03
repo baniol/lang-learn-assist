@@ -16,6 +16,7 @@ import {
   ExcludeIcon,
 } from "../components/icons";
 import { useSettings } from "../contexts/SettingsContext";
+import { LEARNING } from "../lib/constants";
 import type {
   PhraseWithProgress,
   CreatePhraseRequest,
@@ -418,7 +419,7 @@ export function PhraseLibraryView() {
           {filteredPhrases.map((item) => {
             const p = item.phrase;
             const progress = item.progress;
-            const isLearned = progress && progress.correctStreak >= 2;
+            const isLearned = progress && progress.correctStreak >= LEARNING.DEFAULT_REQUIRED_STREAK;
             const isLearning =
               progress && progress.totalAttempts > 0 && !isLearned;
 

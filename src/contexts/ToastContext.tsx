@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "../lib/utils";
+import { UI } from "../lib/constants";
 import { CheckCircleIcon, ExclamationCircleIcon, InfoCircleIcon, WarningIcon, CloseIcon } from "../components/icons";
 
 export type ToastType = "success" | "error" | "info" | "warning";
@@ -38,8 +39,6 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-const DEFAULT_DURATION = 5000;
-
 interface ToastProviderProps {
   children: ReactNode;
 }
@@ -56,7 +55,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
   }, []);
 
   const showToast = useCallback(
-    (type: ToastType, message: string, duration = DEFAULT_DURATION) => {
+    (type: ToastType, message: string, duration: number = UI.TOAST_DURATION_MS) => {
       const id = crypto.randomUUID();
       const newToast: Toast = { id, type, message, duration };
 

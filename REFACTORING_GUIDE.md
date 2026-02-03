@@ -2297,13 +2297,13 @@ Use this checklist to track progress:
 - [x] Add `useToast()` for error/success notifications
 - [ ] Refactor `PhraseLibraryView` (complex, 700+ lines - defer to Phase 6)
 
-### Phase 5: Type Safety ⚠️ FILES CREATED, NOT INTEGRATED
+### Phase 5: Type Safety ✅ COMPLETE
 - [x] Create `src/types/navigation.ts`
 - [x] Create `src/lib/constants.ts`
-- [ ] Create `src/hooks/useNavigation.ts`
-- [ ] Update `App.tsx` to import ViewState from navigation.ts
-- [ ] Update views to use type-safe view data
-- [ ] Replace magic numbers with constants
+- [x] Create `src/hooks/useNavigation.ts`
+- [x] Update `App.tsx` to use type-safe navigation with type guards
+- [x] Replace magic numbers with constants (ToastContext, PhraseLibraryView)
+- [x] Add legacy navigate wrapper for gradual migration
 
 ### Phase 6: Component Decomposition ❌ NOT STARTED
 - [ ] Create `src/components/learning/` directory
