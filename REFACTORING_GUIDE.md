@@ -2305,7 +2305,7 @@ Use this checklist to track progress:
 - [x] Replace magic numbers with constants (ToastContext, PhraseLibraryView)
 - [x] Add legacy navigate wrapper for gradual migration
 
-### Phase 6: Component Decomposition 🔄 IN PROGRESS
+### Phase 6: Component Decomposition ✅ COMPLETE
 #### LearnView Decomposition ✅ COMPLETE
 - [x] Create `src/components/learning/` directory
 - [x] Extract `SessionHeader.tsx` from `LearnView.tsx`
@@ -2333,9 +2333,19 @@ Use this checklist to track progress:
 - [x] Refactor `PhraseLibraryView.tsx` to use new components
 - [x] Run type check and fix issues
 
-#### SettingsView Decomposition ❌ NOT STARTED
-- [ ] Create `src/components/settings/` directory
-- [ ] Extract settings sections from `SettingsView.tsx`
+#### SettingsView Decomposition ✅ COMPLETE
+- [x] Create `src/components/settings/` directory
+- [x] Extract `SettingsSection.tsx` (reusable wrapper)
+- [x] Extract `LlmSettingsSection.tsx` from `SettingsView.tsx`
+- [x] Extract `WhisperSettingsSection.tsx` from `SettingsView.tsx`
+- [x] Extract `TtsSettingsSection.tsx` from `SettingsView.tsx`
+- [x] Extract `LanguageSettingsSection.tsx` from `SettingsView.tsx`
+- [x] Extract `LearningSettingsSection.tsx` from `SettingsView.tsx`
+- [x] Extract `NotesSettingsSection.tsx` from `SettingsView.tsx`
+- [x] Extract `DataManagementSection.tsx` from `SettingsView.tsx`
+- [x] Create `src/components/settings/index.ts`
+- [x] Refactor `SettingsView.tsx` to use new components
+- [x] Run type check and fix issues
 
 ### Phase 7: Error Handling ✅ COMPLETE
 - [x] Create `src/components/shared/ErrorBoundary.tsx`
