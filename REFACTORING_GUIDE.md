@@ -2305,17 +2305,37 @@ Use this checklist to track progress:
 - [x] Replace magic numbers with constants (ToastContext, PhraseLibraryView)
 - [x] Add legacy navigate wrapper for gradual migration
 
-### Phase 6: Component Decomposition ❌ NOT STARTED
-- [ ] Create `src/components/learning/` directory
-- [ ] Extract `SessionHeader.tsx` from `LearnView.tsx`
-- [ ] Extract `FeedbackDisplay.tsx` from `LearnView.tsx`
-- [ ] Extract remaining learning components
-- [ ] Refactor `LearnView.tsx` to use new components
-- [ ] Create `src/components/phrases/` directory
-- [ ] Extract phrase components from `PhraseLibraryView.tsx`
+### Phase 6: Component Decomposition 🔄 IN PROGRESS
+#### LearnView Decomposition ✅ COMPLETE
+- [x] Create `src/components/learning/` directory
+- [x] Extract `SessionHeader.tsx` from `LearnView.tsx`
+- [x] Extract `SessionStats.tsx` from `LearnView.tsx`
+- [x] Extract `ModeSelector.tsx` from `LearnView.tsx`
+- [x] Extract `SessionComplete.tsx` from `LearnView.tsx`
+- [x] Extract `FeedbackDisplay.tsx` from `LearnView.tsx`
+- [x] Extract `ManualExercise.tsx` from `LearnView.tsx`
+- [x] Extract `TypingExercise.tsx` from `LearnView.tsx`
+- [x] Extract `SpeakingExercise.tsx` from `LearnView.tsx`
+- [x] Extract `ExercisePrompt.tsx` from `LearnView.tsx`
+- [x] Extract `RetryModeMessage.tsx` from `LearnView.tsx`
+- [x] Create `src/components/learning/index.ts`
+- [x] Refactor `LearnView.tsx` to use new components
+- [x] Run type check and fix issues
+
+#### PhraseLibraryView Decomposition ✅ COMPLETE
+- [x] Create `src/components/phrases/` directory
+- [x] Extract `PhraseFilters.tsx` from `PhraseLibraryView.tsx`
+- [x] Extract `PhraseStatusBadge.tsx` from `PhraseLibraryView.tsx`
+- [x] Extract `PhraseActions.tsx` from `PhraseLibraryView.tsx`
+- [x] Extract `PhraseListItem.tsx` from `PhraseLibraryView.tsx`
+- [x] Extract `AddPhraseDialog.tsx` from `PhraseLibraryView.tsx`
+- [x] Create `src/components/phrases/index.ts`
+- [x] Refactor `PhraseLibraryView.tsx` to use new components
+- [x] Run type check and fix issues
+
+#### SettingsView Decomposition ❌ NOT STARTED
 - [ ] Create `src/components/settings/` directory
 - [ ] Extract settings sections from `SettingsView.tsx`
-- [ ] Run type check and fix issues
 
 ### Phase 7: Error Handling ✅ COMPLETE
 - [x] Create `src/components/shared/ErrorBoundary.tsx`
