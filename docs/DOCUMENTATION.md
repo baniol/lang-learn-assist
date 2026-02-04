@@ -124,6 +124,34 @@ Click the edit button on any phrase to open the editor with two modes:
 
 The app uses a proven spaced repetition algorithm (based on SM-2/Anki) to optimize your learning.
 
+### Algorithm Flowchart
+
+```mermaid
+flowchart TD
+    Start([Practice Phrase]) --> CheckAnswer{Answer<br/>Correct?}
+
+    CheckAnswer -->|Yes| CheckPhase{In Learning<br/>Phase?<br/><i>streak < 2</i>}
+    CheckAnswer -->|No| ReduceEase[Reduce Ease Factor<br/><i>ease -= 0.2, min 1.3</i>]
+
+    ReduceEase --> ResetLearning[Reset to Learning Phase<br/><i>interval = 0</i>]
+    ResetLearning --> ReviewSoon[Review in 5 min]
+
+    CheckPhase -->|Yes| CheckGraduation{Ready to<br/>Graduate?<br/><i>streak+1 ≥ 2</i>}
+    CheckPhase -->|No| IncreaseInterval[Increase Interval<br/><i>new = old × ease</i><br/><i>min: old + 1 day</i>]
+
+    CheckGraduation -->|Yes| Graduate[Graduate to Review<br/><i>interval = 1 day</i>]
+    CheckGraduation -->|No| StayLearning[Stay in Learning<br/><i>interval = 0</i>]
+
+    StayLearning --> ReviewMinutes[Review in 10 min]
+    Graduate --> ReviewDays[Review in 1 day]
+    IncreaseInterval --> ScheduleNext[Schedule Next Review<br/><i>in [interval] days</i>]
+
+    ReviewSoon --> End([Done])
+    ReviewMinutes --> End
+    ReviewDays --> End
+    ScheduleNext --> End
+```
+
 ### How It Works
 
 Each phrase has:
@@ -133,15 +161,18 @@ Each phrase has:
 
 ### The Algorithm
 
-**When you answer correctly:**
-- Interval increases: `new interval = current interval × ease factor`
-- Next review is scheduled further in the future
+**Learning Phase** (new phrases, streak < 2):
+- Correct answer: review in 10 minutes, until you get 2 in a row
+- After 2 correct: "graduate" to review phase with 1-day interval
+
+**Review Phase** (learned phrases, streak ≥ 2):
+- Correct answer: `new interval = current interval × ease factor` (minimum +1 day)
 - Phrases you know well appear less frequently
 
-**When you answer incorrectly:**
-- Interval resets to 1 day
-- Ease factor decreases slightly (phrase is harder for you)
-- You'll see this phrase again tomorrow
+**Incorrect Answer** (any phase):
+- Ease factor decreases by 0.2 (minimum 1.3)
+- Reset to learning phase (review in 5 minutes)
+- Must build up streak again to re-graduate
 
 ### Scheduling Priority
 
@@ -152,12 +183,16 @@ During practice, phrases are shown in this order:
 
 ### Example Progression
 
-With correct answers at default difficulty:
-- First correct → review in ~2-3 days
-- Second correct → review in ~5-6 days
-- Third correct → review in ~12-15 days
-- Fourth correct → review in ~1 month
-- And so on...
+With all correct answers at default ease (2.5):
+
+| # | Phase | Interval | Next Review |
+|---|-------|----------|-------------|
+| 1 | Learning | 0 | 10 minutes |
+| 2 | Graduate | 1 | 1 day |
+| 3 | Review | 3 | 3 days |
+| 4 | Review | 8 | 1 week |
+| 5 | Review | 20 | 3 weeks |
+| 6 | Review | 50 | ~2 months |
 
 This means well-known phrases eventually only appear once a month or less, while difficult phrases stay in frequent rotation.
 
