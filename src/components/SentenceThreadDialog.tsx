@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import type {
   Material,
   TextSegment,
@@ -14,6 +13,7 @@ import {
   updateMaterialThread,
   askAboutSentence,
 } from "../lib/materials";
+import { createPhrase } from "../api";
 import { AIChatPanel } from "./ui";
 import { CloseIcon, CheckIcon } from "./icons";
 
@@ -127,7 +127,7 @@ export function SentenceThreadDialog({
         nativeLanguage: material.nativeLanguage,
       };
 
-      await invoke("create_phrase", { request });
+      await createPhrase(request);
 
       const updated = pendingPhrases.filter((_, i) => i !== index);
       setPendingPhrases(updated);

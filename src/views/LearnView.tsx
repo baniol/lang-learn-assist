@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useState, useEffect, useCallback } from "react";
 import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
 import { useTTS } from "../hooks/useTTS";
+import { usePracticeSession } from "../hooks/usePracticeSession";
 import { useSettings } from "../contexts/SettingsContext";
 import { Button, Spinner } from "../components/ui";
 import {
@@ -17,74 +17,50 @@ import {
   ExercisePrompt,
   RetryModeMessage,
 } from "../components/learning";
-import type {
-  PhraseWithProgress,
-  LearningStats,
-  ExerciseMode,
-  PracticeSession,
-  Phrase,
-  UpdatePhraseRequest,
-} from "../types";
+import {
+  getLearningStats,
+  validateAnswer,
+  toggleExcluded,
+  updatePhrase,
+  updatePhraseAudio,
+} from "../api";
+import type { LearningStats, ExerciseMode, Phrase } from "../types";
 
 export function LearnView() {
   const { settings, refreshSettings } = useSettings();
   const [mode, setMode] = useState<ExerciseMode>("manual");
   const [stats, setStats] = useState<LearningStats | null>(null);
-  const [currentPhrase, setCurrentPhrase] = useState<PhraseWithProgress | null>(
-    null
-  );
-  const [session, setSession] = useState<PracticeSession | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
   const [inputAnswer, setInputAnswer] = useState("");
   const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(
     null
   );
-  const [seenPhraseIds, setSeenPhraseIds] = useState<number[]>([]);
-  const [requiresRetry, setRequiresRetry] = useState(false);
-
-  // Session-based progress per phrase: { phraseId: sessionStreak }
-  const [sessionStreaks, setSessionStreaks] = useState<Record<number, number>>(
-    {}
-  );
-
-  // Phrases learned in this session (reached requiredStreak)
-  const [sessionLearnedIds, setSessionLearnedIds] = useState<Set<number>>(
-    new Set()
-  );
-
-  // For speak mode retry: how many correct retries done after last failure
-  const [retryCount, setRetryCount] = useState(0);
-
-  // Track how many new phrases have been introduced this session
-  const [newPhraseCount, setNewPhraseCount] = useState(0);
-
-  // Whether in retry mode (speak mode only, after wrong answer)
-  const [inRetryMode, setInRetryMode] = useState(false);
-
-  // Whether awaiting user to proceed after correct answer (Space key)
   const [awaitingProceed, setAwaitingProceed] = useState(false);
-
-  // For opening the phrase refinement dialog when answer is rejected
   const [refiningPhrase, setRefiningPhrase] = useState<{
     phrase: Phrase;
     userAnswer: string;
   } | null>(null);
 
+  const practiceSession = usePracticeSession({
+    settings,
+    onSettingsRefresh: refreshSettings,
+  });
+
   const handleAudioGenerated = useCallback(
     async (phraseId: number, audioPath: string) => {
       try {
-        await invoke("update_phrase_audio", { id: phraseId, audioPath });
-        if (currentPhrase?.phrase.id === phraseId) {
-          setCurrentPhrase((prev) =>
-            prev ? { ...prev, phrase: { ...prev.phrase, audioPath } } : null
-          );
+        await updatePhraseAudio(phraseId, audioPath);
+        if (practiceSession.currentPhrase?.phrase.id === phraseId) {
+          practiceSession.setCurrentPhrase({
+            ...practiceSession.currentPhrase,
+            phrase: { ...practiceSession.currentPhrase.phrase, audioPath },
+          });
         }
       } catch (err) {
         console.error("Failed to save audio path:", err);
       }
     },
-    [currentPhrase?.phrase.id]
+    [practiceSession]
   );
 
   const tts = useTTS({
@@ -94,12 +70,14 @@ export function LearnView() {
   });
 
   const voiceLanguage =
-    currentPhrase?.phrase.targetLanguage || settings?.targetLanguage || "de";
+    practiceSession.currentPhrase?.phrase.targetLanguage ||
+    settings?.targetLanguage ||
+    "de";
 
   const voiceRecording = useVoiceRecording({
     enabled: mode === "speaking",
     language: voiceLanguage,
-    prompt: currentPhrase?.phrase.answer,
+    prompt: practiceSession.currentPhrase?.phrase.answer,
     onTranscription: (text) => {
       setInputAnswer(text);
       handleCheckAnswer(text);
@@ -108,296 +86,55 @@ export function LearnView() {
     disableSpaceKey: awaitingProceed,
   });
 
-  // Track state in refs so cleanup can access without stale closures
-  const sessionIdRef = useRef<number | null>(null);
-  const stateRef = useRef<{
-    seenPhraseIds: number[];
-    sessionStreaks: Record<number, number>;
-    sessionLearnedIds: number[];
-    newPhraseCount: number;
-    currentPhraseId: number | null;
-    inRetryMode: boolean;
-    retryCount: number;
-    requiresRetry: boolean;
-  } | null>(null);
-
   useEffect(() => {
-    sessionIdRef.current = session?.id ?? null;
-  }, [session?.id]);
-
-  useEffect(() => {
-    if (session) {
-      stateRef.current = {
-        seenPhraseIds,
-        sessionStreaks,
-        sessionLearnedIds: Array.from(sessionLearnedIds),
-        newPhraseCount,
-        currentPhraseId: currentPhrase?.phrase.id ?? null,
-        inRetryMode,
-        retryCount,
-        requiresRetry,
-      };
-    } else {
-      stateRef.current = null;
+    if (settings) {
+      setMode(settings.defaultExerciseMode);
+      loadStats(settings.targetLanguage);
     }
-  }, [
-    session,
-    seenPhraseIds,
-    sessionStreaks,
-    sessionLearnedIds,
-    newPhraseCount,
-    currentPhrase,
-    inRetryMode,
-    retryCount,
-    requiresRetry,
-  ]);
+  }, [settings]);
 
-  const saveSessionState = useCallback(async () => {
-    if (!sessionIdRef.current || !stateRef.current) return;
-    try {
-      await invoke("save_session_state", {
-        sessionId: sessionIdRef.current,
-        state: stateRef.current,
-      });
-    } catch (err) {
-      console.error("Failed to save session state:", err);
-    }
-  }, []);
-
+  // Reset UI state when phrase changes
   useEffect(() => {
-    return () => {
-      if (sessionIdRef.current && stateRef.current) {
-        invoke("save_session_state", {
-          sessionId: sessionIdRef.current,
-          state: stateRef.current,
-        }).catch((err) =>
-          console.error("Failed to save session state on unmount:", err)
-        );
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!session) return;
-    const timeoutId = setTimeout(() => {
-      saveSessionState();
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [
-    session,
-    seenPhraseIds,
-    sessionStreaks,
-    sessionLearnedIds,
-    newPhraseCount,
-    currentPhrase?.phrase.id,
-    inRetryMode,
-    retryCount,
-    requiresRetry,
-    saveSessionState,
-  ]);
-
-  const loadNextPhrase = useCallback(
-    async (
-      excludeIds: number[],
-      currentNewCount: number,
-      sessionId?: number
-    ) => {
-      const activeSessionId = sessionId ?? session?.id;
-
-      if (
-        settings &&
-        settings.sessionPhraseLimit > 0 &&
-        excludeIds.length >= settings.sessionPhraseLimit
-      ) {
-        setCurrentPhrase(null);
-        if (activeSessionId) {
-          await invoke("finish_practice_session", {
-            sessionId: activeSessionId,
-          });
-        }
-        return;
-      }
-
-      setIsLoading(true);
-      setShowAnswer(false);
-      setInputAnswer("");
-      setFeedback(null);
-      setAwaitingProceed(false);
-
-      try {
-        const phrase = await invoke<PhraseWithProgress | null>(
-          "get_next_phrase",
-          {
-            targetLanguage: settings?.targetLanguage || null,
-            excludeIds: excludeIds.length > 0 ? excludeIds : null,
-            newPhraseCount: currentNewCount,
-            newPhraseLimit: settings?.newPhrasesPerSession ?? 0,
-          }
-        );
-        setCurrentPhrase(phrase);
-
-        if (phrase) {
-          const isNew = !phrase.progress || phrase.progress.totalAttempts === 0;
-          if (isNew) {
-            setNewPhraseCount(currentNewCount + 1);
-          }
-        } else {
-          if (activeSessionId) {
-            await invoke("finish_practice_session", {
-              sessionId: activeSessionId,
-            });
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load next phrase:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [session?.id, settings]
-  );
-
-  const restoreSession = useCallback(
-    async (activeSession: PracticeSession) => {
-      if (!settings) return;
-
-      const state = activeSession.state;
-      if (!state) {
-        setSession(activeSession);
-        setMode(activeSession.exerciseMode as ExerciseMode);
-        await loadNextPhrase([], 0, activeSession.id);
-        return;
-      }
-
-      setSession(activeSession);
-      setMode(activeSession.exerciseMode as ExerciseMode);
-      setSeenPhraseIds(state.seenPhraseIds);
-      setSessionStreaks(state.sessionStreaks);
-      setSessionLearnedIds(new Set(state.sessionLearnedIds));
-      setNewPhraseCount(state.newPhraseCount);
-      setInRetryMode(state.inRetryMode);
-      setRetryCount(state.retryCount);
-      setRequiresRetry(state.requiresRetry);
-
-      if (state.currentPhraseId) {
-        try {
-          const phrase = await invoke<PhraseWithProgress | null>(
-            "get_next_phrase",
-            {
-              targetLanguage: settings.targetLanguage || null,
-              excludeIds: state.seenPhraseIds.filter(
-                (id) => id !== state.currentPhraseId
-              ),
-              newPhraseCount: state.newPhraseCount,
-              newPhraseLimit: settings.newPhrasesPerSession ?? 0,
-            }
-          );
-          setCurrentPhrase(phrase);
-        } catch (err) {
-          console.error("Failed to restore current phrase:", err);
-          await loadNextPhrase(
-            state.seenPhraseIds,
-            state.newPhraseCount,
-            activeSession.id
-          );
-        }
-      } else {
-        await loadNextPhrase(
-          state.seenPhraseIds,
-          state.newPhraseCount,
-          activeSession.id
-        );
-      }
-    },
-    [settings, loadNextPhrase]
-  );
-
-  useEffect(() => {
-    if (!settings) return;
-
-    const initialize = async () => {
-      try {
-        setMode(settings.defaultExerciseMode);
-        loadStats(settings.targetLanguage);
-
-        const activeSession = await invoke<PracticeSession | null>(
-          "get_active_session",
-          { targetLanguage: settings.targetLanguage }
-        );
-
-        if (activeSession) {
-          await restoreSession(activeSession);
-        }
-      } catch (err) {
-        console.error("Failed to initialize:", err);
-      }
-    };
-
-    initialize();
-  }, [settings, restoreSession]);
+    setShowAnswer(false);
+    setInputAnswer("");
+    setFeedback(null);
+    setAwaitingProceed(false);
+  }, [practiceSession.currentPhrase?.phrase.id]);
 
   const loadStats = async (targetLanguage?: string) => {
     try {
-      const data = await invoke<LearningStats>("get_learning_stats", {
-        targetLanguage: targetLanguage || settings?.targetLanguage || null,
-      });
+      const data = await getLearningStats(
+        targetLanguage || settings?.targetLanguage
+      );
       setStats(data);
     } catch (err) {
       console.error("Failed to load stats:", err);
     }
   };
 
-  const startSession = async () => {
-    setIsLoading(true);
-    try {
-      await refreshSettings();
-
-      const newSession = await invoke<PracticeSession>(
-        "start_practice_session",
-        { exerciseMode: mode }
-      );
-      setSession(newSession);
-      setSeenPhraseIds([]);
-      setSessionStreaks({});
-      setSessionLearnedIds(new Set());
-      setRetryCount(0);
-      setInRetryMode(false);
-      setAwaitingProceed(false);
-      setNewPhraseCount(0);
-      await loadNextPhrase([], 0);
-    } catch (err) {
-      console.error("Failed to start session:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleCheckAnswer = useCallback(
     async (answer?: string) => {
-      if (!currentPhrase || !settings) return;
+      if (!practiceSession.currentPhrase || !settings) return;
 
       const answerToCheck = answer || inputAnswer;
       if (!answerToCheck.trim()) return;
 
-      const phraseId = currentPhrase.phrase.id;
+      const phraseId = practiceSession.currentPhrase.phrase.id;
 
       try {
-        const isCorrect = await invoke<boolean>("validate_answer", {
-          phraseId,
-          input: answerToCheck,
-        });
+        const isCorrect = await validateAnswer(phraseId, answerToCheck);
 
         setFeedback(isCorrect ? "correct" : "incorrect");
 
         if (isCorrect) {
-          if (inRetryMode && mode === "speaking") {
-            const newRetryCount = retryCount + 1;
-            setRetryCount(newRetryCount);
+          if (practiceSession.inRetryMode && mode === "speaking") {
+            const newRetryCount = practiceSession.retryCount + 1;
+            practiceSession.setRetryCount(newRetryCount);
 
             if (newRetryCount >= settings.failureRepetitions) {
-              setInRetryMode(false);
-              setRetryCount(0);
-              setRequiresRetry(false);
+              practiceSession.setInRetryMode(false);
+              practiceSession.setRetryCount(0);
+              practiceSession.setRequiresRetry(false);
               setAwaitingProceed(true);
             } else {
               setTimeout(() => {
@@ -406,126 +143,37 @@ export function LearnView() {
               }, 1500);
             }
           } else {
-            const currentStreak = sessionStreaks[phraseId] || 0;
-            const newStreak = currentStreak + 1;
-            setSessionStreaks((prev) => ({ ...prev, [phraseId]: newStreak }));
-
-            if (newStreak >= settings.requiredStreak) {
-              setSessionLearnedIds((prev) => new Set([...prev, phraseId]));
-            }
-
-            await invoke("record_answer", { phraseId, isCorrect: true });
-
-            if (session) {
-              await invoke("update_practice_session", {
-                sessionId: session.id,
-                totalPhrases: seenPhraseIds.length + 1,
-                correctAnswers: (session.correctAnswers || 0) + 1,
-              });
-              setSession((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      totalPhrases: seenPhraseIds.length + 1,
-                      correctAnswers: (prev.correctAnswers || 0) + 1,
-                    }
-                  : null
-              );
-            }
-
-            setRequiresRetry(false);
+            // Record answer - backend handles session streak tracking
+            await practiceSession.recordAnswer(phraseId, true);
+            practiceSession.setRequiresRetry(false);
             setAwaitingProceed(true);
           }
         } else {
-          setSessionStreaks((prev) => ({ ...prev, [phraseId]: 0 }));
-          setSessionLearnedIds((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(phraseId);
-            return newSet;
-          });
-
-          await invoke("record_answer", { phraseId, isCorrect: false });
-
-          if (session) {
-            await invoke("update_practice_session", {
-              sessionId: session.id,
-              totalPhrases: seenPhraseIds.length + 1,
-              correctAnswers: session.correctAnswers || 0,
-            });
-            setSession((prev) =>
-              prev
-                ? { ...prev, totalPhrases: seenPhraseIds.length + 1 }
-                : null
-            );
-          }
+          // Record incorrect answer - backend handles session streak reset
+          await practiceSession.recordAnswer(phraseId, false);
 
           if (mode === "speaking") {
-            setInRetryMode(true);
-            setRetryCount(0);
+            practiceSession.setInRetryMode(true);
+            practiceSession.setRetryCount(0);
           }
-          setRequiresRetry(true);
+          practiceSession.setRequiresRetry(true);
         }
       } catch (err) {
         console.error("Failed to check answer:", err);
       }
     },
-    [
-      currentPhrase,
-      inputAnswer,
-      session,
-      seenPhraseIds,
-      settings,
-      mode,
-      inRetryMode,
-      retryCount,
-      sessionStreaks,
-    ]
+    [practiceSession, inputAnswer, settings, mode]
   );
 
   const handleManualAnswer = async (isCorrect: boolean) => {
-    if (!currentPhrase || !settings) return;
+    if (!practiceSession.currentPhrase || !settings) return;
 
-    const phraseId = currentPhrase.phrase.id;
+    const phraseId = practiceSession.currentPhrase.phrase.id;
     setFeedback(isCorrect ? "correct" : "incorrect");
 
     try {
-      if (isCorrect) {
-        const currentStreak = sessionStreaks[phraseId] || 0;
-        const newStreak = currentStreak + 1;
-        setSessionStreaks((prev) => ({ ...prev, [phraseId]: newStreak }));
-
-        if (newStreak >= settings.requiredStreak) {
-          setSessionLearnedIds((prev) => new Set([...prev, phraseId]));
-        }
-      } else {
-        setSessionStreaks((prev) => ({ ...prev, [phraseId]: 0 }));
-        setSessionLearnedIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(phraseId);
-          return newSet;
-        });
-      }
-
-      await invoke("record_answer", { phraseId, isCorrect });
-
-      if (session) {
-        await invoke("update_practice_session", {
-          sessionId: session.id,
-          totalPhrases: seenPhraseIds.length + 1,
-          correctAnswers: (session.correctAnswers || 0) + (isCorrect ? 1 : 0),
-        });
-        setSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                totalPhrases: seenPhraseIds.length + 1,
-                correctAnswers:
-                  (prev.correctAnswers || 0) + (isCorrect ? 1 : 0),
-              }
-            : null
-        );
-      }
-
+      // Record answer - backend handles all streak tracking
+      await practiceSession.recordAnswer(phraseId, isCorrect);
       setAwaitingProceed(true);
     } catch (err) {
       console.error("Failed to record answer:", err);
@@ -533,29 +181,21 @@ export function LearnView() {
   };
 
   const handlePlayAnswer = useCallback(() => {
-    if (!currentPhrase) return;
+    if (!practiceSession.currentPhrase) return;
     tts.speak(
-      currentPhrase.phrase.answer,
-      currentPhrase.phrase.id,
-      currentPhrase.phrase.audioPath || undefined,
-      currentPhrase.phrase.targetLanguage
+      practiceSession.currentPhrase.phrase.answer,
+      practiceSession.currentPhrase.phrase.id,
+      practiceSession.currentPhrase.phrase.audioPath || undefined,
+      practiceSession.currentPhrase.phrase.targetLanguage
     );
-  }, [currentPhrase, tts]);
+  }, [practiceSession.currentPhrase, tts]);
 
   const handleProceedToNext = useCallback(() => {
-    if (!currentPhrase || !awaitingProceed) return;
-    const phraseId = currentPhrase.phrase.id;
-    const newSeenIds = [...seenPhraseIds, phraseId];
-    setSeenPhraseIds(newSeenIds);
+    if (!practiceSession.currentPhrase || !awaitingProceed) return;
+    practiceSession.markPhraseSeen(practiceSession.currentPhrase.phrase.id);
     setAwaitingProceed(false);
-    loadNextPhrase(newSeenIds, newPhraseCount);
-  }, [
-    currentPhrase,
-    awaitingProceed,
-    seenPhraseIds,
-    newPhraseCount,
-    loadNextPhrase,
-  ]);
+    practiceSession.loadNextPhrase();
+  }, [practiceSession, awaitingProceed]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -581,78 +221,49 @@ export function LearnView() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [awaitingProceed, handleProceedToNext, handlePlayAnswer]);
 
-  const endSession = async () => {
-    if (session) {
-      await invoke("finish_practice_session", { sessionId: session.id });
-    }
-    const targetLang = settings?.targetLanguage;
-    setSession(null);
-    setCurrentPhrase(null);
-    setSeenPhraseIds([]);
-    setSessionStreaks({});
-    setSessionLearnedIds(new Set());
-    setRetryCount(0);
-    setInRetryMode(false);
-    setAwaitingProceed(false);
-    setNewPhraseCount(0);
-    loadStats(targetLang);
+  const handleEndSession = async () => {
+    await practiceSession.endSession();
+    loadStats(settings?.targetLanguage);
   };
 
   const handleExcludePhrase = async () => {
-    if (!currentPhrase) return;
+    if (!practiceSession.currentPhrase) return;
     try {
-      await invoke("toggle_excluded", { id: currentPhrase.phrase.id });
-      const phraseId = currentPhrase.phrase.id;
-      const newSeenIds = [...seenPhraseIds, phraseId];
-      setSeenPhraseIds(newSeenIds);
-      loadNextPhrase(newSeenIds, newPhraseCount);
+      await toggleExcluded(practiceSession.currentPhrase.phrase.id);
+      practiceSession.markPhraseSeen(practiceSession.currentPhrase.phrase.id);
+      practiceSession.loadNextPhrase();
     } catch (err) {
       console.error("Failed to exclude phrase:", err);
     }
   };
 
   const handleShowAnswerSkip = async () => {
-    if (!currentPhrase || !settings) return;
-    const phraseId = currentPhrase.phrase.id;
+    if (!practiceSession.currentPhrase || !settings) return;
+    const phraseId = practiceSession.currentPhrase.phrase.id;
 
-    setSessionStreaks((prev) => ({ ...prev, [phraseId]: 0 }));
-    setSessionLearnedIds((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(phraseId);
-      return newSet;
-    });
-
-    await invoke("record_answer", { phraseId, isCorrect: false });
-
-    if (session) {
-      await invoke("update_practice_session", {
-        sessionId: session.id,
-        totalPhrases: seenPhraseIds.length + 1,
-        correctAnswers: session.correctAnswers || 0,
-      });
-      setSession((prev) =>
-        prev ? { ...prev, totalPhrases: seenPhraseIds.length + 1 } : null
-      );
-    }
+    // Record as incorrect - backend handles session state
+    await practiceSession.recordAnswer(phraseId, false);
 
     setShowAnswer(true);
     setFeedback("incorrect");
-    setInRetryMode(true);
-    setRetryCount(0);
-    setRequiresRetry(true);
+    practiceSession.setInRetryMode(true);
+    practiceSession.setRetryCount(0);
+    practiceSession.setRequiresRetry(true);
   };
 
   const handleSpeakingNext = () => {
-    if (!currentPhrase) return;
-    const phraseId = currentPhrase.phrase.id;
-    const newSeenIds = [...seenPhraseIds, phraseId];
-    setSeenPhraseIds(newSeenIds);
+    if (!practiceSession.currentPhrase) return;
+    practiceSession.markPhraseSeen(practiceSession.currentPhrase.phrase.id);
     setShowAnswer(false);
-    loadNextPhrase(newSeenIds, newPhraseCount);
+    practiceSession.loadNextPhrase();
+  };
+
+  const handleStartSession = async () => {
+    await practiceSession.startSession(mode);
   };
 
   // Not in a session - show stats and start options
-  if (!session) {
+  if (!practiceSession.session) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">
@@ -664,9 +275,11 @@ export function LearnView() {
         <ModeSelector mode={mode} onModeChange={setMode} />
 
         <Button
-          onClick={startSession}
-          disabled={isLoading || (stats?.totalPhrases ?? 0) === 0}
-          isLoading={isLoading}
+          onClick={handleStartSession}
+          disabled={
+            practiceSession.isLoading || (stats?.totalPhrases ?? 0) === 0
+          }
+          isLoading={practiceSession.isLoading}
           className="w-full py-4 text-lg"
         >
           Start Practice
@@ -682,33 +295,37 @@ export function LearnView() {
   }
 
   // No more phrases
-  if (!currentPhrase && !isLoading) {
-    const practicedAny = session.totalPhrases > 0 || seenPhraseIds.length > 0;
+  if (!practiceSession.currentPhrase && !practiceSession.isLoading) {
+    const practicedAny =
+      practiceSession.session.totalPhrases > 0 ||
+      practiceSession.seenPhraseIds.length > 0;
 
     return (
       <SessionComplete
-        totalPhrases={session.totalPhrases}
-        correctAnswers={session.correctAnswers || 0}
+        totalPhrases={practiceSession.session.totalPhrases}
+        correctAnswers={practiceSession.session.correctAnswers || 0}
         practicedAny={practicedAny}
-        onEndSession={endSession}
+        onEndSession={handleEndSession}
       />
     );
   }
+
+  const currentPhrase = practiceSession.currentPhrase;
 
   // Active practice
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <SessionHeader
-        seenCount={seenPhraseIds.length}
+        seenCount={practiceSession.seenPhraseIds.length}
         totalLimit={settings?.sessionPhraseLimit ?? 0}
-        correctCount={session.correctAnswers || 0}
-        newCount={newPhraseCount}
+        correctCount={practiceSession.session.correctAnswers || 0}
+        newCount={practiceSession.newPhraseCount}
         newLimit={settings?.newPhrasesPerSession ?? 0}
-        learnedCount={sessionLearnedIds.size}
-        onEndSession={endSession}
+        learnedCount={practiceSession.sessionLearnedCount}
+        onEndSession={handleEndSession}
       />
 
-      {isLoading ? (
+      {practiceSession.isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Spinner size="lg" />
         </div>
@@ -743,25 +360,28 @@ export function LearnView() {
             />
           )}
 
-          {inRetryMode && mode === "speaking" && settings && (
+          {practiceSession.inRetryMode && mode === "speaking" && settings && (
             <RetryModeMessage
-              remainingRetries={settings.failureRepetitions - retryCount}
+              remainingRetries={
+                settings.failureRepetitions - practiceSession.retryCount
+              }
             />
           )}
 
-          {feedback === "incorrect" && !(inRetryMode && mode === "speaking") && (
-            <Button
-              onClick={() => {
-                setShowAnswer(false);
-                setInputAnswer("");
-                setFeedback(null);
-              }}
-              variant="secondary"
-              className="w-full mb-6"
-            >
-              Try Again
-            </Button>
-          )}
+          {feedback === "incorrect" &&
+            !(practiceSession.inRetryMode && mode === "speaking") && (
+              <Button
+                onClick={() => {
+                  setShowAnswer(false);
+                  setInputAnswer("");
+                  setFeedback(null);
+                }}
+                variant="secondary"
+                className="w-full mb-6"
+              >
+                Try Again
+              </Button>
+            )}
 
           {mode === "manual" && (
             <div className="space-y-4">
@@ -786,12 +406,12 @@ export function LearnView() {
             />
           )}
 
-          {mode === "speaking" && (!feedback || inRetryMode) && (
+          {mode === "speaking" && (!feedback || practiceSession.inRetryMode) && (
             <SpeakingExercise
               inputAnswer={inputAnswer}
               answer={currentPhrase.phrase.answer}
               showAnswer={showAnswer}
-              inRetryMode={inRetryMode}
+              inRetryMode={practiceSession.inRetryMode}
               isAvailable={voiceRecording.isAvailable}
               status={voiceRecording.status}
               isPlaying={tts.isPlaying}
@@ -807,7 +427,7 @@ export function LearnView() {
           {mode === "speaking" &&
             showAnswer &&
             feedback === "incorrect" &&
-            !inRetryMode && (
+            !practiceSession.inRetryMode && (
               <SpeakingExercise
                 inputAnswer={inputAnswer}
                 answer={currentPhrase.phrase.answer}
@@ -825,11 +445,13 @@ export function LearnView() {
               />
             )}
 
-          {requiresRetry && !feedback && !inRetryMode && (
-            <p className="text-center text-sm text-amber-600 dark:text-amber-400 mt-4">
-              Retry mode: answer correctly to continue
-            </p>
-          )}
+          {practiceSession.requiresRetry &&
+            !feedback &&
+            !practiceSession.inRetryMode && (
+              <p className="text-center text-sm text-amber-600 dark:text-amber-400 mt-4">
+                Retry mode: answer correctly to continue
+              </p>
+            )}
         </div>
       ) : null}
 
@@ -842,17 +464,17 @@ export function LearnView() {
             setInputAnswer("");
           }}
           onAccept={async (prompt, answer, accepted) => {
-            const request: UpdatePhraseRequest = { prompt, answer, accepted };
-            await invoke<Phrase>("update_phrase", {
-              id: refiningPhrase.phrase.id,
-              request,
+            await updatePhrase(refiningPhrase.phrase.id, {
+              prompt,
+              answer,
+              accepted,
             });
 
             if (
               currentPhrase &&
               currentPhrase.phrase.id === refiningPhrase.phrase.id
             ) {
-              setCurrentPhrase({
+              practiceSession.setCurrentPhrase({
                 ...currentPhrase,
                 phrase: { ...currentPhrase.phrase, prompt, answer, accepted },
               });
@@ -863,7 +485,7 @@ export function LearnView() {
               currentPhrase &&
               currentPhrase.phrase.id === refiningPhrase.phrase.id
             ) {
-              setCurrentPhrase({
+              practiceSession.setCurrentPhrase({
                 ...currentPhrase,
                 phrase: { ...currentPhrase.phrase, audioPath },
               });

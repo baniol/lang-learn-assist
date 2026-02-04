@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import type {
   Phrase,
   PhraseThread,
@@ -14,6 +13,7 @@ import {
   deletePhraseThread,
   refinePhrase,
 } from "../lib/phrases";
+import { updatePhraseAudio } from "../api";
 import { generateTts, getAudioBase64 } from "../lib/tts";
 import { AIChatPanel } from "./ui";
 import {
@@ -271,10 +271,7 @@ export function PhraseRefinementDialog({
       );
       setAudioPath(newPath);
 
-      await invoke("update_phrase_audio", {
-        id: phrase.id,
-        audioPath: newPath,
-      });
+      await updatePhraseAudio(phrase.id, newPath);
 
       onAudioRegenerated?.(newPath);
     } catch (err) {

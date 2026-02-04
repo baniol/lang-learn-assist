@@ -204,6 +204,15 @@ pub struct UpdateNoteRequest {
     pub content: String,
 }
 
+/// Result of recording an answer - includes session-level streak tracking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnswerResult {
+    pub progress: PhraseProgress,
+    pub session_streak: i32,
+    pub is_learned_in_session: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LearningStats {

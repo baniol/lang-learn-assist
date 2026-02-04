@@ -27,6 +27,13 @@ export async function deleteQuestionThread(id: number): Promise<void> {
   return invoke<void>("delete_question_thread", { id });
 }
 
+export async function updateQuestionThreadTitle(
+  id: number,
+  title: string
+): Promise<void> {
+  return invoke<void>("update_question_thread_title", { id, title });
+}
+
 export async function askGrammarQuestion(
   threadId: number,
   question: string

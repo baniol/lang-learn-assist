@@ -1,12 +1,16 @@
 import { useState, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { Button, Spinner, Badge, ConfirmDialog } from "../components/ui";
 import { EmptyState } from "../components/shared";
 import { PlusIcon, CloseIcon, ChatIcon } from "../components/icons";
 import { useSettings } from "../contexts/SettingsContext";
 import { useToast } from "../contexts/ToastContext";
 import { useQuery, useMutation } from "../hooks";
-import type { Conversation, ViewType } from "../types";
+import {
+  getConversations,
+  createConversation,
+  deleteConversation,
+} from "../api";
+import type { ViewType } from "../types";
 import { LANGUAGE_OPTIONS } from "../types";
 
 interface DashboardViewProps {
@@ -24,10 +28,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     isLoading,
     refetch,
   } = useQuery(
-    () =>
-      invoke<Conversation[]>("get_conversations", {
-        targetLanguage: settings?.targetLanguage || null,
-      }),
+    () => getConversations({ targetLanguage: settings?.targetLanguage }),
     [settings?.targetLanguage],
     {
       onError: (err) => toast.error(`Failed to load conversations: ${err.message}`),
@@ -36,10 +37,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
 
   // Create conversation mutation
   const createMutation = useMutation(
-    () =>
-      invoke<Conversation>("create_conversation", {
-        request: { title: "New Conversation", subject: "" },
-      }),
+    () => createConversation({ title: "New Conversation", subject: "" }),
     {
       onSuccess: (conversation) => {
         onNavigate("conversation", { conversationId: conversation.id });
@@ -50,7 +48,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
 
   // Delete conversation mutation
   const deleteMutation = useMutation(
-    (id: number) => invoke("delete_conversation", { id }),
+    (id: number) => deleteConversation(id),
     {
       onSuccess: () => {
         setDeleteConfirmId(null);

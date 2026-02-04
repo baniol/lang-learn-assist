@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { extractPhrasesFromConversation } from "../lib/llm";
 import { useAudioPlayback } from "../hooks/useAudioPlayback";
 import { Button, Spinner } from "../components/ui";
@@ -11,6 +10,12 @@ import {
   CheckIcon,
   WarningIcon,
 } from "../components/icons";
+import {
+  getConversation,
+  updateConversationTitle,
+  finalizeConversation,
+} from "../api";
+import { createPhrasesBatch } from "../api";
 import type {
   Conversation,
   ChatMessage,
@@ -57,9 +62,7 @@ export function ConversationReviewView({
 
   const loadAndProcess = async () => {
     try {
-      const conv = await invoke<Conversation>("get_conversation", {
-        id: conversationId,
-      });
+      const conv = await getConversation(conversationId);
       setConversation(conv);
       setTitle(conv.title);
 
@@ -118,7 +121,7 @@ export function ConversationReviewView({
 
     try {
       console.log("1. Updating title...");
-      await invoke("update_conversation_title", { id: conversation.id, title });
+      await updateConversationTitle(conversation.id, title);
       console.log("1. Title updated");
 
       const finalMessages: ChatMessage[] = germanPhrases.map((text, i) => ({
@@ -131,11 +134,7 @@ export function ConversationReviewView({
         id: conversation.id,
         finalMessages,
       });
-      await invoke("finalize_conversation", {
-        id: conversation.id,
-        finalMessages,
-        summary: null,
-      });
+      await finalizeConversation(conversation.id, finalMessages);
       console.log("2. Conversation finalized");
 
       const phrasesToCreate: CreatePhraseRequest[] = suggestedPhrases
@@ -151,7 +150,7 @@ export function ConversationReviewView({
 
       console.log("3. Creating phrases...", phrasesToCreate);
       if (phrasesToCreate.length > 0) {
-        await invoke("create_phrases_batch", { phrases: phrasesToCreate });
+        await createPhrasesBatch(phrasesToCreate);
         console.log("3. Phrases created");
       }
 

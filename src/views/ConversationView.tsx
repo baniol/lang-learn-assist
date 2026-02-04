@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { getConversation } from "../api";
 import type { Conversation, ChatMessage, ViewType } from "../types";
 import { ConversationMessage } from "../components/ConversationMessage";
 import { VoiceButton } from "../components/VoiceButton";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
-import { useConversation } from "../hooks/useConversation";
+import { useConversation, parseMessages } from "../hooks/useConversation";
 import { useAudioPlayback } from "../hooks/useAudioPlayback";
 import { Button, Spinner } from "../components/ui";
 import {
@@ -30,6 +30,8 @@ export function ConversationView({
   onNavigate,
 }: ConversationViewProps) {
   const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [conversationLoading, setConversationLoading] = useState(true);
+  const [conversationError, setConversationError] = useState<string | null>(null);
   const [inputText, setInputText] = useState("");
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>("voice");
@@ -83,13 +85,18 @@ export function ConversationView({
   }, [messages]);
 
   const loadConversation = async () => {
+    setConversationLoading(true);
+    setConversationError(null);
     try {
-      const data = await invoke<Conversation>("get_conversation", {
-        id: conversationId,
-      });
+      const data = await getConversation(conversationId);
       setConversation(data);
     } catch (err) {
       console.error("Failed to load conversation:", err);
+      setConversationError(
+        err instanceof Error ? err.message : "Failed to load conversation"
+      );
+    } finally {
+      setConversationLoading(false);
     }
   };
 
@@ -119,7 +126,7 @@ export function ConversationView({
     setPendingVoiceText("");
   };
 
-  if (!conversation) {
+  if (conversationLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <Spinner size="lg" />
@@ -127,13 +134,29 @@ export function ConversationView({
     );
   }
 
+  if (conversationError || !conversation) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <p className="text-red-600 dark:text-red-400">
+          {conversationError || "Conversation not found"}
+        </p>
+        <div className="flex gap-2">
+          <Button onClick={() => onNavigate("dashboard")} variant="ghost">
+            <ChevronLeftIcon size="sm" />
+            Back
+          </Button>
+          <Button onClick={loadConversation}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
+
   const isFinalized = conversation.status === "finalized";
 
   // For finalized conversations, show only German phrases
-  const finalMessages: ChatMessage[] =
-    isFinalized && conversation.finalMessagesJson
-      ? JSON.parse(conversation.finalMessagesJson)
-      : [];
+  const finalMessages: ChatMessage[] = isFinalized
+    ? parseMessages(conversation.finalMessagesJson)
+    : [];
 
   // Finalized view - read only, German only
   if (isFinalized) {

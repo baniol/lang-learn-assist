@@ -1,11 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
 import { Spinner, Badge } from "../components/ui";
 import { EmptyState } from "../components/shared";
 import { ChartIcon } from "../components/icons";
 import { useSettings } from "../contexts/SettingsContext";
 import { useToast } from "../contexts/ToastContext";
 import { useQuery } from "../hooks";
-import type { LearningStats, SrsStats, PracticeSession } from "../types";
+import { getLearningStats, getSrsStats, getPracticeSessions } from "../api";
 import { LANGUAGE_OPTIONS } from "../types";
 
 export function StatsView() {
@@ -14,13 +13,11 @@ export function StatsView() {
 
   const { data, isLoading } = useQuery(
     async () => {
-      const targetLang = settings?.targetLanguage || null;
+      const targetLang = settings?.targetLanguage;
       const [learningStats, srsStats, sessions] = await Promise.all([
-        invoke<LearningStats>("get_learning_stats", {
-          targetLanguage: targetLang,
-        }),
-        invoke<SrsStats>("get_srs_stats", { targetLanguage: targetLang }),
-        invoke<PracticeSession[]>("get_practice_sessions", { limit: 20 }),
+        getLearningStats(targetLang),
+        getSrsStats(targetLang),
+        getPracticeSessions(20),
       ]);
       return { learningStats, srsStats, sessions };
     },

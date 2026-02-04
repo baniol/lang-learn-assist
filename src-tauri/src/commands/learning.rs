@@ -1,6 +1,7 @@
 use crate::db::get_conn;
-use crate::models::{IntervalDistribution, LearningStats, PhraseProgress, PhraseWithProgress, PracticeSession, SessionState, SrsStats};
+use crate::models::{AnswerResult, IntervalDistribution, LearningStats, PhraseProgress, PhraseWithProgress, PracticeSession, SessionState, SrsStats};
 use rusqlite::params;
+use std::collections::HashMap;
 
 /// Calculate priority for SRS-based scheduling
 /// Higher priority = should be shown sooner
@@ -225,10 +226,22 @@ fn calculate_srs(
 }
 
 #[tauri::command]
-pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress, String> {
+pub fn record_answer(phrase_id: i64, is_correct: bool, session_id: Option<i64>) -> Result<AnswerResult, String> {
     let conn = get_conn()?;
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // Get required_streak setting (default to 2)
+    let required_streak: i32 = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'required_streak'",
+            [],
+            |row| {
+                let val: String = row.get(0)?;
+                Ok(val.parse().unwrap_or(2))
+            },
+        )
+        .unwrap_or(2);
 
     // Check if progress record exists and get current SRS values
     let existing: Option<(i64, f64, i32, i32)> = conn
@@ -293,8 +306,8 @@ pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress,
         .map_err(|e| format!("Failed to create progress: {}", e))?;
     }
 
-    // Return updated progress
-    conn.query_row(
+    // Get updated progress
+    let progress: PhraseProgress = conn.query_row(
         "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at
          FROM phrase_progress WHERE phrase_id = ?1",
         params![phrase_id],
@@ -312,7 +325,70 @@ pub fn record_answer(phrase_id: i64, is_correct: bool) -> Result<PhraseProgress,
             })
         },
     )
-    .map_err(|e| format!("Failed to get progress: {}", e))
+    .map_err(|e| format!("Failed to get progress: {}", e))?;
+
+    // Handle session streak tracking
+    let (session_streak, is_learned_in_session) = if let Some(sid) = session_id {
+        // Load session state
+        let state_json: Option<String> = conn
+            .query_row(
+                "SELECT state_json FROM practice_sessions WHERE id = ?1",
+                params![sid],
+                |row| row.get(0),
+            )
+            .ok()
+            .flatten();
+
+        let mut session_state: SessionState = state_json
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_else(|| SessionState {
+                seen_phrase_ids: vec![],
+                session_streaks: HashMap::new(),
+                session_learned_ids: vec![],
+                new_phrase_count: 0,
+                current_phrase_id: None,
+                in_retry_mode: false,
+                retry_count: 0,
+                requires_retry: false,
+            });
+
+        // Update session streak
+        let current_session_streak = *session_state.session_streaks.get(&phrase_id).unwrap_or(&0);
+        let new_session_streak = if is_correct {
+            current_session_streak + 1
+        } else {
+            0
+        };
+        session_state.session_streaks.insert(phrase_id, new_session_streak);
+
+        // Update learned IDs
+        let is_learned = new_session_streak >= required_streak;
+        if is_learned && !session_state.session_learned_ids.contains(&phrase_id) {
+            session_state.session_learned_ids.push(phrase_id);
+        } else if !is_learned {
+            session_state.session_learned_ids.retain(|&id| id != phrase_id);
+        }
+
+        // Save updated session state
+        let updated_json = serde_json::to_string(&session_state)
+            .map_err(|e| format!("Failed to serialize session state: {}", e))?;
+        conn.execute(
+            "UPDATE practice_sessions SET state_json = ?1 WHERE id = ?2",
+            params![updated_json, sid],
+        )
+        .map_err(|e| format!("Failed to save session state: {}", e))?;
+
+        (new_session_streak, is_learned)
+    } else {
+        // No session - return 0 for session streak
+        (0, false)
+    };
+
+    Ok(AnswerResult {
+        progress,
+        session_streak,
+        is_learned_in_session,
+    })
 }
 
 #[tauri::command]

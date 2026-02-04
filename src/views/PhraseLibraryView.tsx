@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { useTTS } from "../hooks/useTTS";
 import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
 import { Button, Spinner, ConfirmDialog } from "../components/ui";
@@ -14,12 +13,21 @@ import {
   type LanguageFilter,
 } from "../components/phrases";
 import { useSettings } from "../contexts/SettingsContext";
+import {
+  getPhrases,
+  createPhrase,
+  updatePhrase,
+  deletePhrase,
+  toggleStarred,
+  toggleExcluded,
+  updatePhraseAudio,
+  getLearningStats,
+} from "../api";
 import type {
   PhraseWithProgress,
   CreatePhraseRequest,
   LearningStats,
   Phrase,
-  UpdatePhraseRequest,
 } from "../types";
 
 export function PhraseLibraryView() {
@@ -45,7 +53,7 @@ export function PhraseLibraryView() {
   const handleAudioGenerated = useCallback(
     async (phraseId: number, audioPath: string) => {
       try {
-        await invoke("update_phrase_audio", { id: phraseId, audioPath });
+        await updatePhraseAudio(phraseId, audioPath);
         setPhrases((prev) =>
           prev.map((p) =>
             p.phrase.id === phraseId
@@ -100,7 +108,7 @@ export function PhraseLibraryView() {
 
   const loadStats = async () => {
     try {
-      const data = await invoke<LearningStats>("get_learning_stats", {});
+      const data = await getLearningStats();
       setStats(data);
     } catch (err) {
       console.error("Failed to load stats:", err);
@@ -110,22 +118,53 @@ export function PhraseLibraryView() {
   const loadPhrases = async () => {
     setIsLoading(true);
     try {
-      let targetLang: string | null = null;
+      let targetLang: string | undefined;
       if (languageFilter === "current" && settings?.targetLanguage) {
         targetLang = settings.targetLanguage;
       } else if (languageFilter !== "all" && languageFilter !== "current") {
         targetLang = languageFilter;
       }
 
-      const data = await invoke<PhraseWithProgress[]>("get_phrases", {
-        starredOnly: showStarredOnly || null,
-        excludedOnly:
-          excludedFilter === "all" ? null : excludedFilter === "excluded",
+      const data = await getPhrases({
         targetLanguage: targetLang,
-        status: filterStatus !== "all" ? filterStatus : null,
-        searchQuery: debouncedSearch || null,
       });
-      setPhrases(data);
+
+      // Apply client-side filtering for starred, excluded, and search
+      let filtered = data;
+      if (showStarredOnly) {
+        filtered = filtered.filter((p) => p.phrase.starred);
+      }
+      if (excludedFilter === "active") {
+        filtered = filtered.filter((p) => !p.phrase.excluded);
+      } else if (excludedFilter === "excluded") {
+        filtered = filtered.filter((p) => p.phrase.excluded);
+      }
+      if (debouncedSearch) {
+        const search = debouncedSearch.toLowerCase();
+        filtered = filtered.filter(
+          (p) =>
+            p.phrase.prompt.toLowerCase().includes(search) ||
+            p.phrase.answer.toLowerCase().includes(search)
+        );
+      }
+      if (filterStatus === "new") {
+        filtered = filtered.filter(
+          (p) => !p.progress || p.progress.totalAttempts === 0
+        );
+      } else if (filterStatus === "learning") {
+        filtered = filtered.filter(
+          (p) =>
+            p.progress &&
+            p.progress.totalAttempts > 0 &&
+            p.progress.correctStreak < 2
+        );
+      } else if (filterStatus === "learned") {
+        filtered = filtered.filter(
+          (p) => p.progress && p.progress.correctStreak >= 2
+        );
+      }
+
+      setPhrases(filtered);
     } catch (err) {
       console.error("Failed to load phrases:", err);
     } finally {
@@ -135,7 +174,7 @@ export function PhraseLibraryView() {
 
   const handleToggleStar = async (id: number) => {
     try {
-      const newStarred = await invoke<boolean>("toggle_starred", { id });
+      const newStarred = await toggleStarred(id);
       setPhrases((prev) =>
         prev.map((p) =>
           p.phrase.id === id
@@ -150,7 +189,7 @@ export function PhraseLibraryView() {
 
   const handleToggleExcluded = async (id: number) => {
     try {
-      const newExcluded = await invoke<boolean>("toggle_excluded", { id });
+      const newExcluded = await toggleExcluded(id);
       setPhrases((prev) =>
         prev.map((p) =>
           p.phrase.id === id
@@ -191,7 +230,7 @@ export function PhraseLibraryView() {
     if (!deleteConfirmId) return;
 
     try {
-      await invoke("delete_phrase", { id: deleteConfirmId });
+      await deletePhrase(deleteConfirmId);
       setPhrases((prev) => prev.filter((p) => p.phrase.id !== deleteConfirmId));
       loadStats();
     } catch (err) {
@@ -203,7 +242,7 @@ export function PhraseLibraryView() {
 
   const handleAddPhrase = async (request: CreatePhraseRequest) => {
     try {
-      await invoke("create_phrase", { request });
+      await createPhrase(request);
       setShowAddDialog(false);
       await loadStats();
       await loadPhrases();
@@ -219,8 +258,7 @@ export function PhraseLibraryView() {
   ) => {
     if (!refiningPhrase) return;
 
-    const request: UpdatePhraseRequest = { prompt, answer, accepted };
-    await invoke<Phrase>("update_phrase", { id: refiningPhrase.id, request });
+    await updatePhrase(refiningPhrase.id, { prompt, answer, accepted });
 
     setPhrases((prev) =>
       prev.map((p) =>

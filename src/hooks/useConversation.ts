@@ -1,7 +1,33 @@
 import { useState, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { sendConversationMessage } from "../lib/llm";
+import {
+  updateConversationMessages,
+  updateConversationTitle,
+  generateTitle,
+} from "../api";
 import type { ChatMessage, Conversation } from "../types";
+
+function isValidChatMessage(obj: unknown): obj is ChatMessage {
+  return (
+    typeof obj === "object" &&
+    obj !== null &&
+    typeof (obj as ChatMessage).id === "string" &&
+    typeof (obj as ChatMessage).content === "string" &&
+    ((obj as ChatMessage).role === "user" ||
+      (obj as ChatMessage).role === "assistant")
+  );
+}
+
+export function parseMessages(json: string | null | undefined): ChatMessage[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isValidChatMessage);
+  } catch {
+    return [];
+  }
+}
 
 interface UseConversationOptions {
   conversation: Conversation | null;
@@ -31,13 +57,7 @@ export function useConversation({
       setMessages([]);
       return;
     }
-
-    try {
-      const parsed = JSON.parse(conversation.rawMessagesJson || "[]");
-      setMessages(parsed);
-    } catch {
-      setMessages([]);
-    }
+    setMessages(parseMessages(conversation.rawMessagesJson));
   }, [conversation]);
 
   const saveMessages = useCallback(
@@ -45,10 +65,7 @@ export function useConversation({
       if (!conversation) return;
 
       try {
-        await invoke("update_conversation_messages", {
-          id: conversation.id,
-          messages: newMessages,
-        });
+        await updateConversationMessages(conversation.id, newMessages);
         onMessagesUpdate?.(newMessages);
       } catch (err) {
         console.error("Failed to save messages:", err);
@@ -96,15 +113,12 @@ export function useConversation({
         if (isFirstExchange) {
           try {
             const contentForTitle = `${content}\n${response.content.substring(0, 200)}`;
-            const newTitle = await invoke<string>("generate_title", {
-              content: contentForTitle,
-              contentType: "conversation",
-              nativeLanguage: conversation.nativeLanguage,
-            });
-            await invoke("update_conversation_title", {
-              id: conversation.id,
-              title: newTitle,
-            });
+            const newTitle = await generateTitle(
+              contentForTitle,
+              "conversation",
+              conversation.nativeLanguage
+            );
+            await updateConversationTitle(conversation.id, newTitle);
           } catch (titleErr) {
             console.error("Failed to generate title:", titleErr);
           }

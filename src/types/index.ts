@@ -69,6 +69,12 @@ export interface PhraseProgress {
   nextReviewAt: string | null;
 }
 
+export interface AnswerResult {
+  progress: PhraseProgress;
+  sessionStreak: number;
+  isLearnedInSession: boolean;
+}
+
 export interface PhraseWithProgress {
   phrase: Phrase;
   progress: PhraseProgress | null;

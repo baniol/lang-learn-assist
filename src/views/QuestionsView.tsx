@@ -1,12 +1,13 @@
 import { useState, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import {
   getQuestionThreads,
   getQuestionThread,
   createQuestionThread,
   deleteQuestionThread,
   askGrammarQuestion,
+  updateQuestionThreadTitle,
 } from "../lib/questions";
+import { generateTitle, createPhrase } from "../api";
 import { Button, Spinner, ConfirmDialog, AIChatPanel } from "../components/ui";
 import type { ChatMessage } from "../components/ui";
 import { EmptyState } from "../components/shared";
@@ -121,15 +122,12 @@ export function QuestionsView() {
             .slice(0, 2)
             .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
             .join("\n");
-          const newTitle = await invoke<string>("generate_title", {
+          const newTitle = await generateTitle(
             content,
-            contentType: "question",
-            nativeLanguage: settings?.nativeLanguage,
-          });
-          await invoke("update_question_thread_title", {
-            id: updatedThread.id,
-            title: newTitle,
-          });
+            "question",
+            settings?.nativeLanguage
+          );
+          await updateQuestionThreadTitle(updatedThread.id, newTitle);
           updatedThread.title = newTitle;
         } catch (err) {
           console.error("Failed to generate title:", err);
@@ -162,7 +160,7 @@ export function QuestionsView() {
           nativeLanguage: selectedThread.nativeLanguage,
         };
 
-        await invoke("create_phrase", { request });
+        await createPhrase(request);
         setAddedExamples((prev) => new Set([...prev, exampleKey]));
       } catch (err) {
         console.error("Failed to add phrase:", err);

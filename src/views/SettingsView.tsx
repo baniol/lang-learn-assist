@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "../contexts/SettingsContext";
-import { testLlmConnection } from "../lib/llm";
+import { getSettings, saveSettings, testLlmConnection } from "../api";
 import { testTtsConnection, getAvailableVoices } from "../lib/tts";
 import {
   getAvailableModels,
@@ -81,7 +80,7 @@ export function SettingsView() {
 
   const loadSettings = async () => {
     try {
-      const data = await invoke<AppSettings>("get_settings");
+      const data = await getSettings();
       setSettings(data);
     } catch (err) {
       console.error("Failed to load settings:", err);
@@ -126,7 +125,7 @@ export function SettingsView() {
     if (!settings) return;
     setIsSaving(true);
     try {
-      await invoke("save_settings", { settings });
+      await saveSettings(settings);
       await updateGlobalSettings(settings);
     } catch (err) {
       console.error("Failed to save settings:", err);
@@ -160,7 +159,7 @@ export function SettingsView() {
       if (settings && !settings.activeWhisperModel) {
         const newSettings = { ...settings, activeWhisperModel: fileName };
         setSettings(newSettings);
-        await invoke("save_settings", { settings: newSettings });
+        await saveSettings(newSettings);
       }
     } catch (err) {
       console.error("Failed to download model:", err);
@@ -179,7 +178,7 @@ export function SettingsView() {
     setSettings(newSettings);
 
     try {
-      await invoke("save_settings", { settings: newSettings });
+      await saveSettings(newSettings);
     } catch (err) {
       console.error("Failed to save settings:", err);
     }
@@ -193,7 +192,7 @@ export function SettingsView() {
       if (settings?.activeWhisperModel === deletingModel) {
         const newSettings = { ...settings, activeWhisperModel: "" };
         setSettings(newSettings);
-        await invoke("save_settings", { settings: newSettings });
+        await saveSettings(newSettings);
       }
 
       await loadWhisperModels();

@@ -6,7 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { getSettings, saveSettings } from "../api";
 import type { AppSettings } from "../types";
 
 interface SettingsContextValue {
@@ -42,7 +42,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await invoke<AppSettings>("get_settings");
+      const data = await getSettings();
       setSettings(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -59,7 +59,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
 
   const updateSettings = useCallback(async (newSettings: AppSettings) => {
     try {
-      await invoke("save_settings", { settings: newSettings });
+      await saveSettings(newSettings);
       setSettings(newSettings);
     } catch (err) {
       console.error("Failed to save settings:", err);
