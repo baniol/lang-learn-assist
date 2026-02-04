@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { sendConversationMessage } from "../lib/llm";
 import {
   updateConversationMessages,
@@ -52,6 +52,10 @@ export function useConversation({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Ref to track messages during async operations to avoid stale closures
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  messagesRef.current = messages;
+
   const loadMessages = useCallback(() => {
     if (!conversation) {
       setMessages([]);
@@ -78,7 +82,10 @@ export function useConversation({
     async (content: string) => {
       if (!conversation || !content.trim()) return;
 
-      const isFirstExchange = messages.length === 0;
+      // Capture current state at start of operation
+      const previousMessages = messagesRef.current;
+      const isFirstExchange = previousMessages.length === 0;
+
       setError(null);
       setIsLoading(true);
 
@@ -88,7 +95,7 @@ export function useConversation({
         content: content,
       };
 
-      const updatedMessages = [...messages, userMessage];
+      const updatedMessages = [...previousMessages, userMessage];
       setMessages(updatedMessages);
 
       try {
@@ -126,12 +133,13 @@ export function useConversation({
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         setError(errorMsg);
-        setMessages(messages);
+        // Revert to state before this operation started
+        setMessages(previousMessages);
       } finally {
         setIsLoading(false);
       }
     },
-    [conversation, messages, saveMessages]
+    [conversation, saveMessages]
   );
 
   const deleteMessage = useCallback(

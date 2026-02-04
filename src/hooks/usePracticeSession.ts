@@ -57,12 +57,22 @@ export function usePracticeSession({
   const [inRetryMode, setInRetryMode] = useState(false);
   const [requiresRetry, setRequiresRetry] = useState(false);
 
-  // Ref for cleanup access
+  // Refs to track current values during async operations
   const sessionIdRef = useRef<number | null>(null);
+  const seenPhraseIdsRef = useRef<number[]>([]);
+  const settingsRef = useRef<AppSettings | null>(settings);
 
   useEffect(() => {
     sessionIdRef.current = session?.id ?? null;
   }, [session?.id]);
+
+  useEffect(() => {
+    seenPhraseIdsRef.current = seenPhraseIds;
+  }, [seenPhraseIds]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const loadNextPhraseInternal = useCallback(
     async (
@@ -71,11 +81,13 @@ export function usePracticeSession({
       sessionId?: number
     ) => {
       const activeSessionId = sessionId ?? session?.id;
+      // Use ref to get latest settings (avoids stale closure after settings refresh)
+      const currentSettings = settingsRef.current;
 
       if (
-        settings &&
-        settings.sessionPhraseLimit > 0 &&
-        excludeIds.length >= settings.sessionPhraseLimit
+        currentSettings &&
+        currentSettings.sessionPhraseLimit > 0 &&
+        excludeIds.length >= currentSettings.sessionPhraseLimit
       ) {
         setCurrentPhrase(null);
         if (activeSessionId) {
@@ -88,10 +100,10 @@ export function usePracticeSession({
 
       try {
         const phrase = await getNextPhrase({
-          targetLanguage: settings?.targetLanguage,
+          targetLanguage: currentSettings?.targetLanguage,
           excludeIds: excludeIds.length > 0 ? excludeIds : undefined,
           newPhraseCount: currentNewCount,
-          newPhraseLimit: settings?.newPhrasesPerSession ?? 0,
+          newPhraseLimit: currentSettings?.newPhrasesPerSession ?? 0,
         });
         setCurrentPhrase(phrase);
 
@@ -111,12 +123,13 @@ export function usePracticeSession({
         setIsLoading(false);
       }
     },
-    [session?.id, settings]
+    [session?.id]
   );
 
   const restoreSession = useCallback(
     async (activeSession: PracticeSession) => {
-      if (!settings) return;
+      const currentSettings = settingsRef.current;
+      if (!currentSettings) return;
 
       const state = activeSession.state;
       if (!state) {
@@ -136,12 +149,12 @@ export function usePracticeSession({
       if (state.currentPhraseId) {
         try {
           const phrase = await getNextPhrase({
-            targetLanguage: settings.targetLanguage,
+            targetLanguage: currentSettings.targetLanguage,
             excludeIds: state.seenPhraseIds.filter(
               (id) => id !== state.currentPhraseId
             ),
             newPhraseCount: state.newPhraseCount,
-            newPhraseLimit: settings.newPhrasesPerSession ?? 0,
+            newPhraseLimit: currentSettings.newPhrasesPerSession ?? 0,
           });
           setCurrentPhrase(phrase);
         } catch (err) {
@@ -160,7 +173,7 @@ export function usePracticeSession({
         );
       }
     },
-    [settings, loadNextPhraseInternal]
+    [loadNextPhraseInternal]
   );
 
   // Initialize - check for active session
@@ -228,15 +241,16 @@ export function usePracticeSession({
       // Call backend with session_id - it handles streak tracking
       const result = await apiRecordAnswer(phraseId, isCorrect, session?.id);
 
-      // Update session stats
+      // Update session stats using ref for current count
       if (session) {
+        const currentSeenCount = seenPhraseIdsRef.current.length;
         const newCorrectAnswers = isCorrect
           ? (session.correctAnswers || 0) + 1
           : session.correctAnswers || 0;
 
         await updatePracticeSession(
           session.id,
-          seenPhraseIds.length + 1,
+          currentSeenCount + 1,
           newCorrectAnswers
         );
 
@@ -244,7 +258,7 @@ export function usePracticeSession({
           prev
             ? {
                 ...prev,
-                totalPhrases: seenPhraseIds.length + 1,
+                totalPhrases: currentSeenCount + 1,
                 correctAnswers: newCorrectAnswers,
               }
             : null
@@ -259,7 +273,7 @@ export function usePracticeSession({
 
       return result;
     },
-    [session, seenPhraseIds.length, settings?.targetLanguage]
+    [session, settings?.targetLanguage]
   );
 
   const markPhraseSeen = useCallback((phraseId: number) => {

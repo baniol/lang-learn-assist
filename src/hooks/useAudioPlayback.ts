@@ -40,20 +40,30 @@ export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudi
 
   // Load per-language voices when language changes
   useEffect(() => {
+    let mounted = true;
+
     if (language) {
       Promise.all([
         getVoiceForLanguage(language, "voiceA"),
         getVoiceForLanguage(language, "voiceB"),
       ]).then(([a, b]) => {
-        setLanguageVoiceA(a || undefined);
-        setLanguageVoiceB(b || undefined);
+        if (mounted) {
+          setLanguageVoiceA(a || undefined);
+          setLanguageVoiceB(b || undefined);
+        }
       }).catch((err) => {
-        console.error("Failed to load per-language voices:", err);
+        if (mounted) {
+          console.error("Failed to load per-language voices:", err);
+        }
       });
     } else {
       setLanguageVoiceA(undefined);
       setLanguageVoiceB(undefined);
     }
+
+    return () => {
+      mounted = false;
+    };
   }, [language]);
 
   // Use per-language voices if language is set, otherwise fall back to explicit options

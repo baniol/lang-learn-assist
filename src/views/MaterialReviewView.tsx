@@ -76,7 +76,9 @@ export function MaterialReviewView({
     : [];
 
   const selectedSegment =
-    selectedIndex !== null ? segments[selectedIndex] : null;
+    selectedIndex !== null && selectedIndex >= 0 && selectedIndex < segments.length
+      ? segments[selectedIndex]
+      : null;
 
   return (
     <div className="h-full flex flex-col">
