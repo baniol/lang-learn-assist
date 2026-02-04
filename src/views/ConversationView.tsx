@@ -74,6 +74,7 @@ export function ConversationView({
 
   useEffect(() => {
     loadConversation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadConversation is stable, only re-run when conversationId changes
   }, [conversationId]);
 
   useEffect(() => {

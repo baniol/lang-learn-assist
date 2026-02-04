@@ -2,6 +2,9 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { generateTts, getAudioBase64, getVoiceForLanguage } from "../lib/tts";
 import type { ChatMessage } from "../types";
 
+/** Maximum number of audio files to keep in cache */
+const MAX_AUDIO_CACHE_SIZE = 50;
+
 interface UseAudioPlaybackOptions {
   /** Explicit voice A ID (legacy) */
   voiceA?: string;
@@ -124,6 +127,11 @@ export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudi
 
         if (!audioPath) {
           audioPath = await generateTts(text, undefined, voiceId);
+          // Evict oldest entry if cache is full (simple LRU)
+          if (audioCache.current.size >= MAX_AUDIO_CACHE_SIZE) {
+            const oldestKey = audioCache.current.keys().next().value;
+            if (oldestKey) audioCache.current.delete(oldestKey);
+          }
           audioCache.current.set(cacheKey, audioPath);
         }
 

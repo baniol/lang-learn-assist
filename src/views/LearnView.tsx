@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
 import { useTTS } from "../hooks/useTTS";
 import { usePracticeSession } from "../hooks/usePracticeSession";
 import { useSettings } from "../contexts/SettingsContext";
+import { useToast } from "../contexts/ToastContext";
 import { Button, Spinner } from "../components/ui";
 import {
   SessionHeader,
@@ -28,6 +29,7 @@ import type { LearningStats, ExerciseMode, Phrase } from "../types";
 
 export function LearnView() {
   const { settings, refreshSettings } = useSettings();
+  const toast = useToast();
   const [mode, setMode] = useState<ExerciseMode>("manual");
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -46,21 +48,26 @@ export function LearnView() {
     onSettingsRefresh: refreshSettings,
   });
 
+  // Ref to track current phrase for use in callbacks (avoids stale closures)
+  const currentPhraseRef = useRef(practiceSession.currentPhrase);
+  currentPhraseRef.current = practiceSession.currentPhrase;
+
   const handleAudioGenerated = useCallback(
     async (phraseId: number, audioPath: string) => {
       try {
         await updatePhraseAudio(phraseId, audioPath);
-        if (practiceSession.currentPhrase?.phrase.id === phraseId) {
+        const currentPhrase = currentPhraseRef.current;
+        if (currentPhrase?.phrase.id === phraseId) {
           practiceSession.setCurrentPhrase({
-            ...practiceSession.currentPhrase,
-            phrase: { ...practiceSession.currentPhrase.phrase, audioPath },
+            ...currentPhrase,
+            phrase: { ...currentPhrase.phrase, audioPath },
           });
         }
       } catch (err) {
         console.error("Failed to save audio path:", err);
       }
     },
-    [practiceSession]
+    [practiceSession.setCurrentPhrase]
   );
 
   const tts = useTTS({
@@ -109,6 +116,7 @@ export function LearnView() {
       setStats(data);
     } catch (err) {
       console.error("Failed to load stats:", err);
+      toast.error("Failed to load learning stats");
     }
   };
 

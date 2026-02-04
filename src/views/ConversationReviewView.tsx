@@ -58,6 +58,7 @@ export function ConversationReviewView({
 
   useEffect(() => {
     loadAndProcess();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadAndProcess is stable, only re-run when conversationId changes
   }, [conversationId]);
 
   const loadAndProcess = async () => {
@@ -120,9 +121,7 @@ export function ConversationReviewView({
     setError(null);
 
     try {
-      console.log("1. Updating title...");
       await updateConversationTitle(conversation.id, title);
-      console.log("1. Title updated");
 
       const finalMessages: ChatMessage[] = germanPhrases.map((text, i) => ({
         id: `final-${i}`,
@@ -130,12 +129,7 @@ export function ConversationReviewView({
         content: text,
       }));
 
-      console.log("2. Finalizing conversation...", {
-        id: conversation.id,
-        finalMessages,
-      });
       await finalizeConversation(conversation.id, finalMessages);
-      console.log("2. Conversation finalized");
 
       const phrasesToCreate: CreatePhraseRequest[] = suggestedPhrases
         .filter((_, i) => selectedPhrases.has(i))
@@ -148,13 +142,10 @@ export function ConversationReviewView({
           nativeLanguage: conversation.nativeLanguage,
         }));
 
-      console.log("3. Creating phrases...", phrasesToCreate);
       if (phrasesToCreate.length > 0) {
         await createPhrasesBatch(phrasesToCreate);
-        console.log("3. Phrases created");
       }
 
-      console.log("4. Navigating to dashboard");
       onNavigate("dashboard");
     } catch (err) {
       console.error("Save failed:", err);
