@@ -346,13 +346,307 @@ import { PlusIcon } from "../components/icons";
 const { settings } = useSettings();
 ```
 
-## Backend Patterns
+## Backend Development Standards
 
-**Navigation:** State-based via `onNavigate(view: ViewType, data?: unknown)` - no router library
+### Module Organization
 
-**Tauri commands:** Use `#[tauri::command]` + camelCase params (Rust snake_case auto-converts)
+**File size limits:** Split files exceeding ~300 lines into submodules
+```
+src/commands/learning.rs (1000 lines) → src/commands/learning/
+├── mod.rs          # Re-exports public items
+├── srs.rs          # Algorithm functions
+├── selection.rs    # Phrase selection
+├── answer.rs       # Answer validation
+├── stats.rs        # Statistics queries
+└── session.rs      # Session management
+```
 
-**SRS algorithm:** Located in `learning.rs` - simplified SM-2 with ease_factor, interval_days, next_review_at
+**When to create submodules:**
+- File exceeds 300 lines
+- Clear functional boundaries exist
+- Multiple developers work on same file
+- Testing requires isolation
+
+### Tauri Command Structure
+
+**Basic command:**
+```rust
+#[tauri::command]
+pub fn get_phrase(id: i64) -> Result<Phrase, String> {
+    let conn = get_conn()?;
+    // ... implementation
+}
+```
+
+**Command with state:**
+```rust
+#[tauri::command]
+pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
+    let settings = state.settings.safe_read()?;
+    Ok(settings.clone())
+}
+```
+
+**Async command:**
+```rust
+#[tauri::command]
+pub async fn send_message(
+    state: State<'_, AppState>,
+    message: String,
+) -> Result<LlmResponse, String> {
+    let settings = state.settings.safe_read()?.clone();
+    // ... async implementation
+}
+```
+
+**Parameter naming:** Use camelCase in Rust (auto-converts from TypeScript)
+```rust
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_phrases(
+    conversationId: Option<i64>,  // camelCase for Tauri
+    targetLanguage: Option<String>,
+) -> Result<Vec<Phrase>, String> { ... }
+```
+
+### Error Handling
+
+**Return `Result<T, String>` for Tauri commands:**
+```rust
+pub fn do_something() -> Result<Data, String> {
+    let conn = get_conn()?;  // Uses ? with map_err
+
+    conn.execute("...", params![...])
+        .map_err(|e| format!("Failed to execute: {}", e))?;
+
+    Ok(data)
+}
+```
+
+**Use safe lock wrappers (never bare `.unwrap()` on locks):**
+```rust
+use crate::utils::lock::{SafeLock, SafeRwLock};
+
+// BAD - can panic if lock is poisoned
+let guard = mutex.lock().unwrap();
+
+// GOOD - returns Result
+let guard = mutex.safe_lock()?;
+let guard = rwlock.safe_read()?;
+let guard = rwlock.safe_write()?;
+```
+
+### Database Operations
+
+**Get connection:**
+```rust
+use crate::db::get_conn;
+
+let conn = get_conn()?;  // Returns Result<Connection, String>
+```
+
+**Use shared row mappers:**
+```rust
+use crate::utils::db::{row_to_phrase, row_to_phrase_with_progress};
+
+let phrases = stmt
+    .query_map(params, row_to_phrase_with_progress)
+    .map_err(|e| format!("Query failed: {}", e))?
+    .collect::<Result<Vec<_>, _>>()
+    .map_err(|e| format!("Collection failed: {}", e))?;
+```
+
+**Migrations:** Always add migrations for new columns
+```rust
+// In db.rs init_db()
+if !columns.contains(&"new_column".to_string()) {
+    log_migration_result(
+        "add new_column to table",
+        conn.execute("ALTER TABLE t ADD COLUMN new_column TYPE DEFAULT value", []),
+    );
+}
+```
+
+### State Management
+
+**Use RwLock for read-heavy data (settings):**
+```rust
+pub struct AppState {
+    pub settings: RwLock<AppSettings>,  // Many readers, rare writes
+}
+
+// Reading (allows concurrent access)
+let settings = state.settings.safe_read()?;
+
+// Writing (exclusive access)
+let mut settings = state.settings.safe_write()?;
+```
+
+**Use Mutex for write-heavy or complex state:**
+```rust
+pub struct AppState {
+    pub whisper_model: Mutex<Option<WhisperContext>>,
+}
+
+let mut model = state.whisper_model.safe_lock()?;
+```
+
+### Constants
+
+**Centralize magic numbers in `src/constants.rs`:**
+```rust
+pub mod srs {
+    pub const DEFAULT_EASE_FACTOR: f64 = 2.5;
+    pub const MIN_EASE_FACTOR: f64 = 1.3;
+}
+
+pub mod llm {
+    pub const CONVERSATION_MAX_TOKENS: i64 = 500;
+    pub const REQUEST_TIMEOUT_SECS: u64 = 60;
+}
+```
+
+**Usage:**
+```rust
+use crate::constants::srs::DEFAULT_EASE_FACTOR;
+```
+
+### Testing
+
+**Test file location:** Add `#[cfg(test)]` module at end of file
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_something() {
+        assert_eq!(calculate(1, 2), 3);
+    }
+}
+```
+
+**Database tests with in-memory SQLite:**
+```rust
+use crate::db::init_db;
+use rusqlite::Connection;
+
+fn setup_test_db() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    init_db(&conn).unwrap();
+    conn
+}
+
+#[test]
+fn test_with_db() {
+    let conn = setup_test_db();
+    // ... test using conn
+}
+```
+
+**What to test:**
+- Pure functions (algorithms, calculations)
+- Data transformations (row mappers, serialization)
+- Business logic (SRS scheduling, answer matching)
+- Import/export (data integrity)
+
+**What NOT to test:**
+- Simple CRUD (just SQL, low bug risk)
+- External API calls (mock at integration level)
+- Tauri framework behavior
+
+### Anti-patterns to Avoid
+
+**DON'T: Bare unwrap on locks**
+```rust
+// BAD - panics on poisoned lock
+let guard = mutex.lock().unwrap();
+
+// GOOD
+let guard = mutex.safe_lock()?;
+```
+
+**DON'T: Silent error swallowing**
+```rust
+// BAD
+conn.execute("...", []).ok();
+
+// GOOD
+log_migration_result("migration_name", conn.execute("...", []));
+```
+
+**DON'T: Hardcoded magic numbers**
+```rust
+// BAD
+if ease_factor < 1.3 { ... }
+
+// GOOD
+use crate::constants::srs::MIN_EASE_FACTOR;
+if ease_factor < MIN_EASE_FACTOR { ... }
+```
+
+**DON'T: Monolithic files**
+```rust
+// BAD - 1000+ line file with mixed concerns
+
+// GOOD - split into focused modules
+mod srs;      // Algorithm
+mod answer;   // Validation
+mod stats;    // Queries
+```
+
+## General Development Rules
+
+### Code Quality
+
+- **Read before writing:** Always read existing files to understand patterns
+- **Minimal changes:** Only modify what's necessary for the task
+- **No over-engineering:** Avoid abstractions until needed twice
+- **Self-documenting code:** Clear names over comments
+
+### Architecture
+
+- **Frontend:** React handles UI state, Tauri commands fetch data
+- **Backend:** Rust handles business logic, SQLite stores data
+- **No router:** Navigation via `onNavigate(view, data)` state pattern
+- **No global state library:** Context for settings, local state for UI
+
+### Testing Requirements
+
+- **Before PR:** `make type-check && make test-rust && npm test`
+- **New algorithms:** Must have unit tests
+- **Data operations:** Test roundtrip (export → import → export)
+- **Bug fixes:** Add regression test when practical
+
+### Commits
+
+- **Atomic commits:** One logical change per commit
+- **Run checks:** Build and test before committing
+- **Message format:** Imperative mood, explain why not what
+
+### File Organization
+
+```
+src/                    # Frontend (React/TypeScript)
+├── components/         # Reusable UI components
+├── views/              # Page-level components
+├── hooks/              # Custom React hooks
+├── lib/                # Tauri command wrappers
+├── contexts/           # React contexts
+├── types/              # TypeScript interfaces
+└── __tests__/          # Frontend tests
+
+src-tauri/src/          # Backend (Rust)
+├── commands/           # Tauri command handlers
+│   ├── learning/       # Split module example
+│   └── llm/            # Split module example
+├── utils/              # Shared utilities
+├── constants.rs        # Magic numbers
+├── db.rs               # Database schema & migrations
+├── models.rs           # Data structures
+├── state.rs            # App state definition
+└── lib.rs              # App entry point
+```
 
 ## IMPORTANT
 
@@ -364,9 +658,20 @@ const { settings } = useSettings();
 - See `REFACTORING_GUIDE.md` for ongoing refactoring work and progress
 
 ## Reference
+
+**Documentation:**
 - `DOCUMENTATION.md` - User-facing feature docs
 - `REFACTORING_GUIDE.md` - Frontend refactoring plan and progress
+
+**Backend:**
 - `src-tauri/src/db.rs` - Database schema and migrations
 - `src-tauri/src/models.rs` - All Rust data structures
+- `src-tauri/src/constants.rs` - Centralized constants
+- `src-tauri/src/utils/` - Shared utilities (lock, db, error, regex)
+- `src-tauri/src/commands/learning/srs.rs` - SRS algorithm (SM-2 variant)
+- `src-tauri/src/commands/data_export.rs` - Import/export with tests
+
+**Frontend:**
 - `src/types/index.ts` - All TypeScript interfaces
+- `src/lib/` - Tauri command wrappers
 - `src/__tests__/` - Frontend test examples and patterns
