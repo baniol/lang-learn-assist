@@ -562,6 +562,7 @@ pub struct Material {
     pub target_language: String,
     pub native_language: String,
     pub status: String,
+    pub bookmark_index: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
 }

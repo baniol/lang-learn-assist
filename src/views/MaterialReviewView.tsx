@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { getMaterial, getMaterialThreadIndices } from "../lib/materials";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getMaterial, getMaterialThreadIndices, updateMaterialBookmark } from "../lib/materials";
 import { SentenceThreadDialog } from "../components/SentenceThreadDialog";
 import { Button, Spinner } from "../components/ui";
-import { ChevronLeftIcon, LightbulbIcon } from "../components/icons";
+import { ChevronLeftIcon, LightbulbIcon, BookmarkIcon } from "../components/icons";
 import type { ViewType, Material, TextSegment } from "../types";
 
 interface MaterialReviewViewProps {
@@ -20,6 +20,8 @@ export function MaterialReviewView({
   const [threadDates, setThreadDates] = useState<Map<number, string>>(
     new Map(),
   );
+  const [bookmarkIndex, setBookmarkIndex] = useState<number | null>(null);
+  const sentenceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const loadMaterial = useCallback(async () => {
     try {
@@ -29,6 +31,7 @@ export function MaterialReviewView({
       ]);
       setMaterial(data);
       setThreadDates(new Map(indices));
+      setBookmarkIndex(data.bookmarkIndex);
     } catch (err) {
       console.error("Failed to load material:", err);
     } finally {
@@ -47,6 +50,27 @@ export function MaterialReviewView({
       .catch(console.error);
     setSelectedIndex(null);
   };
+
+  const handleToggleBookmark = useCallback(async (index: number) => {
+    const newBookmarkIndex = bookmarkIndex === index ? null : index;
+    setBookmarkIndex(newBookmarkIndex);
+    try {
+      await updateMaterialBookmark(materialId, newBookmarkIndex);
+    } catch (err) {
+      console.error("Failed to update bookmark:", err);
+      // Revert on error
+      setBookmarkIndex(bookmarkIndex);
+    }
+  }, [materialId, bookmarkIndex]);
+
+  const scrollToBookmark = useCallback(() => {
+    if (bookmarkIndex !== null) {
+      const element = sentenceRefs.current.get(bookmarkIndex);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [bookmarkIndex]);
 
   if (isLoading) {
     return (
@@ -92,7 +116,7 @@ export function MaterialReviewView({
           >
             <ChevronLeftIcon size="sm" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold text-slate-800 dark:text-white">
               {material.title}
             </h1>
@@ -101,6 +125,18 @@ export function MaterialReviewView({
               sentence
             </p>
           </div>
+          <button
+            onClick={scrollToBookmark}
+            disabled={bookmarkIndex === null}
+            className={`p-2 rounded-lg transition-colors ${
+              bookmarkIndex !== null
+                ? "text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                : "text-slate-300 dark:text-slate-600 cursor-not-allowed"
+            }`}
+            title={bookmarkIndex !== null ? "Go to bookmark" : "No bookmark set"}
+          >
+            <BookmarkIcon size="md" filled={bookmarkIndex !== null} />
+          </button>
         </div>
       </div>
 
@@ -109,13 +145,22 @@ export function MaterialReviewView({
         <div className="divide-y divide-slate-200 dark:divide-slate-700">
           {segments.map((segment, index) => {
             const hasThread = threadDates.has(index);
+            const isBookmarked = bookmarkIndex === index;
             return (
               <div
                 key={index}
-                className="flex items-start p-4 gap-4 bg-white dark:bg-slate-800"
+                ref={(el) => {
+                  if (el) sentenceRefs.current.set(index, el);
+                  else sentenceRefs.current.delete(index);
+                }}
+                className={`flex items-start p-4 gap-4 ${
+                  isBookmarked
+                    ? "bg-blue-50 dark:bg-blue-900/20"
+                    : "bg-white dark:bg-slate-800"
+                }`}
               >
-                {/* Ask AI Button */}
-                <div className="flex flex-col items-center flex-shrink-0">
+                {/* Action buttons */}
+                <div className="flex flex-col items-center flex-shrink-0 gap-1">
                   <button
                     onClick={() => setSelectedIndex(index)}
                     className={`p-2 rounded-lg transition-colors ${
@@ -126,6 +171,17 @@ export function MaterialReviewView({
                     title="Ask about this sentence"
                   >
                     <LightbulbIcon size="sm" />
+                  </button>
+                  <button
+                    onClick={() => handleToggleBookmark(index)}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isBookmarked
+                        ? "text-blue-600 dark:text-blue-400"
+                        : "text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-blue-500 dark:text-slate-600"
+                    }`}
+                    title={isBookmarked ? "Remove bookmark" : "Set bookmark"}
+                  >
+                    <BookmarkIcon size="sm" filled={isBookmarked} />
                   </button>
                   {segment.timestamp && (
                     <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">

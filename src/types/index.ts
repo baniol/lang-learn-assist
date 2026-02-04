@@ -493,6 +493,7 @@ export interface Material {
   targetLanguage: string;
   nativeLanguage: string;
   status: MaterialStatus;
+  bookmarkIndex: number | null;
   createdAt: string;
   updatedAt: string;
 }

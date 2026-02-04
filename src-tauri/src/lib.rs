@@ -85,6 +85,7 @@ pub fn run() {
             materials::get_material,
             materials::update_material,
             materials::delete_material,
+            materials::update_material_bookmark,
             materials::get_material_thread,
             materials::create_material_thread,
             materials::update_material_thread,

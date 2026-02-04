@@ -344,5 +344,15 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         );
     }
 
+    if !material_columns.contains(&"bookmark_index".to_string()) {
+        log_migration_result(
+            "add bookmark_index to materials",
+            conn.execute(
+                "ALTER TABLE materials ADD COLUMN bookmark_index INTEGER",
+                [],
+            ),
+        );
+    }
+
     Ok(())
 }

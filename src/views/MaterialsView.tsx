@@ -176,9 +176,22 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
                       {getTypeIcon(material.materialType)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-slate-800 dark:text-white truncate">
-                        {material.title}
-                      </h3>
+                      {material.status === "ready" ? (
+                        <button
+                          onClick={() =>
+                            onNavigate("material-review", {
+                              materialId: material.id,
+                            })
+                          }
+                          className="font-medium text-slate-800 dark:text-white truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left"
+                        >
+                          {material.title}
+                        </button>
+                      ) : (
+                        <h3 className="font-medium text-slate-800 dark:text-white truncate">
+                          {material.title}
+                        </h3>
+                      )}
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-sm text-slate-500 dark:text-slate-400 capitalize">
                           {material.materialType}
@@ -191,18 +204,6 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    {material.status === "ready" && (
-                      <Button
-                        onClick={() =>
-                          onNavigate("material-review", {
-                            materialId: material.id,
-                          })
-                        }
-                        size="sm"
-                      >
-                        Review
-                      </Button>
-                    )}
                     <Button
                       onClick={() => setDeleteConfirm(material.id)}
                       variant="ghost"

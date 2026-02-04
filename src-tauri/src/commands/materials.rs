@@ -17,8 +17,9 @@ fn row_to_material(row: &rusqlite::Row) -> Result<Material, rusqlite::Error> {
         target_language: row.get(6)?,
         native_language: row.get(7)?,
         status: row.get(8)?,
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
+        bookmark_index: row.get(9)?,
+        created_at: row.get(10)?,
+        updated_at: row.get(11)?,
     })
 }
 
@@ -57,7 +58,7 @@ pub fn create_material(
 
     conn.query_row(
         "SELECT id, title, material_type, source_url, original_text, segments_json,
-                target_language, native_language, status, created_at, updated_at
+                target_language, native_language, status, bookmark_index, created_at, updated_at
          FROM materials WHERE id = ?1",
         params![id],
         row_to_material,
@@ -94,7 +95,7 @@ pub fn get_materials(
 
     let query = format!(
         "SELECT id, title, material_type, source_url, original_text, segments_json,
-                target_language, native_language, status, created_at, updated_at
+                target_language, native_language, status, bookmark_index, created_at, updated_at
          FROM materials{}
          ORDER BY created_at DESC",
         where_clause
@@ -175,7 +176,7 @@ pub fn get_material(id: i64) -> Result<Material, String> {
 
     let mut material = conn.query_row(
         "SELECT id, title, material_type, source_url, original_text, segments_json,
-                target_language, native_language, status, created_at, updated_at
+                target_language, native_language, status, bookmark_index, created_at, updated_at
          FROM materials WHERE id = ?1",
         params![id],
         row_to_material,
@@ -224,7 +225,7 @@ pub fn update_material(id: i64, request: UpdateMaterialRequest) -> Result<Materi
 
     conn.query_row(
         "SELECT id, title, material_type, source_url, original_text, segments_json,
-                target_language, native_language, status, created_at, updated_at
+                target_language, native_language, status, bookmark_index, created_at, updated_at
          FROM materials WHERE id = ?1",
         params![id],
         row_to_material,
@@ -238,6 +239,20 @@ pub fn delete_material(id: i64) -> Result<(), String> {
 
     conn.execute("DELETE FROM materials WHERE id = ?1", params![id])
         .map_err(|e| format!("Failed to delete material: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn update_material_bookmark(id: i64, bookmarkIndex: Option<i32>) -> Result<(), String> {
+    let conn = get_conn()?;
+
+    conn.execute(
+        "UPDATE materials SET bookmark_index = ?1, updated_at = datetime('now') WHERE id = ?2",
+        params![bookmarkIndex, id],
+    )
+    .map_err(|e| format!("Failed to update bookmark: {}", e))?;
 
     Ok(())
 }

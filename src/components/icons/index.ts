@@ -52,6 +52,7 @@ export { MicrophoneIcon, MicrophoneOutlineIcon, VolumeUpIcon, VolumeOffIcon } fr
 // Special Icons (with custom props)
 export {
   StarIcon,
+  BookmarkIcon,
   PlayPauseIcon,
   LoadingDotsIcon,
   PlayCircleIcon,

@@ -39,6 +39,13 @@ export async function deleteMaterial(id: number): Promise<void> {
   return invoke<void>("delete_material", { id });
 }
 
+export async function updateMaterialBookmark(
+  id: number,
+  bookmarkIndex: number | null
+): Promise<void> {
+  return invoke<void>("update_material_bookmark", { id, bookmarkIndex });
+}
+
 export async function processMaterial(
   materialId: number,
   materialType: MaterialType,
