@@ -1,9 +1,10 @@
 use crate::db::get_conn;
 use crate::models::{CreateMaterialRequest, Material, MaterialThread, MaterialThreadMessage, SuggestedPhrase, TextSegment, UpdateMaterialRequest};
 use crate::state::AppState;
+use crate::utils::lock::SafeRwLock;
+use crate::utils::regex::TIMESTAMP_REGEX;
 use rusqlite::params;
 use tauri::State;
-use regex::Regex;
 
 fn row_to_material(row: &rusqlite::Row) -> Result<Material, rusqlite::Error> {
     Ok(Material {
@@ -29,10 +30,7 @@ pub fn create_material(
     let conn = get_conn()?;
 
     // Get default languages from settings if not provided
-    let settings = state
-        .settings
-        .lock()
-        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+    let settings = state.settings.safe_read()?;
 
     let target_lang = request
         .target_language
@@ -118,12 +116,11 @@ pub fn get_materials(
 
 /// Parse timestamps from original transcript text
 fn parse_timestamps_from_original(text: &str) -> Vec<String> {
-    let ts_re = Regex::new(r"^\[?(\d+:\d+(?::\d+)?)\]?\s*$").unwrap();
     let mut timestamps = Vec::new();
 
     for line in text.lines() {
         let line = line.trim();
-        if let Some(caps) = ts_re.captures(line) {
+        if let Some(caps) = TIMESTAMP_REGEX.captures(line) {
             if let Some(ts) = caps.get(1) {
                 timestamps.push(ts.as_str().to_string());
             }

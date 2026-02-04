@@ -1,34 +1,13 @@
 use crate::db::get_conn;
 use crate::models::{
-    CreatePhraseRequest, Phrase, PhraseProgress, PhraseThread, PhraseThreadMessage,
+    CreatePhraseRequest, Phrase, PhraseThread, PhraseThreadMessage,
     PhraseWithProgress, UpdatePhraseRequest,
 };
 use crate::state::AppState;
+use crate::utils::db::{row_to_phrase, row_to_phrase_with_progress};
+use crate::utils::lock::SafeRwLock;
 use rusqlite::params;
 use tauri::State;
-
-fn row_to_phrase(row: &rusqlite::Row) -> Result<Phrase, rusqlite::Error> {
-    let accepted_json: String = row.get(4)?;
-    let accepted: Vec<String> = serde_json::from_str(&accepted_json).unwrap_or_default();
-    let starred_int: i32 = row.get(9)?;
-    let excluded_int: i32 = row.get(10).unwrap_or(0);
-
-    Ok(Phrase {
-        id: row.get(0)?,
-        conversation_id: row.get(1)?,
-        material_id: row.get(12).ok(),
-        prompt: row.get(2)?,
-        answer: row.get(3)?,
-        accepted,
-        target_language: row.get(5)?,
-        native_language: row.get(6)?,
-        audio_path: row.get(7)?,
-        notes: row.get(8)?,
-        starred: starred_int != 0,
-        excluded: excluded_int != 0,
-        created_at: row.get(11)?,
-    })
-}
 
 /// Status filter for phrase queries
 /// - "all": no filtering
@@ -124,27 +103,7 @@ pub fn get_phrases(
 
     let params: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
     let phrases = stmt
-        .query_map(params.as_slice(), |row| {
-            let phrase = row_to_phrase(row)?;
-
-            let progress = if let Ok(progress_id) = row.get::<_, i64>(13) {
-                Some(PhraseProgress {
-                    id: progress_id,
-                    phrase_id: phrase.id,
-                    correct_streak: row.get(14)?,
-                    total_attempts: row.get(15)?,
-                    success_count: row.get(16)?,
-                    last_seen: row.get(17)?,
-                    ease_factor: row.get(18).unwrap_or(2.5),
-                    interval_days: row.get(19).unwrap_or(1),
-                    next_review_at: row.get(20).ok(),
-                })
-            } else {
-                None
-            };
-
-            Ok(PhraseWithProgress { phrase, progress })
-        })
+        .query_map(params.as_slice(), row_to_phrase_with_progress)
         .map_err(|e| format!("Failed to query phrases: {}", e))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect phrases: {}", e))?;
@@ -165,27 +124,7 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
          WHERE p.id = ?1",
         params![id],
-        |row| {
-            let phrase = row_to_phrase(row)?;
-
-            let progress = if let Ok(progress_id) = row.get::<_, i64>(13) {
-                Some(PhraseProgress {
-                    id: progress_id,
-                    phrase_id: phrase.id,
-                    correct_streak: row.get(14)?,
-                    total_attempts: row.get(15)?,
-                    success_count: row.get(16)?,
-                    last_seen: row.get(17)?,
-                    ease_factor: row.get(18).unwrap_or(2.5),
-                    interval_days: row.get(19).unwrap_or(1),
-                    next_review_at: row.get(20).ok(),
-                })
-            } else {
-                None
-            };
-
-            Ok(PhraseWithProgress { phrase, progress })
-        },
+        row_to_phrase_with_progress,
     )
     .map_err(|e| format!("Phrase not found: {}", e))
 }
@@ -201,10 +140,7 @@ pub fn create_phrase(
         .map_err(|e| format!("Failed to serialize accepted: {}", e))?;
 
     // Get default languages from settings if not provided in request
-    let settings = state
-        .settings
-        .lock()
-        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+    let settings = state.settings.safe_read()?;
 
     let target_lang = request
         .target_language
@@ -248,13 +184,10 @@ pub fn create_phrases_batch(
     let mut conn = get_conn()?;
 
     // Get default languages from settings
-    let settings = state
-        .settings
-        .lock()
-        .map_err(|e| format!("Failed to lock settings: {}", e))?;
-    let default_target_lang = settings.target_language.clone();
-    let default_native_lang = settings.native_language.clone();
-    drop(settings); // Release lock before transaction
+    let (default_target_lang, default_native_lang) = {
+        let settings = state.settings.safe_read()?;
+        (settings.target_language.clone(), settings.native_language.clone())
+    };
 
     // Use transaction for atomicity - all phrases created or none
     let tx = conn

@@ -1,7 +1,9 @@
 mod commands;
+mod constants;
 mod db;
 mod models;
 mod state;
+mod utils;
 
 use commands::{audio, conversations, data_export, learning, llm, materials, notes, phrases, questions, settings, tts};
 use db::{get_db_path, init_db};
@@ -54,29 +56,29 @@ pub fn run() {
             phrases::accept_phrase_thread,
             phrases::delete_phrase_thread,
             // Learning
-            learning::get_next_phrase,
-            learning::record_answer,
-            learning::get_learning_stats,
-            learning::get_srs_stats,
-            learning::get_practice_sessions,
-            learning::start_practice_session,
-            learning::update_practice_session,
-            learning::finish_practice_session,
-            learning::save_session_state,
-            learning::get_active_session,
-            learning::reset_learning_phrases,
-            learning::reset_progress,
-            learning::validate_answer,
+            learning::selection::get_next_phrase,
+            learning::answer::record_answer,
+            learning::answer::validate_answer,
+            learning::stats::get_learning_stats,
+            learning::stats::get_srs_stats,
+            learning::session::get_practice_sessions,
+            learning::session::start_practice_session,
+            learning::session::update_practice_session,
+            learning::session::finish_practice_session,
+            learning::session::save_session_state,
+            learning::session::get_active_session,
+            learning::session::reset_learning_phrases,
+            learning::session::reset_progress,
             // LLM
-            llm::send_conversation_message,
-            llm::suggest_conversation_cleanup,
-            llm::extract_phrases_from_conversation,
-            llm::test_llm_connection,
-            llm::refine_phrase,
-            llm::generate_title,
-            llm::process_material,
-            llm::estimate_material_tokens,
-            llm::ask_about_sentence,
+            llm::conversation::send_conversation_message,
+            llm::conversation::suggest_conversation_cleanup,
+            llm::conversation::extract_phrases_from_conversation,
+            llm::conversation::test_llm_connection,
+            llm::phrase::refine_phrase,
+            llm::phrase::generate_title,
+            llm::material::process_material,
+            llm::material::estimate_material_tokens,
+            llm::material::ask_about_sentence,
             // Materials
             materials::create_material,
             materials::get_materials,

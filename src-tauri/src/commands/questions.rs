@@ -3,6 +3,7 @@ use crate::models::{
     get_language_name, AppSettings, GrammarQuestionResponse, QuestionMessage, QuestionThread,
 };
 use crate::state::AppState;
+use crate::utils::lock::SafeRwLock;
 use rusqlite::params;
 use serde::Deserialize;
 use std::time::Duration;
@@ -300,13 +301,7 @@ pub async fn ask_grammar_question(
     threadId: i64,
     question: String,
 ) -> Result<GrammarQuestionResponse, String> {
-    let settings = {
-        let guard = state
-            .settings
-            .lock()
-            .map_err(|e| format!("Failed to lock settings: {}", e))?;
-        guard.clone()
-    };
+    let settings = state.settings.safe_read()?.clone();
 
     if settings.llm_api_key.is_empty() {
         return Err("LLM API key not configured".to_string());

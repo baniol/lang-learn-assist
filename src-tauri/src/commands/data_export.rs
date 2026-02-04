@@ -4,12 +4,17 @@ use crate::models::{
     ExportPhrase, ExportPhraseProgress, ExportPhraseThread, ExportPracticeSession,
     ExportQuestionThread, ExportSetting, ImportMode, ImportResult, ImportStats,
 };
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use std::collections::HashMap;
 
 #[tauri::command]
 pub fn export_data() -> Result<ExportData, String> {
     let conn = get_conn()?;
+    export_data_with_conn(&conn)
+}
+
+/// Core export logic that can be tested with any connection
+pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
 
     // Export settings
     let mut stmt = conn
@@ -284,7 +289,15 @@ pub fn export_data() -> Result<ExportData, String> {
 #[tauri::command]
 pub fn import_data(data: ExportData, mode: ImportMode) -> Result<ImportResult, String> {
     let mut conn = get_conn()?;
+    import_data_with_conn(&mut conn, data, mode)
+}
 
+/// Core import logic that can be tested with any connection
+pub fn import_data_with_conn(
+    conn: &mut Connection,
+    data: ExportData,
+    mode: ImportMode,
+) -> Result<ImportResult, String> {
     // Check version compatibility
     if data.version > 2 {
         return Err(format!(
@@ -871,4 +884,265 @@ pub fn import_data(data: ExportData, mode: ImportMode) -> Result<ImportResult, S
         ),
         stats,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::init_db;
+
+    /// Create an in-memory database with schema initialized
+    fn setup_test_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("Failed to create in-memory database");
+        init_db(&conn).expect("Failed to initialize database schema");
+        conn
+    }
+
+    /// Create minimal test export data
+    fn create_test_export_data() -> ExportData {
+        ExportData {
+            version: 2,
+            exported_at: "2024-01-01T00:00:00Z".to_string(),
+            settings: vec![ExportSetting {
+                key: "test_key".to_string(),
+                value: "test_value".to_string(),
+            }],
+            conversations: vec![ExportConversation {
+                id: 1,
+                title: "Test Conversation".to_string(),
+                subject: "Testing".to_string(),
+                target_language: "de".to_string(),
+                native_language: "en".to_string(),
+                status: "draft".to_string(),
+                raw_messages_json: "[]".to_string(),
+                final_messages_json: None,
+                llm_summary: None,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            }],
+            phrases: vec![ExportPhrase {
+                id: 1,
+                conversation_id: Some(1),
+                material_id: None,
+                prompt: "Hello".to_string(),
+                answer: "Hallo".to_string(),
+                accepted_json: "[]".to_string(),
+                target_language: "de".to_string(),
+                native_language: "en".to_string(),
+                audio_path: None,
+                notes: None,
+                starred: false,
+                excluded: false,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+            }],
+            phrase_progress: vec![ExportPhraseProgress {
+                id: 1,
+                phrase_id: 1,
+                correct_streak: 2,
+                total_attempts: 5,
+                success_count: 4,
+                last_seen: Some("2024-01-01T00:00:00Z".to_string()),
+                ease_factor: 2.5,
+                interval_days: 3,
+                next_review_at: Some("2024-01-04T00:00:00Z".to_string()),
+            }],
+            phrase_threads: vec![],
+            question_threads: vec![],
+            notes: vec![ExportNote {
+                id: 1,
+                content: "Test note".to_string(),
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            }],
+            practice_sessions: vec![],
+            materials: vec![],
+            material_threads: vec![],
+        }
+    }
+
+    #[test]
+    fn test_export_empty_database() {
+        let conn = setup_test_db();
+        let result = export_data_with_conn(&conn);
+        assert!(result.is_ok());
+
+        let data = result.unwrap();
+        assert_eq!(data.version, 2);
+        assert!(data.settings.is_empty());
+        assert!(data.conversations.is_empty());
+        assert!(data.phrases.is_empty());
+    }
+
+    #[test]
+    fn test_import_overwrite_mode() {
+        let mut conn = setup_test_db();
+
+        let test_data = create_test_export_data();
+        let result = import_data_with_conn(&mut conn, test_data, ImportMode::Overwrite);
+
+        assert!(result.is_ok());
+        let import_result = result.unwrap();
+        assert!(import_result.success);
+        assert_eq!(import_result.stats.settings_imported, 1);
+        assert_eq!(import_result.stats.conversations_imported, 1);
+        assert_eq!(import_result.stats.phrases_imported, 1);
+        assert_eq!(import_result.stats.phrase_progress_imported, 1);
+        assert_eq!(import_result.stats.notes_imported, 1);
+    }
+
+    #[test]
+    fn test_import_then_export_roundtrip() {
+        let mut conn = setup_test_db();
+
+        // Import test data
+        let original_data = create_test_export_data();
+        import_data_with_conn(&mut conn, original_data.clone(), ImportMode::Overwrite)
+            .expect("Import failed");
+
+        // Export and verify
+        let exported = export_data_with_conn(&conn).expect("Export failed");
+
+        assert_eq!(exported.settings.len(), 1);
+        assert_eq!(exported.settings[0].key, "test_key");
+        assert_eq!(exported.conversations.len(), 1);
+        assert_eq!(exported.conversations[0].title, "Test Conversation");
+        assert_eq!(exported.phrases.len(), 1);
+        assert_eq!(exported.phrases[0].prompt, "Hello");
+        assert_eq!(exported.phrases[0].answer, "Hallo");
+        assert_eq!(exported.phrase_progress.len(), 1);
+        assert_eq!(exported.phrase_progress[0].correct_streak, 2);
+        assert_eq!(exported.notes.len(), 1);
+    }
+
+    #[test]
+    fn test_import_merge_mode_adds_new() {
+        let mut conn = setup_test_db();
+
+        // First import
+        let data1 = create_test_export_data();
+        import_data_with_conn(&mut conn, data1, ImportMode::Overwrite).expect("First import failed");
+
+        // Second import with different data
+        let mut data2 = create_test_export_data();
+        data2.conversations[0].id = 2;
+        data2.conversations[0].title = "Another Conversation".to_string();
+        data2.conversations[0].created_at = "2024-01-02T00:00:00Z".to_string();
+        data2.phrases[0].id = 2;
+        data2.phrases[0].conversation_id = Some(2);
+        data2.phrases[0].prompt = "Goodbye".to_string();
+        data2.phrases[0].answer = "Tschüss".to_string();
+        data2.phrases[0].created_at = "2024-01-02T00:00:00Z".to_string();
+        data2.phrase_progress[0].id = 2;
+        data2.phrase_progress[0].phrase_id = 2;
+        data2.notes[0].id = 2;
+        data2.notes[0].content = "Another note".to_string();
+        data2.notes[0].created_at = "2024-01-02T00:00:00Z".to_string();
+
+        let result = import_data_with_conn(&mut conn, data2, ImportMode::Merge);
+        assert!(result.is_ok());
+
+        // Verify both sets of data exist
+        let exported = export_data_with_conn(&conn).expect("Export failed");
+        assert_eq!(exported.conversations.len(), 2);
+        assert_eq!(exported.phrases.len(), 2);
+        assert_eq!(exported.notes.len(), 2);
+    }
+
+    #[test]
+    fn test_import_merge_mode_skips_duplicates() {
+        let mut conn = setup_test_db();
+
+        // First import
+        let data = create_test_export_data();
+        import_data_with_conn(&mut conn, data.clone(), ImportMode::Overwrite)
+            .expect("First import failed");
+
+        // Same data again in merge mode
+        let result = import_data_with_conn(&mut conn, data.clone(), ImportMode::Merge);
+        assert!(result.is_ok());
+        let import_result = result.unwrap();
+
+        // Should not create duplicates
+        assert_eq!(import_result.stats.conversations_imported, 0);
+        assert_eq!(import_result.stats.phrases_imported, 0);
+        assert_eq!(import_result.stats.notes_imported, 0);
+
+        // Verify no duplicates
+        let exported = export_data_with_conn(&conn).expect("Export failed");
+        assert_eq!(exported.conversations.len(), 1);
+        assert_eq!(exported.phrases.len(), 1);
+        assert_eq!(exported.notes.len(), 1);
+    }
+
+    #[test]
+    fn test_import_rejects_future_version() {
+        let mut conn = setup_test_db();
+
+        let mut data = create_test_export_data();
+        data.version = 99;
+
+        let result = import_data_with_conn(&mut conn, data, ImportMode::Overwrite);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not supported"));
+    }
+
+    #[test]
+    fn test_import_preserves_foreign_key_relationships() {
+        let mut conn = setup_test_db();
+
+        let data = create_test_export_data();
+        import_data_with_conn(&mut conn, data, ImportMode::Overwrite).expect("Import failed");
+
+        // Verify phrase is linked to conversation
+        let phrase_conv_id: Option<i64> = conn
+            .query_row(
+                "SELECT conversation_id FROM phrases WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("Query failed");
+        assert_eq!(phrase_conv_id, Some(1));
+
+        // Verify progress is linked to phrase
+        let progress_phrase_id: i64 = conn
+            .query_row(
+                "SELECT phrase_id FROM phrase_progress WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("Query failed");
+        assert_eq!(progress_phrase_id, 1);
+    }
+
+    #[test]
+    fn test_export_includes_all_phrase_fields() {
+        let conn = setup_test_db();
+
+        // Insert a phrase with all fields populated
+        conn.execute(
+            "INSERT INTO conversations (id, title, subject) VALUES (1, 'Test', 'Test')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO phrases (id, conversation_id, prompt, answer, accepted_json,
+                                  target_language, native_language, audio_path, notes,
+                                  starred, excluded, created_at)
+             VALUES (1, 1, 'Hello', 'Hallo', '[\"Hi\"]', 'de', 'en', '/path/to/audio.mp3',
+                     'A greeting', 1, 0, '2024-01-01')",
+            [],
+        )
+        .unwrap();
+
+        let exported = export_data_with_conn(&conn).expect("Export failed");
+        let phrase = &exported.phrases[0];
+
+        assert_eq!(phrase.prompt, "Hello");
+        assert_eq!(phrase.answer, "Hallo");
+        assert_eq!(phrase.accepted_json, "[\"Hi\"]");
+        assert_eq!(phrase.audio_path, Some("/path/to/audio.mp3".to_string()));
+        assert_eq!(phrase.notes, Some("A greeting".to_string()));
+        assert!(phrase.starred);
+        assert!(!phrase.excluded);
+    }
 }

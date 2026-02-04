@@ -1,6 +1,7 @@
 use crate::db::get_conn;
 use crate::models::{ChatMessage, Conversation, CreateConversationRequest};
 use crate::state::AppState;
+use crate::utils::lock::SafeRwLock;
 use rusqlite::params;
 use tauri::State;
 
@@ -91,10 +92,7 @@ pub fn create_conversation(
     let conn = get_conn()?;
 
     // Get default languages from settings if not provided in request
-    let settings = state
-        .settings
-        .lock()
-        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+    let settings = state.settings.safe_read()?;
 
     let target_lang = request
         .target_language

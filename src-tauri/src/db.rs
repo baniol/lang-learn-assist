@@ -1,6 +1,21 @@
 use rusqlite::{Connection, Result};
 use std::path::PathBuf;
 
+/// Log a migration result, reporting any errors while allowing continuation.
+/// This is used for migrations that may fail on existing databases
+/// (e.g., adding a column that already exists).
+fn log_migration_result(migration_name: &str, result: std::result::Result<usize, rusqlite::Error>) {
+    if let Err(e) = result {
+        // Check if it's a "duplicate column" error which is expected for existing DBs
+        let error_str = e.to_string();
+        if error_str.contains("duplicate column") || error_str.contains("already exists") {
+            // Expected error - column already exists from previous migration
+        } else {
+            eprintln!("Warning: Migration '{}' failed: {}", migration_name, e);
+        }
+    }
+}
+
 pub fn get_db_path() -> PathBuf {
     let app_dir = dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -109,22 +124,28 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         .unwrap_or_default();
 
     if !columns.contains(&"ease_factor".to_string()) {
-        conn.execute(
-            "ALTER TABLE phrase_progress ADD COLUMN ease_factor REAL NOT NULL DEFAULT 2.5",
-            [],
-        ).ok();
+        log_migration_result(
+            "add ease_factor to phrase_progress",
+            conn.execute(
+                "ALTER TABLE phrase_progress ADD COLUMN ease_factor REAL NOT NULL DEFAULT 2.5",
+                [],
+            ),
+        );
     }
     if !columns.contains(&"interval_days".to_string()) {
-        conn.execute(
-            "ALTER TABLE phrase_progress ADD COLUMN interval_days INTEGER NOT NULL DEFAULT 1",
-            [],
-        ).ok();
+        log_migration_result(
+            "add interval_days to phrase_progress",
+            conn.execute(
+                "ALTER TABLE phrase_progress ADD COLUMN interval_days INTEGER NOT NULL DEFAULT 1",
+                [],
+            ),
+        );
     }
     if !columns.contains(&"next_review_at".to_string()) {
-        conn.execute(
-            "ALTER TABLE phrase_progress ADD COLUMN next_review_at TEXT",
-            [],
-        ).ok();
+        log_migration_result(
+            "add next_review_at to phrase_progress",
+            conn.execute("ALTER TABLE phrase_progress ADD COLUMN next_review_at TEXT", []),
+        );
     }
 
     // Migration: Add excluded column to phrases if it doesn't exist
@@ -139,18 +160,24 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         .unwrap_or_default();
 
     if !phrase_columns.contains(&"excluded".to_string()) {
-        conn.execute(
-            "ALTER TABLE phrases ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0",
-            [],
-        ).ok();
+        log_migration_result(
+            "add excluded to phrases",
+            conn.execute(
+                "ALTER TABLE phrases ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0",
+                [],
+            ),
+        );
     }
 
     // Migration: Add material_id column to phrases if it doesn't exist
     if !phrase_columns.contains(&"material_id".to_string()) {
-        conn.execute(
-            "ALTER TABLE phrases ADD COLUMN material_id INTEGER REFERENCES materials(id) ON DELETE SET NULL",
-            [],
-        ).ok();
+        log_migration_result(
+            "add material_id to phrases",
+            conn.execute(
+                "ALTER TABLE phrases ADD COLUMN material_id INTEGER REFERENCES materials(id) ON DELETE SET NULL",
+                [],
+            ),
+        );
     }
 
     // Practice sessions table
@@ -179,10 +206,10 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         .unwrap_or_default();
 
     if !session_columns.contains(&"state_json".to_string()) {
-        conn.execute(
-            "ALTER TABLE practice_sessions ADD COLUMN state_json TEXT",
-            [],
-        ).ok();
+        log_migration_result(
+            "add state_json to practice_sessions",
+            conn.execute("ALTER TABLE practice_sessions ADD COLUMN state_json TEXT", []),
+        );
     }
 
     // Phrase refinement threads table
@@ -308,10 +335,13 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         .unwrap_or_default();
 
     if !material_columns.contains(&"processed_chunks".to_string()) {
-        conn.execute(
-            "ALTER TABLE materials ADD COLUMN processed_chunks INTEGER NOT NULL DEFAULT 0",
-            [],
-        ).ok();
+        log_migration_result(
+            "add processed_chunks to materials",
+            conn.execute(
+                "ALTER TABLE materials ADD COLUMN processed_chunks INTEGER NOT NULL DEFAULT 0",
+                [],
+            ),
+        );
     }
 
     Ok(())

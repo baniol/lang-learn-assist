@@ -1,6 +1,7 @@
 use crate::db::get_db_path;
 use crate::models::{AppSettings, LanguageVoiceSettings};
 use crate::state::AppState;
+use crate::utils::lock::SafeRwLock;
 use rusqlite::Connection;
 use std::collections::HashMap;
 use tauri::State;
@@ -147,10 +148,7 @@ pub fn load_initial_settings() -> AppSettings {
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
-    let settings = state
-        .settings
-        .lock()
-        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+    let settings = state.settings.safe_read()?;
     Ok(settings.clone())
 }
 
@@ -162,10 +160,7 @@ pub fn save_settings(state: State<'_, AppState>, settings: AppSettings) -> Resul
 
     save_settings_to_db(&conn, &settings)?;
 
-    let mut current = state
-        .settings
-        .lock()
-        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+    let mut current = state.settings.safe_write()?;
     *current = settings;
 
     Ok(())

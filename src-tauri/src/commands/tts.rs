@@ -1,5 +1,6 @@
 use crate::db::get_audio_dir;
 use crate::state::AppState;
+use crate::utils::lock::SafeRwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::File;
@@ -29,13 +30,7 @@ struct ElevenLabsVoicesResponse {
 
 #[tauri::command]
 pub async fn get_available_voices(state: State<'_, AppState>) -> Result<Vec<TtsVoice>, String> {
-    let settings = {
-        let guard = state
-            .settings
-            .lock()
-            .map_err(|e| format!("Failed to lock settings: {}", e))?;
-        guard.clone()
-    };
+    let settings = state.settings.safe_read()?.clone();
 
     match settings.tts_provider.as_str() {
         "elevenlabs" => get_elevenlabs_voices(&settings.tts_api_key).await,
@@ -133,13 +128,7 @@ pub async fn generate_tts(
     voice_id: Option<String>,
     language: Option<String>,
 ) -> Result<String, String> {
-    let settings = {
-        let guard = state
-            .settings
-            .lock()
-            .map_err(|e| format!("Failed to lock settings: {}", e))?;
-        guard.clone()
-    };
+    let settings = state.settings.safe_read()?.clone();
 
     // Resolve voice ID with priority: explicit > per-language > legacy global
     let effective_voice_id = resolve_voice_id(voice_id.as_ref(), language.as_ref(), &settings);
@@ -162,10 +151,7 @@ pub fn get_voice_for_language(
     language: String,
     voice_type: String,
 ) -> Result<String, String> {
-    let settings = state
-        .settings
-        .lock()
-        .map_err(|e| format!("Failed to lock settings: {}", e))?;
+    let settings = state.settings.safe_read()?;
 
     // Get per-language settings if available
     if let Some(lang_settings) = settings.tts_voices_per_language.get(&language) {
@@ -292,13 +278,7 @@ pub async fn get_audio_base64(path: String) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn test_tts_connection(state: State<'_, AppState>) -> Result<String, String> {
-    let settings = {
-        let guard = state
-            .settings
-            .lock()
-            .map_err(|e| format!("Failed to lock settings: {}", e))?;
-        guard.clone()
-    };
+    let settings = state.settings.safe_read()?.clone();
 
     match settings.tts_provider.as_str() {
         "elevenlabs" => {

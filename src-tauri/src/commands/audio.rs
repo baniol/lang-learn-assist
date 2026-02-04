@@ -1,4 +1,5 @@
 use crate::state::AppState;
+use crate::utils::lock::{SafeLock, SafeRwLock};
 use futures_util::StreamExt;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -75,21 +76,18 @@ pub fn get_model_status(app: tauri::AppHandle, file_name: String) -> bool {
 
 /// Check if active model file exists
 #[tauri::command]
-pub fn is_model_downloaded(app: tauri::AppHandle, state: State<'_, AppState>) -> bool {
-    if let Ok(app_data_dir) = app.path().app_data_dir() {
-        let settings = state.settings.lock().unwrap();
-        let active_model = &settings.active_whisper_model;
-        let model_path = app_data_dir.join("models").join(active_model);
-        model_path.exists()
-    } else {
-        false
-    }
+pub fn is_model_downloaded(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let settings = state.settings.safe_read()?;
+    let active_model = &settings.active_whisper_model;
+    let model_path = app_data_dir.join("models").join(active_model);
+    Ok(model_path.exists())
 }
 
 /// Check if whisper is initialized
 #[tauri::command]
-pub fn is_whisper_ready(state: State<'_, AppState>) -> bool {
-    state.whisper_context.lock().unwrap().is_some()
+pub fn is_whisper_ready(state: State<'_, AppState>) -> Result<bool, String> {
+    Ok(state.whisper_context.safe_lock()?.is_some())
 }
 
 /// Download whisper model with progress events
@@ -169,7 +167,7 @@ pub fn delete_model(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     // Check if this model is currently loaded
-    let current_model_path = state.whisper_model_path.lock().unwrap();
+    let current_model_path = state.whisper_model_path.safe_lock()?;
     if let Some(ref loaded_path) = *current_model_path {
         if loaded_path.file_name().and_then(|n| n.to_str()) == Some(&file_name) {
             return Err("Cannot delete the currently active model".to_string());
@@ -199,7 +197,7 @@ pub fn init_whisper(app: tauri::AppHandle, state: State<'_, AppState>) -> Result
 
     // Get active model from settings
     let active_model = {
-        let settings = state.settings.lock().map_err(|e| e.to_string())?;
+        let settings = state.settings.safe_read()?;
         settings.active_whisper_model.clone()
     };
 
@@ -220,8 +218,8 @@ pub fn init_whisper(app: tauri::AppHandle, state: State<'_, AppState>) -> Result
     )
     .map_err(|e| format!("Failed to load whisper model: {e}"))?;
 
-    *state.whisper_context.lock().unwrap() = Some(ctx);
-    *state.whisper_model_path.lock().unwrap() = Some(model_path);
+    *state.whisper_context.safe_lock()? = Some(ctx);
+    *state.whisper_model_path.safe_lock()? = Some(model_path);
 
     Ok(())
 }
@@ -327,7 +325,7 @@ pub fn transcribe_audio(
     };
 
     // Get whisper context
-    let ctx_guard = state.whisper_context.lock().unwrap();
+    let ctx_guard = state.whisper_context.safe_lock()?;
     let ctx = ctx_guard
         .as_ref()
         .ok_or("Whisper not initialized. Call init_whisper first.")?;
