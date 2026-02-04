@@ -144,7 +144,7 @@ flowchart TD
 
     StayLearning --> ReviewMinutes[Review in 10 min]
     Graduate --> ReviewDays[Review in 1 day]
-    IncreaseInterval --> ScheduleNext[Schedule Next Review<br/><i>in [interval] days</i>]
+    IncreaseInterval --> ScheduleNext[Schedule Next Review<br/><i>in N days</i>]
 
     ReviewSoon --> End([Done])
     ReviewMinutes --> End
