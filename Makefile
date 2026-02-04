@@ -1,4 +1,4 @@
-.PHONY: install dev build preview clean lint format test test-rust test-all type-check help
+.PHONY: install dev build preview clean lint format test test-watch test-coverage test-rust test-all type-check help
 
 help:
 	@echo "Available commands:"
@@ -8,7 +8,11 @@ help:
 	@echo "  make preview       - Preview Vite build"
 	@echo "  make lint          - Run TypeScript check"
 	@echo "  make format        - Format code"
+	@echo "  make test          - Run frontend tests"
+	@echo "  make test-watch    - Run frontend tests in watch mode"
+	@echo "  make test-coverage - Run frontend tests with coverage"
 	@echo "  make test-rust     - Run Rust backend tests"
+	@echo "  make test-all      - Run all tests (frontend + Rust)"
 	@echo "  make type-check    - Run TypeScript type check"
 	@echo "  make clean         - Remove build artifacts"
 
@@ -33,10 +37,19 @@ format:
 type-check:
 	npx tsc --noEmit
 
+test:
+	npm run test
+
+test-watch:
+	npm run test:watch
+
+test-coverage:
+	npm run test:coverage
+
 test-rust:
 	cd src-tauri && cargo test
 
-test-all: test-rust
+test-all: test test-rust
 
 clean:
 	rm -rf dist/
