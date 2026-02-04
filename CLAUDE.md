@@ -618,6 +618,15 @@ mod stats;    // Queries
 - **Data operations:** Test roundtrip (export → import → export)
 - **Bug fixes:** Add regression test when practical
 
+**Auto-infer test needs:** When implementing code that matches these criteria, write tests without being asked:
+- New hooks with async logic or complex state
+- New utility functions with business logic
+- New algorithms or calculations (frontend or backend)
+- Data transformation functions
+- Import/export operations
+
+For simple CRUD, UI-only changes, or navigation logic - tests are optional unless explicitly requested.
+
 ### Commits
 
 - **Atomic commits:** One logical change per commit
