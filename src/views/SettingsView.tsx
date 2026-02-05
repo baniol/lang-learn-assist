@@ -350,6 +350,7 @@ export function SettingsView() {
           failureRepetitions={settings.failureRepetitions}
           sessionPhraseLimit={settings.sessionPhraseLimit}
           newPhrasesPerSession={settings.newPhrasesPerSession}
+          newPhraseInterval={settings.newPhraseInterval}
           defaultExerciseMode={settings.defaultExerciseMode}
           immediateRetry={settings.immediateRetry}
           fuzzyMatching={settings.fuzzyMatching}
@@ -362,6 +363,9 @@ export function SettingsView() {
           }
           onNewPhrasesPerSessionChange={(v) =>
             updateSetting("newPhrasesPerSession", v)
+          }
+          onNewPhraseIntervalChange={(v) =>
+            updateSetting("newPhraseInterval", v)
           }
           onDefaultExerciseModeChange={(m) =>
             updateSetting("defaultExerciseMode", m)

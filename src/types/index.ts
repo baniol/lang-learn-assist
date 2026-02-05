@@ -133,6 +133,7 @@ export interface AppSettings {
   failureRepetitions: number;
   sessionPhraseLimit: number;
   newPhrasesPerSession: number;
+  newPhraseInterval: number;
   fuzzyMatching: boolean;
   notesEnabled: boolean;
 }

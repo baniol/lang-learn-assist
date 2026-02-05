@@ -94,12 +94,21 @@ pub fn calculate_next_review(
             (current_ease, new_interval, next_review_str)
         }
     } else {
-        // Incorrect answer: reset to learning phase
+        // Incorrect answer: soft reset
         let new_ease = (current_ease - EASE_PENALTY).max(MIN_EASE_FACTOR);
-        let new_interval = 0; // Back to learning phase
-        let next_review = now + chrono::Duration::minutes(INCORRECT_REVIEW_MINUTES);
-        let next_review_str = next_review.format("%Y-%m-%d %H:%M:%S").to_string();
-        (new_ease, new_interval, next_review_str)
+
+        if current_interval >= 1 {
+            // Review phase: halve interval instead of full reset (minimum 1 day)
+            let new_interval = (current_interval / 2).max(1);
+            let next_review = now + chrono::Duration::days(new_interval as i64);
+            let next_review_str = next_review.format("%Y-%m-%d %H:%M:%S").to_string();
+            (new_ease, new_interval, next_review_str)
+        } else {
+            // Learning phase: still use short intervals
+            let next_review = now + chrono::Duration::minutes(INCORRECT_REVIEW_MINUTES);
+            let next_review_str = next_review.format("%Y-%m-%d %H:%M:%S").to_string();
+            (new_ease, 0, next_review_str)
+        }
     }
 }
 
@@ -145,9 +154,26 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_next_review_incorrect() {
+    fn test_calculate_next_review_incorrect_review_phase() {
+        // Review phase (interval >= 1): soft reset - halve interval
+        let (ease, interval, _) = calculate_next_review(false, 2.5, 8, 2);
+        assert!((ease - 2.3).abs() < 0.01);
+        assert_eq!(interval, 4); // Halved from 8 to 4
+
         let (ease, interval, _) = calculate_next_review(false, 2.5, 3, 2);
         assert!((ease - 2.3).abs() < 0.01);
-        assert_eq!(interval, 0); // Reset to learning phase
+        assert_eq!(interval, 1); // Halved from 3 to 1 (minimum)
+
+        let (ease, interval, _) = calculate_next_review(false, 2.5, 1, 2);
+        assert!((ease - 2.3).abs() < 0.01);
+        assert_eq!(interval, 1); // Already at minimum, stays at 1
+    }
+
+    #[test]
+    fn test_calculate_next_review_incorrect_learning_phase() {
+        // Learning phase (interval 0): still use short intervals
+        let (ease, interval, _) = calculate_next_review(false, 2.5, 0, 0);
+        assert!((ease - 2.3).abs() < 0.01);
+        assert_eq!(interval, 0); // Stays in learning phase
     }
 }

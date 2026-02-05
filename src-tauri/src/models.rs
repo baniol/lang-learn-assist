@@ -150,6 +150,7 @@ pub struct AppSettings {
     pub failure_repetitions: i32,
     pub session_phrase_limit: i32,
     pub new_phrases_per_session: i32,
+    pub new_phrase_interval: i32,
     pub fuzzy_matching: bool,
     pub notes_enabled: bool,
 }
@@ -175,6 +176,7 @@ impl AppSettings {
             failure_repetitions: 2,
             session_phrase_limit: 20,
             new_phrases_per_session: 2,
+            new_phrase_interval: 4,
             fuzzy_matching: true,
             notes_enabled: false,
         }

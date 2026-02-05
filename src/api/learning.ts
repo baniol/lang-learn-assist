@@ -62,12 +62,16 @@ export async function getNextPhrase(options: {
   excludeIds?: number[];
   newPhraseCount?: number;
   newPhraseLimit?: number;
+  sessionPosition?: number;
+  newPhraseInterval?: number;
 }): Promise<PhraseWithProgress | null> {
   return invoke<PhraseWithProgress | null>("get_next_phrase", {
     targetLanguage: options.targetLanguage ?? null,
     excludeIds: options.excludeIds?.length ? options.excludeIds : null,
     newPhraseCount: options.newPhraseCount ?? 0,
     newPhraseLimit: options.newPhraseLimit ?? 0,
+    sessionPosition: options.sessionPosition ?? 0,
+    newPhraseInterval: options.newPhraseInterval ?? 4,
   });
 }
 

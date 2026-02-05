@@ -130,14 +130,17 @@ The app uses a proven spaced repetition algorithm (based on SM-2/Anki) to optimi
 flowchart TD
     Start([Practice Phrase]) --> CheckAnswer{Answer<br/>Correct?}
 
-    CheckAnswer -->|Yes| CheckPhase{In Learning<br/>Phase?<br/><i>streak < 2</i>}
+    CheckAnswer -->|Yes| CheckPhaseCorrect{In Learning<br/>Phase?<br/><i>streak < 2</i>}
     CheckAnswer -->|No| ReduceEase[Reduce Ease Factor<br/><i>ease -= 0.2, min 1.3</i>]
 
-    ReduceEase --> ResetLearning[Reset to Learning Phase<br/><i>interval = 0</i>]
-    ResetLearning --> ReviewSoon[Review in 5 min]
+    ReduceEase --> CheckPhaseWrong{In Learning<br/>Phase?<br/><i>interval = 0</i>}
 
-    CheckPhase -->|Yes| CheckGraduation{Ready to<br/>Graduate?<br/><i>streak+1 ≥ 2</i>}
-    CheckPhase -->|No| IncreaseInterval[Increase Interval<br/><i>new = old × ease</i><br/><i>min: old + 1 day</i>]
+    CheckPhaseWrong -->|Yes| ReviewSoon[Review in 5 min]
+    CheckPhaseWrong -->|No| SoftReset[Soft Reset<br/><i>interval = interval / 2</i><br/><i>min: 1 day</i>]
+    SoftReset --> ScheduleSoft[Schedule Next Review<br/><i>in N days</i>]
+
+    CheckPhaseCorrect -->|Yes| CheckGraduation{Ready to<br/>Graduate?<br/><i>streak+1 ≥ 2</i>}
+    CheckPhaseCorrect -->|No| IncreaseInterval[Increase Interval<br/><i>new = old × ease</i><br/><i>min: old + 1 day</i>]
 
     CheckGraduation -->|Yes| Graduate[Graduate to Review<br/><i>interval = 1 day</i>]
     CheckGraduation -->|No| StayLearning[Stay in Learning<br/><i>interval = 0</i>]
@@ -150,6 +153,7 @@ flowchart TD
     ReviewMinutes --> End
     ReviewDays --> End
     ScheduleNext --> End
+    ScheduleSoft --> End
 ```
 
 ### How It Works
@@ -169,17 +173,21 @@ Each phrase has:
 - Correct answer: `new interval = current interval × ease factor` (minimum +1 day)
 - Phrases you know well appear less frequently
 
-**Incorrect Answer** (any phase):
+**Incorrect Answer**:
 - Ease factor decreases by 0.2 (minimum 1.3)
-- Reset to learning phase (review in 5 minutes)
-- Must build up streak again to re-graduate
+- **Learning phase** (interval 0): review in 5 minutes
+- **Review phase** (interval ≥ 1): soft reset - halve interval (minimum 1 day)
+  - Example: 8 days → 4 days, 3 days → 1 day
 
 ### Scheduling Priority
 
 During practice, phrases are shown in this order:
-1. **Overdue phrases** - Past their review date (most urgent first)
-2. **New phrases** - Never practiced before
-3. **Not yet due** - Skipped until their review date
+1. **Interleaved new phrases** - Every Nth phrase is a new one (configurable interval, default 4)
+2. **Overdue phrases** - Past their review date (most urgent first)
+3. **New phrases** - Never practiced before
+4. **Not yet due** - Skipped until their review date
+
+The interleaving ensures new phrases are introduced steadily, even when you have many overdue reviews.
 
 ### Example Progression
 
@@ -266,6 +274,8 @@ Set your default target and native languages for new conversations.
 - **Required streak** - Correct answers needed to mark phrase as "learned"
 - **Immediate retry** - Whether to retry wrong answers immediately
 - **Default exercise mode** - Preferred practice mode (Manual/Typing/Speaking)
+- **New phrases per session** - Maximum new phrases to introduce (0 = unlimited)
+- **New phrase interval** - Introduce a new phrase every N phrases (e.g., 4 = every 4th phrase is new)
 
 ---
 

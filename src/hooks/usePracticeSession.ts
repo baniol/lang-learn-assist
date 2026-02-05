@@ -104,6 +104,8 @@ export function usePracticeSession({
           excludeIds: excludeIds.length > 0 ? excludeIds : undefined,
           newPhraseCount: currentNewCount,
           newPhraseLimit: currentSettings?.newPhrasesPerSession ?? 0,
+          sessionPosition: excludeIds.length,
+          newPhraseInterval: currentSettings?.newPhraseInterval ?? 4,
         });
         setCurrentPhrase(phrase);
 
@@ -155,6 +157,8 @@ export function usePracticeSession({
             ),
             newPhraseCount: state.newPhraseCount,
             newPhraseLimit: currentSettings.newPhrasesPerSession ?? 0,
+            sessionPosition: state.seenPhraseIds.length,
+            newPhraseInterval: currentSettings.newPhraseInterval ?? 4,
           });
           setCurrentPhrase(phrase);
         } catch (err) {

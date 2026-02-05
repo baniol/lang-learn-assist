@@ -7,6 +7,7 @@ interface LearningSettingsSectionProps {
   failureRepetitions: number;
   sessionPhraseLimit: number;
   newPhrasesPerSession: number;
+  newPhraseInterval: number;
   defaultExerciseMode: ExerciseMode;
   immediateRetry: boolean;
   fuzzyMatching: boolean;
@@ -14,6 +15,7 @@ interface LearningSettingsSectionProps {
   onFailureRepetitionsChange: (value: number) => void;
   onSessionPhraseLimitChange: (value: number) => void;
   onNewPhrasesPerSessionChange: (value: number) => void;
+  onNewPhraseIntervalChange: (value: number) => void;
   onDefaultExerciseModeChange: (mode: ExerciseMode) => void;
   onImmediateRetryChange: (value: boolean) => void;
   onFuzzyMatchingChange: (value: boolean) => void;
@@ -24,6 +26,7 @@ export function LearningSettingsSection({
   failureRepetitions,
   sessionPhraseLimit,
   newPhrasesPerSession,
+  newPhraseInterval,
   defaultExerciseMode,
   immediateRetry,
   fuzzyMatching,
@@ -31,6 +34,7 @@ export function LearningSettingsSection({
   onFailureRepetitionsChange,
   onSessionPhraseLimitChange,
   onNewPhrasesPerSessionChange,
+  onNewPhraseIntervalChange,
   onDefaultExerciseModeChange,
   onImmediateRetryChange,
   onFuzzyMatchingChange,
@@ -112,6 +116,26 @@ export function LearningSettingsSection({
             value={newPhrasesPerSession}
             onChange={(e) =>
               onNewPhrasesPerSessionChange(parseInt(e.target.value) || 2)
+            }
+            className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            New phrase interval
+          </label>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+            Introduce a new phrase every N phrases (e.g., 4 = every 4th phrase is
+            new). Prevents reviews from blocking new material. (0 = disabled)
+          </p>
+          <input
+            type="number"
+            min={0}
+            max={20}
+            value={newPhraseInterval}
+            onChange={(e) =>
+              onNewPhraseIntervalChange(parseInt(e.target.value) || 4)
             }
             className="w-32 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
           />
