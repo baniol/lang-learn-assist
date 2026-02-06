@@ -25,7 +25,7 @@ import {
   updatePhrase,
   updatePhraseAudio,
 } from "../api";
-import type { LearningStats, ExerciseMode, Phrase } from "../types";
+import type { LearningStats, ExerciseMode, Phrase, AnswerResult } from "../types";
 
 export function LearnView() {
   const { settings, refreshSettings } = useSettings();
@@ -42,6 +42,7 @@ export function LearnView() {
     phrase: Phrase;
     userAnswer: string;
   } | null>(null);
+  const [lastAnswerResult, setLastAnswerResult] = useState<AnswerResult | null>(null);
 
   const practiceSession = usePracticeSession({
     settings,
@@ -106,6 +107,7 @@ export function LearnView() {
     setInputAnswer("");
     setFeedback(null);
     setAwaitingProceed(false);
+    setLastAnswerResult(null);
   }, [practiceSession.currentPhrase?.phrase.id]);
 
   const loadStats = async (targetLanguage?: string) => {
@@ -152,13 +154,24 @@ export function LearnView() {
             }
           } else {
             // Record answer - backend handles session streak tracking
-            await practiceSession.recordAnswer(phraseId, true);
+            try {
+              const result = await practiceSession.recordAnswer(phraseId, true);
+              setLastAnswerResult(result);
+            } catch (recordErr) {
+              console.error("Failed to record correct answer:", recordErr);
+              // Still allow proceeding even if recording fails
+            }
             practiceSession.setRequiresRetry(false);
             setAwaitingProceed(true);
           }
         } else {
           // Record incorrect answer - backend handles session streak reset
-          await practiceSession.recordAnswer(phraseId, false);
+          try {
+            const result = await practiceSession.recordAnswer(phraseId, false);
+            setLastAnswerResult(result);
+          } catch (recordErr) {
+            console.error("Failed to record incorrect answer:", recordErr);
+          }
 
           if (mode === "speaking") {
             practiceSession.setInRetryMode(true);
@@ -168,6 +181,7 @@ export function LearnView() {
         }
       } catch (err) {
         console.error("Failed to check answer:", err);
+        toast.error("Failed to check answer");
       }
     },
     [practiceSession, inputAnswer, settings, mode]
@@ -181,11 +195,13 @@ export function LearnView() {
 
     try {
       // Record answer - backend handles all streak tracking
-      await practiceSession.recordAnswer(phraseId, isCorrect);
-      setAwaitingProceed(true);
+      const result = await practiceSession.recordAnswer(phraseId, isCorrect);
+      setLastAnswerResult(result);
     } catch (err) {
       console.error("Failed to record answer:", err);
     }
+    // Always allow proceeding, even if recording fails
+    setAwaitingProceed(true);
   };
 
   const handlePlayAnswer = useCallback(() => {
@@ -200,10 +216,23 @@ export function LearnView() {
 
   const handleProceedToNext = useCallback(() => {
     if (!practiceSession.currentPhrase || !awaitingProceed) return;
-    practiceSession.markPhraseSeen(practiceSession.currentPhrase.phrase.id);
+    // Only exclude phrases that have graduated (interval_days >= 1)
+    // Learning-phase phrases (interval_days = 0) should be allowed to repeat
+    // in the same session after their 10-minute review time passes
+    const hasGraduated = lastAnswerResult && lastAnswerResult.progress.intervalDays >= 1;
+    if (hasGraduated) {
+      practiceSession.markPhraseSeen(practiceSession.currentPhrase.phrase.id);
+    }
+    // Reset UI state before loading next phrase
+    // This is needed because the same phrase might be returned again (learning phase)
+    // and the useEffect won't trigger if phrase.id doesn't change
     setAwaitingProceed(false);
+    setFeedback(null);
+    setInputAnswer("");
+    setLastAnswerResult(null);
+    setShowAnswer(false);
     practiceSession.loadNextPhrase();
-  }, [practiceSession, awaitingProceed]);
+  }, [practiceSession, awaitingProceed, lastAnswerResult]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -250,7 +279,8 @@ export function LearnView() {
     const phraseId = practiceSession.currentPhrase.phrase.id;
 
     // Record as incorrect - backend handles session state
-    await practiceSession.recordAnswer(phraseId, false);
+    const result = await practiceSession.recordAnswer(phraseId, false);
+    setLastAnswerResult(result);
 
     setShowAnswer(true);
     setFeedback("incorrect");
@@ -261,8 +291,17 @@ export function LearnView() {
 
   const handleSpeakingNext = () => {
     if (!practiceSession.currentPhrase) return;
-    practiceSession.markPhraseSeen(practiceSession.currentPhrase.phrase.id);
+    // Only exclude phrases that have graduated (interval_days >= 1)
+    const hasGraduated = lastAnswerResult && lastAnswerResult.progress.intervalDays >= 1;
+    if (hasGraduated) {
+      practiceSession.markPhraseSeen(practiceSession.currentPhrase.phrase.id);
+    }
+    // Reset UI state before loading next phrase (same phrase might be returned again)
     setShowAnswer(false);
+    setFeedback(null);
+    setInputAnswer("");
+    setLastAnswerResult(null);
+    setAwaitingProceed(false);
     practiceSession.loadNextPhrase();
   };
 

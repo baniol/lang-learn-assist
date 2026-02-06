@@ -34,10 +34,12 @@ export async function createConversation(options: {
   nativeLanguage?: string;
 }): Promise<Conversation> {
   return invoke<Conversation>("create_conversation", {
-    title: options.title,
-    subject: options.subject,
-    targetLanguage: options.targetLanguage ?? null,
-    nativeLanguage: options.nativeLanguage ?? null,
+    request: {
+      title: options.title,
+      subject: options.subject,
+      targetLanguage: options.targetLanguage ?? null,
+      nativeLanguage: options.nativeLanguage ?? null,
+    },
   });
 }
 

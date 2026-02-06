@@ -32,6 +32,10 @@ pub mod priority {
     /// Priority for new phrases (never practiced)
     pub const NEW_PHRASE: f64 = 1000.0;
 
+    /// Priority for phrases in learning phase (interval_days = 0, practiced but not graduated)
+    /// These should always be available within a session for repetition
+    pub const LEARNING_PHASE: f64 = 800.0;
+
     /// Priority for phrases with parsing errors in next_review_at
     pub const PARSE_ERROR: f64 = 500.0;
 
