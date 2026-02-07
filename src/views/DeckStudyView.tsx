@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getDeck } from "../lib/decks";
-import { validateAnswer, updatePhraseAudio } from "../api";
+import { validateAnswer, updatePhraseAudio, updatePhrase } from "../api";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
 import { useTTS } from "../hooks/useTTS";
 import { useDeckStudySession } from "../hooks/useDeckStudySession";
@@ -8,6 +8,7 @@ import { useSettings } from "../contexts/SettingsContext";
 import { useToast } from "../contexts/ToastContext";
 import { Button, Spinner } from "../components/ui";
 import { EmptyState } from "../components/shared";
+import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
 import { BookIcon } from "../components/icons";
 import {
   ModeSelector,
@@ -18,8 +19,8 @@ import {
   ExercisePrompt,
   RetryModeMessage,
 } from "../components/learning";
-import { DeckStudyHeader, GraduationCelebration } from "../components/decks";
-import type { ViewType, ExerciseMode, Deck } from "../types";
+import { DeckStudyHeader } from "../components/decks";
+import type { ViewType, ExerciseMode, Deck, Phrase } from "../types";
 
 interface DeckStudyViewProps {
   deckId: number;
@@ -36,6 +37,10 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
   const [inputAnswer, setInputAnswer] = useState("");
   const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
   const [awaitingProceed, setAwaitingProceed] = useState(false);
+  const [refiningPhrase, setRefiningPhrase] = useState<{
+    phrase: Phrase;
+    userAnswer: string;
+  } | null>(null);
 
   const deckStudy = useDeckStudySession({
     deckId,
@@ -216,11 +221,6 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
     deckStudy.loadNextPhrase();
   }, [deckStudy, awaitingProceed]);
 
-  const handleGraduationContinue = useCallback(() => {
-    deckStudy.clearGraduation();
-    handleProceedToNext();
-  }, [deckStudy, handleProceedToNext]);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -230,7 +230,7 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
         return;
       }
 
-      if (awaitingProceed && !deckStudy.lastGraduation) {
+      if (awaitingProceed) {
         if (e.code === "Space") {
           e.preventDefault();
           handleProceedToNext();
@@ -243,7 +243,7 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [awaitingProceed, handleProceedToNext, handlePlayAnswer, deckStudy.lastGraduation]);
+  }, [awaitingProceed, handleProceedToNext, handlePlayAnswer]);
 
   const handleEndSession = async () => {
     await deckStudy.endSession();
@@ -405,12 +405,18 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
               onProceed={handleProceedToNext}
               isPlaying={tts.isPlaying}
               isLoading={tts.isLoading}
-              showProceed={awaitingProceed && !deckStudy.lastGraduation}
+              showProceed={awaitingProceed}
               showOverride={mode === "speaking"}
               onOverride={() => {
                 setFeedback("correct");
                 handleManualAnswer(true);
               }}
+              onAskAI={() =>
+                setRefiningPhrase({
+                  phrase: currentPhrase.phrase,
+                  userAnswer: inputAnswer,
+                })
+              }
             />
           )}
 
@@ -503,12 +509,47 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
         </div>
       ) : null}
 
-      {/* Graduation celebration */}
-      {deckStudy.lastGraduation && currentPhrase && (
-        <GraduationCelebration
-          result={deckStudy.lastGraduation}
-          phraseName={currentPhrase.phrase.answer}
-          onContinue={handleGraduationContinue}
+      {/* Phrase refinement dialog */}
+      {refiningPhrase && (
+        <PhraseRefinementDialog
+          phrase={refiningPhrase.phrase}
+          onClose={() => {
+            setRefiningPhrase(null);
+            setFeedback(null);
+            setInputAnswer("");
+          }}
+          onAccept={async (prompt, answer, accepted) => {
+            await updatePhrase(refiningPhrase.phrase.id, {
+              prompt,
+              answer,
+              accepted,
+              refined: true,
+            });
+
+            if (
+              deckStudy.currentPhrase &&
+              deckStudy.currentPhrase.phrase.id === refiningPhrase.phrase.id
+            ) {
+              deckStudy.setCurrentPhrase({
+                ...deckStudy.currentPhrase,
+                phrase: { ...deckStudy.currentPhrase.phrase, prompt, answer, accepted, refined: true },
+              });
+            }
+          }}
+          onAudioRegenerated={(audioPath) => {
+            if (
+              deckStudy.currentPhrase &&
+              deckStudy.currentPhrase.phrase.id === refiningPhrase.phrase.id
+            ) {
+              deckStudy.setCurrentPhrase({
+                ...deckStudy.currentPhrase,
+                phrase: { ...deckStudy.currentPhrase.phrase, audioPath },
+              });
+            }
+            setRefiningPhrase((prev) =>
+              prev ? { ...prev, phrase: { ...prev.phrase, audioPath } } : null
+            );
+          }}
         />
       )}
     </div>

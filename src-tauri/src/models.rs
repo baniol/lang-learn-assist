@@ -59,6 +59,7 @@ pub struct Phrase {
     pub notes: Option<String>,
     pub starred: bool,
     pub excluded: bool,
+    pub refined: bool,
     pub created_at: String,
 }
 
@@ -357,6 +358,7 @@ pub struct UpdatePhraseRequest {
     pub accepted: Option<Vec<String>>,
     pub notes: Option<String>,
     pub starred: Option<bool>,
+    pub refined: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -11,12 +11,13 @@ use rusqlite::Row;
 /// Expects columns in the following order:
 /// 0: id, 1: conversation_id, 2: prompt, 3: answer, 4: accepted_json,
 /// 5: target_language, 6: native_language, 7: audio_path, 8: notes,
-/// 9: starred, 10: excluded, 11: created_at, 12: material_id, 13: deck_id
+/// 9: starred, 10: excluded, 11: created_at, 12: material_id, 13: deck_id, 14: refined
 pub fn row_to_phrase(row: &Row) -> Result<Phrase, rusqlite::Error> {
     let accepted_json: String = row.get(4)?;
     let accepted: Vec<String> = serde_json::from_str(&accepted_json).unwrap_or_default();
     let starred_int: i32 = row.get(9)?;
     let excluded_int: i32 = row.get(10).unwrap_or(0);
+    let refined_int: i32 = row.get(14).unwrap_or(0);
 
     Ok(Phrase {
         id: row.get(0)?,
@@ -32,6 +33,7 @@ pub fn row_to_phrase(row: &Row) -> Result<Phrase, rusqlite::Error> {
         notes: row.get(8)?,
         starred: starred_int != 0,
         excluded: excluded_int != 0,
+        refined: refined_int != 0,
         created_at: row.get(11)?,
     })
 }
@@ -66,10 +68,10 @@ pub fn row_to_phrase_progress(row: &Row, offset: usize, phrase_id: i64) -> Optio
 /// Convert a database row to a PhraseWithProgress model.
 ///
 /// Expects columns:
-/// - Phrase columns at indices 0-13 (including deck_id)
-/// - Progress columns at indices 14-23 (including in_srs_pool, deck_correct_count)
+/// - Phrase columns at indices 0-14 (including deck_id, refined)
+/// - Progress columns at indices 15-24 (including in_srs_pool, deck_correct_count)
 pub fn row_to_phrase_with_progress(row: &Row) -> Result<PhraseWithProgress, rusqlite::Error> {
     let phrase = row_to_phrase(row)?;
-    let progress = row_to_phrase_progress(row, 14, phrase.id);
+    let progress = row_to_phrase_progress(row, 15, phrase.id);
     Ok(PhraseWithProgress { phrase, progress })
 }

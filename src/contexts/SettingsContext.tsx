@@ -38,24 +38,24 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadSettings = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const data = await getSettings();
-      setSettings(data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      console.error("Failed to load settings:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
+  // Initial load - shows loading spinner
   useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
+    const initialLoad = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await getSettings();
+        setSettings(data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        console.error("Failed to load settings:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    initialLoad();
+  }, []);
 
   const updateSettings = useCallback(async (newSettings: AppSettings) => {
     try {
@@ -78,9 +78,18 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     [settings, updateSettings]
   );
 
+  // Refresh without showing loading spinner (doesn't unmount views)
   const refreshSettings = useCallback(async () => {
-    await loadSettings();
-  }, [loadSettings]);
+    try {
+      const data = await getSettings();
+      setSettings(data);
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      console.error("Failed to refresh settings:", err);
+    }
+  }, []);
 
   return (
     <SettingsContext.Provider

@@ -11,6 +11,7 @@ import {
   type FilterStatus,
   type ExcludedFilter,
   type LanguageFilter,
+  type DeckFilter,
 } from "../components/phrases";
 import { DeckSelector } from "../components/decks";
 import { useSettings } from "../contexts/SettingsContext";
@@ -25,12 +26,13 @@ import {
   updatePhraseAudio,
   getLearningStats,
 } from "../api";
-import { assignPhraseToDeck } from "../lib/decks";
+import { assignPhraseToDeck, getDecks } from "../lib/decks";
 import type {
   PhraseWithProgress,
   CreatePhraseRequest,
   LearningStats,
   Phrase,
+  DeckWithStats,
 } from "../types";
 
 export function PhraseLibraryView() {
@@ -45,6 +47,8 @@ export function PhraseLibraryView() {
     useState<ExcludedFilter>("active");
   const [languageFilter, setLanguageFilter] =
     useState<LanguageFilter>("current");
+  const [deckFilter, setDeckFilter] = useState<DeckFilter>("all");
+  const [decks, setDecks] = useState<DeckWithStats[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -99,6 +103,19 @@ export function PhraseLibraryView() {
     loadStats();
   }, []);
 
+  // Load decks for filter
+  useEffect(() => {
+    const loadDecksData = async () => {
+      try {
+        const data = await getDecks(settings?.targetLanguage);
+        setDecks(data);
+      } catch (err) {
+        console.error("Failed to load decks:", err);
+      }
+    };
+    loadDecksData();
+  }, [settings?.targetLanguage]);
+
   // Load phrases when filters change
   useEffect(() => {
     loadPhrases();
@@ -108,6 +125,7 @@ export function PhraseLibraryView() {
     filterStatus,
     debouncedSearch,
     languageFilter,
+    deckFilter,
     settings?.targetLanguage,
   ]);
 
@@ -151,6 +169,11 @@ export function PhraseLibraryView() {
             p.phrase.prompt.toLowerCase().includes(search) ||
             p.phrase.answer.toLowerCase().includes(search)
         );
+      }
+      if (deckFilter === "no-deck") {
+        filtered = filtered.filter((p) => p.phrase.deckId === null);
+      } else if (typeof deckFilter === "number") {
+        filtered = filtered.filter((p) => p.phrase.deckId === deckFilter);
       }
       if (filterStatus === "new") {
         filtered = filtered.filter(
@@ -263,12 +286,12 @@ export function PhraseLibraryView() {
   ) => {
     if (!refiningPhrase) return;
 
-    await updatePhrase(refiningPhrase.id, { prompt, answer, accepted });
+    await updatePhrase(refiningPhrase.id, { prompt, answer, accepted, refined: true });
 
     setPhrases((prev) =>
       prev.map((p) =>
         p.phrase.id === refiningPhrase.id
-          ? { ...p, phrase: { ...p.phrase, prompt, answer, accepted } }
+          ? { ...p, phrase: { ...p.phrase, prompt, answer, accepted, refined: true } }
           : p
       )
     );
@@ -325,6 +348,9 @@ export function PhraseLibraryView() {
         onExcludedFilterChange={setExcludedFilter}
         languageFilter={languageFilter}
         onLanguageFilterChange={setLanguageFilter}
+        deckFilter={deckFilter}
+        onDeckFilterChange={setDeckFilter}
+        decks={decks}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         currentLanguage={settings?.targetLanguage}

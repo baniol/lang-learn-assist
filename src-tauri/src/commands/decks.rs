@@ -318,7 +318,7 @@ pub fn get_deck_phrases(deckId: i64) -> Result<Vec<PhraseWithProgress>, String> 
     let mut stmt = conn
         .prepare(
             "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                    p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id,
+                    p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                     pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                     pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count
              FROM phrases p

@@ -62,6 +62,7 @@ export function PhraseListItem({
         isPlaying={isPlaying}
         isLoading={isLoading}
         hasDeck={phrase.deckId !== null}
+        isRefined={phrase.refined}
         onPlay={onPlay}
         onRefine={onRefine}
         onToggleExcluded={() => onToggleExcluded(phrase.id)}

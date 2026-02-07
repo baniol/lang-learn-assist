@@ -515,6 +515,7 @@ export function LearnView() {
               prompt,
               answer,
               accepted,
+              refined: true,
             });
 
             if (
@@ -523,7 +524,7 @@ export function LearnView() {
             ) {
               practiceSession.setCurrentPhrase({
                 ...currentPhrase,
-                phrase: { ...currentPhrase.phrase, prompt, answer, accepted },
+                phrase: { ...currentPhrase.phrase, prompt, answer, accepted, refined: true },
               });
             }
           }}

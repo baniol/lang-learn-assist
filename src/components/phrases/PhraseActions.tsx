@@ -16,6 +16,7 @@ interface PhraseActionsProps {
   isPlaying: boolean;
   isLoading: boolean;
   hasDeck?: boolean;
+  isRefined?: boolean;
   onPlay: () => void;
   onRefine: () => void;
   onToggleExcluded: () => void;
@@ -28,6 +29,7 @@ export function PhraseActions({
   isPlaying,
   isLoading,
   hasDeck,
+  isRefined,
   onPlay,
   onRefine,
   onToggleExcluded,
@@ -52,8 +54,13 @@ export function PhraseActions({
       </button>
       <button
         onClick={onRefine}
-        className="p-2 rounded text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors opacity-0 group-hover:opacity-100"
-        title="Refine with AI"
+        className={cn(
+          "p-2 rounded transition-colors",
+          isRefined
+            ? "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50"
+            : "text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+        )}
+        title={isRefined ? "Refined - click to edit again" : "Refine with AI"}
       >
         <LightbulbIcon size="xs" />
       </button>
@@ -61,7 +68,7 @@ export function PhraseActions({
         <button
           onClick={onAssignToDeck}
           className={cn(
-            "p-2 rounded transition-colors opacity-0 group-hover:opacity-100",
+            "p-2 rounded transition-colors",
             hasDeck
               ? "text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/30"
               : "text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
@@ -74,7 +81,7 @@ export function PhraseActions({
       <button
         onClick={onToggleExcluded}
         className={cn(
-          "p-2 rounded transition-colors opacity-0 group-hover:opacity-100",
+          "p-2 rounded transition-colors",
           isExcluded
             ? "text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
             : "text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
@@ -88,7 +95,7 @@ export function PhraseActions({
           e.stopPropagation();
           onDelete();
         }}
-        className="p-2 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors opacity-0 group-hover:opacity-100"
+        className="p-2 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
         title="Delete"
       >
         <CloseIcon size="xs" />

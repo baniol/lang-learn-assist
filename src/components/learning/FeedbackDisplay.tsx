@@ -61,6 +61,16 @@ export function FeedbackDisplay({
             <Button onClick={onProceed} variant="success">
               Continue
             </Button>
+            {onAskAI && (
+              <button
+                onClick={onAskAI}
+                className="px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors text-sm font-medium flex items-center gap-1.5"
+                title="Refine phrase with AI"
+              >
+                <LightbulbIcon size="xs" />
+                Ask AI
+              </button>
+            )}
           </div>
           <p className="text-sm mt-2 text-green-500 dark:text-green-500">
             Press{" "}

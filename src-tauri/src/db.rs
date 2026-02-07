@@ -423,6 +423,17 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         );
     }
 
+    // Migration: Add refined column to phrases
+    if !phrase_columns_updated.contains(&"refined".to_string()) {
+        log_migration_result(
+            "add refined to phrases",
+            conn.execute(
+                "ALTER TABLE phrases ADD COLUMN refined INTEGER NOT NULL DEFAULT 0",
+                [],
+            ),
+        );
+    }
+
     // Create indexes for deck-related queries
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_phrases_deck ON phrases(deck_id)",

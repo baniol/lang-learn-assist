@@ -56,6 +56,7 @@ export interface Phrase {
   notes: string | null;
   starred: boolean;
   excluded: boolean;
+  refined: boolean;
   createdAt: string;
 }
 
@@ -269,6 +270,7 @@ export interface UpdatePhraseRequest {
   accepted?: string[];
   notes?: string;
   starred?: boolean;
+  refined?: boolean;
 }
 
 export interface LlmResponse {

@@ -83,6 +83,7 @@ const mockPhraseData: Phrase = {
   notes: null,
   starred: false,
   excluded: false,
+  refined: false,
 };
 
 const mockSession: PracticeSession = {

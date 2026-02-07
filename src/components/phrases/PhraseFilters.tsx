@@ -1,10 +1,12 @@
 import { cn } from "../../lib/utils";
 import { StarIcon } from "../icons";
 import { LANGUAGE_OPTIONS } from "../../types";
+import type { DeckWithStats } from "../../types";
 
 export type FilterStatus = "all" | "new" | "learning" | "learned";
 export type ExcludedFilter = "active" | "excluded" | "all";
 export type LanguageFilter = "all" | "current" | string;
+export type DeckFilter = "all" | "no-deck" | number;
 
 interface PhraseFiltersProps {
   filterStatus: FilterStatus;
@@ -15,6 +17,9 @@ interface PhraseFiltersProps {
   onExcludedFilterChange: (filter: ExcludedFilter) => void;
   languageFilter: LanguageFilter;
   onLanguageFilterChange: (filter: LanguageFilter) => void;
+  deckFilter: DeckFilter;
+  onDeckFilterChange: (filter: DeckFilter) => void;
+  decks: DeckWithStats[];
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
   currentLanguage?: string;
@@ -32,6 +37,9 @@ export function PhraseFilters({
   onExcludedFilterChange,
   languageFilter,
   onLanguageFilterChange,
+  deckFilter,
+  onDeckFilterChange,
+  decks,
   searchQuery,
   onSearchQueryChange,
   currentLanguage,
@@ -110,6 +118,32 @@ export function PhraseFilters({
           {LANGUAGE_OPTIONS.map((lang) => (
             <option key={lang.code} value={lang.code}>
               {lang.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Deck filter */}
+      <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-4">
+        <select
+          value={deckFilter === "all" ? "all" : deckFilter === "no-deck" ? "no-deck" : String(deckFilter)}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === "all") {
+              onDeckFilterChange("all");
+            } else if (value === "no-deck") {
+              onDeckFilterChange("no-deck");
+            } else {
+              onDeckFilterChange(Number(value));
+            }
+          }}
+          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+        >
+          <option value="all">All decks</option>
+          <option value="no-deck">No deck</option>
+          {decks.map((deckWithStats) => (
+            <option key={deckWithStats.deck.id} value={deckWithStats.deck.id}>
+              {deckWithStats.deck.name}
             </option>
           ))}
         </select>

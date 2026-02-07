@@ -87,7 +87,7 @@ pub fn get_phrases(
 
     let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count
          FROM phrases p
@@ -117,7 +117,7 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
 
     conn.query_row(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count
          FROM phrases p
@@ -294,8 +294,16 @@ pub fn update_phrase(id: i64, request: UpdatePhraseRequest) -> Result<Phrase, St
         .map_err(|e| format!("Failed to update starred: {}", e))?;
     }
 
+    if let Some(refined) = request.refined {
+        conn.execute(
+            "UPDATE phrases SET refined = ?1 WHERE id = ?2",
+            params![refined as i32, id],
+        )
+        .map_err(|e| format!("Failed to update refined: {}", e))?;
+    }
+
     conn.query_row(
-        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id
+        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id, refined
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,
