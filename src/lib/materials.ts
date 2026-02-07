@@ -111,6 +111,27 @@ export async function estimateMaterialTokens(
   return invoke<TokenEstimate>("estimate_material_tokens", { text, materialType });
 }
 
+// Audio segment input for processing
+export interface AudioSegmentInput {
+  text: string;
+  audioPath: string;
+}
+
+// Process audio segments: translate transcriptions and return complete segments
+export async function processAudioSegments(
+  materialId: number,
+  segments: AudioSegmentInput[],
+  targetLanguage: string,
+  nativeLanguage: string
+): Promise<string> {
+  return invoke<string>("process_audio_segments", {
+    materialId,
+    segments,
+    targetLanguage,
+    nativeLanguage,
+  });
+}
+
 export async function askAboutSentence(
   sentence: string,
   translation: string,

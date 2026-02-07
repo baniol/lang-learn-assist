@@ -326,6 +326,183 @@ Response format (JSON array only):
     Ok(result)
 }
 
+/// Audio segment input for processing
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioSegmentInput {
+    pub text: String,
+    pub audio_path: String,
+}
+
+/// Process audio segments: translate transcriptions and return complete segments.
+/// Used for audio material type where we already have segmented text from Whisper.
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn process_audio_segments(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    materialId: i64,
+    segments: Vec<AudioSegmentInput>,
+    targetLanguage: String,
+    nativeLanguage: String,
+) -> Result<String, String> {
+    let settings = state.settings.safe_read()?.clone();
+
+    if settings.llm_api_key.is_empty() {
+        return Err("LLM API key not configured".to_string());
+    }
+
+    if segments.is_empty() {
+        return Err("No audio segments provided".to_string());
+    }
+
+    // Update status to processing
+    {
+        let conn = get_conn()?;
+        conn.execute(
+            "UPDATE materials SET status = 'processing', updated_at = datetime('now') WHERE id = ?1",
+            params![materialId],
+        )
+        .map_err(|e| format!("Failed to update status: {}", e))?;
+    }
+
+    let target_name = get_language_name(&targetLanguage);
+    let native_name = get_language_name(&nativeLanguage);
+
+    // Split segments into batches based on token limits
+    let mut batches: Vec<Vec<&AudioSegmentInput>> = Vec::new();
+    let mut current_batch: Vec<&AudioSegmentInput> = Vec::new();
+    let mut current_tokens = 0;
+
+    for segment in &segments {
+        let segment_tokens = estimate_tokens(&segment.text);
+
+        if current_tokens + segment_tokens > MAX_CHUNK_INPUT_TOKENS && !current_batch.is_empty() {
+            batches.push(current_batch);
+            current_batch = Vec::new();
+            current_tokens = 0;
+        }
+
+        current_tokens += segment_tokens;
+        current_batch.push(segment);
+    }
+
+    if !current_batch.is_empty() {
+        batches.push(current_batch);
+    }
+
+    let total_batches = batches.len();
+    let mut all_segments: Vec<TextSegment> = Vec::new();
+
+    // Process each batch
+    for (batch_idx, batch) in batches.iter().enumerate() {
+        // Build batch text - number each segment for LLM to maintain order
+        let batch_text = batch
+            .iter()
+            .enumerate()
+            .map(|(i, seg)| format!("[{}] {}", i + 1, seg.text))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let prompt = format!(
+            r#"Translate these {} sentences to {}. Each sentence is numbered.
+
+IMPORTANT:
+- Keep the same numbering
+- Return ONLY a JSON array with translations in the same order
+- Each object should have "index" (the number) and "translation"
+
+Sentences:
+{}
+
+Response format (JSON array only):
+[{{"index": 1, "translation": "Translation here"}}]"#,
+            target_name, native_name, batch_text
+        );
+
+        let llm_messages = vec![serde_json::json!({"role": "user", "content": prompt})];
+        let response = call_llm(&settings, &llm_messages, None, MATERIAL_CHUNK_MAX_TOKENS).await?;
+
+        // Parse response
+        let json_start = response.content.find('[');
+        let json_end = response.content.rfind(']');
+
+        let (json_start, json_end) = match (json_start, json_end) {
+            (Some(start), Some(end)) if end >= start => (start, end),
+            _ => return Err(format!(
+                "Failed to parse LLM response for batch {}. Raw: {}",
+                batch_idx + 1, response.content
+            )),
+        };
+
+        let json_str = &response.content[json_start..=json_end];
+
+        #[derive(serde::Deserialize)]
+        struct TranslationItem {
+            index: usize,
+            translation: String,
+        }
+
+        let translations: Vec<TranslationItem> = serde_json::from_str(json_str)
+            .map_err(|e| format!(
+                "Failed to parse translations for batch {}: {}. Raw JSON: {}",
+                batch_idx + 1, e, json_str
+            ))?;
+
+        // Map translations back to segments
+        for (i, seg) in batch.iter().enumerate() {
+            let translation = translations
+                .iter()
+                .find(|t| t.index == i + 1)
+                .map(|t| t.translation.clone())
+                .unwrap_or_else(|| "[Translation not found]".to_string());
+
+            all_segments.push(TextSegment {
+                text: seg.text.clone(),
+                translation,
+                timestamp: None,
+                audio_path: Some(seg.audio_path.clone()),
+            });
+        }
+
+        // Emit progress
+        let progress = MaterialProcessingProgress {
+            material_id: materialId,
+            current_chunk: batch_idx + 1,
+            total_chunks: total_batches,
+            percent: (((batch_idx + 1) as f32) / (total_batches as f32)) * 100.0,
+        };
+        let _ = app.emit("material-processing-progress", &progress);
+
+        // Save progress after each batch
+        {
+            let partial_result = serde_json::to_string(&all_segments)
+                .map_err(|e| format!("Failed to serialize segments: {}", e))?;
+            let conn = get_conn()?;
+            conn.execute(
+                "UPDATE materials SET segments_json = ?1, updated_at = datetime('now') WHERE id = ?2",
+                params![partial_result, materialId],
+            )
+            .map_err(|e| format!("Failed to save progress: {}", e))?;
+        }
+    }
+
+    let result = serde_json::to_string(&all_segments)
+        .map_err(|e| format!("Failed to serialize segments: {}", e))?;
+
+    // Set status to ready
+    {
+        let conn = get_conn()?;
+        conn.execute(
+            "UPDATE materials SET status = 'ready', updated_at = datetime('now') WHERE id = ?1",
+            params![materialId],
+        )
+        .map_err(|e| format!("Failed to update material: {}", e))?;
+    }
+
+    Ok(result)
+}
+
 /// Ask a question about a sentence from a material.
 #[tauri::command]
 #[allow(non_snake_case)]

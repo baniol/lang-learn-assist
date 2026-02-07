@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getMaterial, getMaterialThreadIndices, updateMaterialBookmark } from "../lib/materials";
+import { playAudioFile } from "../lib/audio";
 import { SentenceThreadDialog } from "../components/SentenceThreadDialog";
 import { Button, Spinner } from "../components/ui";
-import { ChevronLeftIcon, LightbulbIcon, BookmarkIcon } from "../components/icons";
+import { ChevronLeftIcon, LightbulbIcon, BookmarkIcon, VolumeUpIcon, ExternalLinkIcon } from "../components/icons";
 import type { ViewType, Material, TextSegment } from "../types";
 
 /**
@@ -62,6 +63,7 @@ export function MaterialReviewView({
     new Map(),
   );
   const [bookmarkIndex, setBookmarkIndex] = useState<number | null>(null);
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const sentenceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const loadMaterial = useCallback(async () => {
@@ -113,6 +115,19 @@ export function MaterialReviewView({
     }
   }, [bookmarkIndex]);
 
+  const handlePlayAudio = useCallback(async (index: number, audioPath: string) => {
+    if (playingIndex === index) return;
+
+    setPlayingIndex(index);
+    try {
+      await playAudioFile(audioPath);
+    } catch (err) {
+      console.error("Failed to play audio:", err);
+    } finally {
+      setPlayingIndex(null);
+    }
+  }, [playingIndex]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -161,10 +176,23 @@ export function MaterialReviewView({
             <h1 className="text-xl font-bold text-slate-800 dark:text-white">
               {material.title}
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {segments.length} sentences - Click the bulb to ask about any
-              sentence
-            </p>
+            <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+              <span>
+                {segments.length} sentences - Click the bulb to ask about any
+                sentence
+              </span>
+              {material.sourceUrl && (
+                <a
+                  href={material.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                >
+                  <ExternalLinkIcon size="sm" />
+                  <span>Source</span>
+                </a>
+              )}
+            </div>
           </div>
           <button
             onClick={scrollToBookmark}
@@ -224,6 +252,20 @@ export function MaterialReviewView({
                   >
                     <BookmarkIcon size="sm" filled={isBookmarked} />
                   </button>
+                  {segment.audioPath && (
+                    <button
+                      onClick={() => handlePlayAudio(index, segment.audioPath!)}
+                      disabled={playingIndex === index}
+                      className={`p-2 rounded-lg transition-colors ${
+                        playingIndex === index
+                          ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                          : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-green-500"
+                      }`}
+                      title="Play audio"
+                    >
+                      <VolumeUpIcon size="sm" />
+                    </button>
+                  )}
                   {segment.timestamp && (
                     material.materialType === "transcript" && isYouTubeUrl(material.sourceUrl) ? (
                       <a

@@ -734,6 +734,8 @@ pub struct TextSegment {
     pub translation: String,
     #[serde(default)]
     pub timestamp: Option<String>,
+    #[serde(default)]
+    pub audio_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

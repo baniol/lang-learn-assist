@@ -74,6 +74,7 @@ pub fn run() {
             llm::material::process_material,
             llm::material::estimate_material_tokens,
             llm::material::ask_about_sentence,
+            llm::material::process_audio_segments,
             // Materials
             materials::create_material,
             materials::get_materials,
@@ -95,6 +96,7 @@ pub fn run() {
             audio::init_whisper,
             audio::is_whisper_ready,
             audio::transcribe_audio,
+            audio::transcribe_and_preserve_audio,
             // TTS
             tts::get_available_voices,
             tts::generate_tts,

@@ -51,3 +51,49 @@ export async function transcribeAudio(
 ): Promise<string> {
   return invoke<string>("transcribe_audio", { audioPath, language, prompt });
 }
+
+// Result of transcribing and preserving audio
+export interface TranscriptionWithAudio {
+  transcription: string;
+  savedAudioPath: string;
+}
+
+// Transcribe audio and preserve the audio file for later playback
+export async function transcribeAndPreserveAudio(
+  audioPath: string,
+  language?: string,
+): Promise<TranscriptionWithAudio> {
+  return invoke<TranscriptionWithAudio>("transcribe_and_preserve_audio", {
+    audioPath,
+    language,
+  });
+}
+
+// Play audio file using Web Audio API
+let audioContext: AudioContext | null = null;
+
+export async function playAudioFile(filePath: string): Promise<void> {
+  // Get base64 audio data from Rust
+  const base64Data = await invoke<string>("get_audio_base64", { audioPath: filePath });
+
+  // Initialize AudioContext if needed
+  if (!audioContext) {
+    audioContext = new AudioContext();
+  }
+
+  // Decode base64 to ArrayBuffer
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  // Decode audio data
+  const audioBuffer = await audioContext.decodeAudioData(bytes.buffer);
+
+  // Create and play source
+  const source = audioContext.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(audioContext.destination);
+  source.start();
+}
