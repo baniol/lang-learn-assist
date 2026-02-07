@@ -10,6 +10,7 @@ import {
   QuestionCircleIcon,
   NoteIcon,
   SettingsIcon,
+  DecksIcon,
   PlusIcon,
   ChevronDownIcon,
   CheckIcon,
@@ -43,6 +44,7 @@ const baseNavItems: NavItem[] = [
   { id: "dashboard", label: "Conversations", icon: <ChatIcon /> },
   { id: "phrase-library", label: "Phrases", icon: <BookIcon /> },
   { id: "materials", label: "Materials", icon: <ArchiveIcon /> },
+  { id: "decks", label: "Decks", icon: <DecksIcon /> },
   { id: "learn", label: "Learn", icon: <LightbulbIcon /> },
   { id: "stats", label: "Stats", icon: <ChartIcon /> },
   { id: "questions", label: "Questions", icon: <QuestionCircleIcon /> },
@@ -175,7 +177,10 @@ export function Layout({
                   currentView === "conversation-review")) ||
               (item.id === "materials" &&
                 (currentView === "material-create" ||
-                  currentView === "material-review"));
+                  currentView === "material-review")) ||
+              (item.id === "decks" &&
+                (currentView === "deck-detail" ||
+                  currentView === "deck-study"));
 
             return (
               <button

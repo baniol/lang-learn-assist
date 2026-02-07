@@ -5,7 +5,7 @@
 
 use crate::constants::srs::DEFAULT_EASE_FACTOR;
 use crate::db::get_conn;
-use crate::models::{AnswerResult, PhraseProgress, SessionState};
+use crate::models::{AnswerResult, DeckAnswerResult, PhraseProgress, SessionState};
 use rusqlite::params;
 use std::collections::HashMap;
 
@@ -104,10 +104,11 @@ pub fn record_answer(
     // Get updated progress
     let progress: PhraseProgress = conn
         .query_row(
-            "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at
+            "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count
          FROM phrase_progress WHERE phrase_id = ?1",
             params![phrase_id],
             |row| {
+                let in_srs_pool_int: i32 = row.get(9).unwrap_or(1);
                 Ok(PhraseProgress {
                     id: row.get(0)?,
                     phrase_id: row.get(1)?,
@@ -118,6 +119,8 @@ pub fn record_answer(
                     ease_factor: row.get(6)?,
                     interval_days: row.get(7)?,
                     next_review_at: row.get(8)?,
+                    in_srs_pool: in_srs_pool_int != 0,
+                    deck_correct_count: row.get(10).unwrap_or(0),
                 })
             },
         )
@@ -167,6 +170,8 @@ fn update_session_streak(
             in_retry_mode: false,
             retry_count: 0,
             requires_retry: false,
+            deck_id: None,
+            session_type: None,
         });
 
     // Update session streak
@@ -200,6 +205,157 @@ fn update_session_streak(
     .map_err(|e| format!("Failed to save session state: {}", e))?;
 
     Ok((new_session_streak, is_learned))
+}
+
+/// Record an answer for deck study mode.
+///
+/// Unlike SRS mode, this tracks deck_correct_count for graduation.
+/// When deck_correct_count reaches graduation_threshold, the phrase graduates to SRS pool.
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn record_deck_answer(
+    phraseId: i64,
+    isCorrect: bool,
+    deckId: i64,
+    sessionId: Option<i64>,
+) -> Result<DeckAnswerResult, String> {
+    let conn = get_conn()?;
+
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // Get graduation threshold from deck
+    let graduation_threshold: i32 = conn
+        .query_row(
+            "SELECT graduation_threshold FROM decks WHERE id = ?1",
+            params![deckId],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("Deck not found: {}", e))?;
+
+    // Check if progress record exists
+    let existing: Option<(i64, i32, bool)> = conn
+        .query_row(
+            "SELECT id, deck_correct_count, in_srs_pool FROM phrase_progress WHERE phrase_id = ?1",
+            params![phraseId],
+            |row| {
+                let in_srs_pool_int: i32 = row.get(2).unwrap_or(0);
+                Ok((row.get(0)?, row.get(1)?, in_srs_pool_int != 0))
+            },
+        )
+        .ok();
+
+    let (new_deck_correct_count, just_graduated) = if let Some((_, current_count, was_graduated)) =
+        existing
+    {
+        if isCorrect {
+            let new_count = current_count + 1;
+            let should_graduate = !was_graduated && new_count >= graduation_threshold;
+
+            if should_graduate {
+                // Graduate to SRS pool
+                conn.execute(
+                    "UPDATE phrase_progress SET
+                        deck_correct_count = ?1,
+                        in_srs_pool = 1,
+                        total_attempts = total_attempts + 1,
+                        success_count = success_count + 1,
+                        last_seen = ?2
+                     WHERE phrase_id = ?3",
+                    params![new_count, now, phraseId],
+                )
+                .map_err(|e| format!("Failed to update progress: {}", e))?;
+            } else {
+                conn.execute(
+                    "UPDATE phrase_progress SET
+                        deck_correct_count = ?1,
+                        total_attempts = total_attempts + 1,
+                        success_count = success_count + 1,
+                        last_seen = ?2
+                     WHERE phrase_id = ?3",
+                    params![new_count, now, phraseId],
+                )
+                .map_err(|e| format!("Failed to update progress: {}", e))?;
+            }
+
+            (new_count, should_graduate)
+        } else {
+            // Wrong answer - reset deck_correct_count
+            conn.execute(
+                "UPDATE phrase_progress SET
+                    deck_correct_count = 0,
+                    total_attempts = total_attempts + 1,
+                    last_seen = ?1
+                 WHERE phrase_id = ?2",
+                params![now, phraseId],
+            )
+            .map_err(|e| format!("Failed to update progress: {}", e))?;
+
+            (0, false)
+        }
+    } else {
+        // Create new progress record
+        let new_count = if isCorrect { 1 } else { 0 };
+        let should_graduate = isCorrect && new_count >= graduation_threshold;
+
+        conn.execute(
+            "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts, success_count, last_seen, in_srs_pool, deck_correct_count, ease_factor, interval_days)
+             VALUES (?1, 0, 1, ?2, ?3, ?4, ?5, ?6, 1)",
+            params![
+                phraseId,
+                if isCorrect { 1 } else { 0 },
+                now,
+                if should_graduate { 1 } else { 0 },
+                new_count,
+                DEFAULT_EASE_FACTOR
+            ],
+        )
+        .map_err(|e| format!("Failed to create progress: {}", e))?;
+
+        (new_count, should_graduate)
+    };
+
+    // Get updated progress
+    let progress: PhraseProgress = conn
+        .query_row(
+            "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count
+             FROM phrase_progress WHERE phrase_id = ?1",
+            params![phraseId],
+            |row| {
+                let in_srs_pool_int: i32 = row.get(9).unwrap_or(1);
+                Ok(PhraseProgress {
+                    id: row.get(0)?,
+                    phrase_id: row.get(1)?,
+                    correct_streak: row.get(2)?,
+                    total_attempts: row.get(3)?,
+                    success_count: row.get(4)?,
+                    last_seen: row.get(5)?,
+                    ease_factor: row.get(6)?,
+                    interval_days: row.get(7)?,
+                    next_review_at: row.get(8)?,
+                    in_srs_pool: in_srs_pool_int != 0,
+                    deck_correct_count: row.get(10).unwrap_or(0),
+                })
+            },
+        )
+        .map_err(|e| format!("Failed to get progress: {}", e))?;
+
+    // Update session stats if session_id is provided
+    if let Some(sid) = sessionId {
+        let _ = conn.execute(
+            "UPDATE practice_sessions SET
+                total_phrases = total_phrases + 1,
+                correct_answers = correct_answers + ?1
+             WHERE id = ?2",
+            params![if isCorrect { 1 } else { 0 }, sid],
+        );
+    }
+
+    Ok(DeckAnswerResult {
+        progress,
+        deck_correct_count: new_deck_correct_count,
+        just_graduated,
+        graduation_threshold,
+    })
 }
 
 /// Validate an answer against the phrase's correct answer and accepted alternatives.

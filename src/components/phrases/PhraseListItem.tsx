@@ -12,6 +12,7 @@ interface PhraseListItemProps {
   onPlay: () => void;
   onRefine: () => void;
   onDelete: () => void;
+  onAssignToDeck?: () => void;
 }
 
 export function PhraseListItem({
@@ -23,6 +24,7 @@ export function PhraseListItem({
   onPlay,
   onRefine,
   onDelete,
+  onAssignToDeck,
 }: PhraseListItemProps) {
   const { phrase, progress } = item;
 
@@ -59,10 +61,12 @@ export function PhraseListItem({
         isExcluded={phrase.excluded}
         isPlaying={isPlaying}
         isLoading={isLoading}
+        hasDeck={phrase.deckId !== null}
         onPlay={onPlay}
         onRefine={onRefine}
         onToggleExcluded={() => onToggleExcluded(phrase.id)}
         onDelete={onDelete}
+        onAssignToDeck={onAssignToDeck}
       />
     </div>
   );

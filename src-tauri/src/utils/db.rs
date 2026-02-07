@@ -11,7 +11,7 @@ use rusqlite::Row;
 /// Expects columns in the following order:
 /// 0: id, 1: conversation_id, 2: prompt, 3: answer, 4: accepted_json,
 /// 5: target_language, 6: native_language, 7: audio_path, 8: notes,
-/// 9: starred, 10: excluded, 11: created_at, 12: material_id
+/// 9: starred, 10: excluded, 11: created_at, 12: material_id, 13: deck_id
 pub fn row_to_phrase(row: &Row) -> Result<Phrase, rusqlite::Error> {
     let accepted_json: String = row.get(4)?;
     let accepted: Vec<String> = serde_json::from_str(&accepted_json).unwrap_or_default();
@@ -22,6 +22,7 @@ pub fn row_to_phrase(row: &Row) -> Result<Phrase, rusqlite::Error> {
         id: row.get(0)?,
         conversation_id: row.get(1)?,
         material_id: row.get(12).ok(),
+        deck_id: row.get(13).ok(),
         prompt: row.get(2)?,
         answer: row.get(3)?,
         accepted,
@@ -41,9 +42,11 @@ pub fn row_to_phrase(row: &Row) -> Result<Phrase, rusqlite::Error> {
 ///
 /// Expected columns at offset:
 /// +0: progress_id, +1: correct_streak, +2: total_attempts, +3: success_count,
-/// +4: last_seen, +5: ease_factor, +6: interval_days, +7: next_review_at
+/// +4: last_seen, +5: ease_factor, +6: interval_days, +7: next_review_at,
+/// +8: in_srs_pool, +9: deck_correct_count
 pub fn row_to_phrase_progress(row: &Row, offset: usize, phrase_id: i64) -> Option<PhraseProgress> {
     row.get::<_, Option<i64>>(offset).ok().flatten().map(|progress_id| {
+        let in_srs_pool_int: i32 = row.get(offset + 8).unwrap_or(1);
         PhraseProgress {
             id: progress_id,
             phrase_id,
@@ -54,6 +57,8 @@ pub fn row_to_phrase_progress(row: &Row, offset: usize, phrase_id: i64) -> Optio
             ease_factor: row.get(offset + 5).unwrap_or(2.5),
             interval_days: row.get(offset + 6).unwrap_or(1),
             next_review_at: row.get(offset + 7).ok(),
+            in_srs_pool: in_srs_pool_int != 0,
+            deck_correct_count: row.get(offset + 9).unwrap_or(0),
         }
     })
 }
@@ -61,10 +66,10 @@ pub fn row_to_phrase_progress(row: &Row, offset: usize, phrase_id: i64) -> Optio
 /// Convert a database row to a PhraseWithProgress model.
 ///
 /// Expects columns:
-/// - Phrase columns at indices 0-12
-/// - Progress columns at indices 13-20
+/// - Phrase columns at indices 0-13 (including deck_id)
+/// - Progress columns at indices 14-23 (including in_srs_pool, deck_correct_count)
 pub fn row_to_phrase_with_progress(row: &Row) -> Result<PhraseWithProgress, rusqlite::Error> {
     let phrase = row_to_phrase(row)?;
-    let progress = row_to_phrase_progress(row, 13, phrase.id);
+    let progress = row_to_phrase_progress(row, 14, phrase.id);
     Ok(PhraseWithProgress { phrase, progress })
 }

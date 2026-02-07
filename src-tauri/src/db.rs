@@ -354,5 +354,84 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         );
     }
 
+    // Decks table (for learning new phrases before SRS graduation)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS decks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            target_language TEXT NOT NULL DEFAULT 'de',
+            native_language TEXT NOT NULL DEFAULT 'pl',
+            graduation_threshold INTEGER NOT NULL DEFAULT 2,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+
+    // Migration: Add deck_id column to phrases if it doesn't exist
+    // Re-read phrase_columns as we may have added columns above
+    let phrase_columns_updated: Vec<String> = conn
+        .prepare("PRAGMA table_info(phrases)")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    if !phrase_columns_updated.contains(&"deck_id".to_string()) {
+        log_migration_result(
+            "add deck_id to phrases",
+            conn.execute(
+                "ALTER TABLE phrases ADD COLUMN deck_id INTEGER REFERENCES decks(id) ON DELETE SET NULL",
+                [],
+            ),
+        );
+    }
+
+    // Migration: Add deck-related columns to phrase_progress
+    // Re-read progress columns
+    let progress_columns_updated: Vec<String> = conn
+        .prepare("PRAGMA table_info(phrase_progress)")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    if !progress_columns_updated.contains(&"in_srs_pool".to_string()) {
+        log_migration_result(
+            "add in_srs_pool to phrase_progress",
+            conn.execute(
+                "ALTER TABLE phrase_progress ADD COLUMN in_srs_pool INTEGER NOT NULL DEFAULT 1",
+                [],
+            ),
+        );
+    }
+
+    if !progress_columns_updated.contains(&"deck_correct_count".to_string()) {
+        log_migration_result(
+            "add deck_correct_count to phrase_progress",
+            conn.execute(
+                "ALTER TABLE phrase_progress ADD COLUMN deck_correct_count INTEGER NOT NULL DEFAULT 0",
+                [],
+            ),
+        );
+    }
+
+    // Create indexes for deck-related queries
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_phrases_deck ON phrases(deck_id)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_phrase_progress_srs_pool ON phrase_progress(in_srs_pool)",
+        [],
+    )?;
+
     Ok(())
 }

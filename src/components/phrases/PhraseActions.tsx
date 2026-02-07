@@ -7,6 +7,7 @@ import {
   CheckCircleIcon,
   ExcludeIcon,
   CloseIcon,
+  DecksIcon,
 } from "../icons";
 
 interface PhraseActionsProps {
@@ -14,20 +15,24 @@ interface PhraseActionsProps {
   isExcluded: boolean;
   isPlaying: boolean;
   isLoading: boolean;
+  hasDeck?: boolean;
   onPlay: () => void;
   onRefine: () => void;
   onToggleExcluded: () => void;
   onDelete: () => void;
+  onAssignToDeck?: () => void;
 }
 
 export function PhraseActions({
   isExcluded,
   isPlaying,
   isLoading,
+  hasDeck,
   onPlay,
   onRefine,
   onToggleExcluded,
   onDelete,
+  onAssignToDeck,
 }: PhraseActionsProps) {
   return (
     <div className="flex items-center gap-1 flex-shrink-0">
@@ -52,6 +57,20 @@ export function PhraseActions({
       >
         <LightbulbIcon size="xs" />
       </button>
+      {onAssignToDeck && (
+        <button
+          onClick={onAssignToDeck}
+          className={cn(
+            "p-2 rounded transition-colors opacity-0 group-hover:opacity-100",
+            hasDeck
+              ? "text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/30"
+              : "text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+          )}
+          title={hasDeck ? "Change deck" : "Add to deck"}
+        >
+          <DecksIcon size="xs" />
+        </button>
+      )}
       <button
         onClick={onToggleExcluded}
         className={cn(

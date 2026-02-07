@@ -87,9 +87,9 @@ pub fn get_phrases(
 
     let query = format!(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
-                pp.ease_factor, pp.interval_days, pp.next_review_at
+                pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count
          FROM phrases p
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
          WHERE 1=1{}
@@ -117,9 +117,9 @@ pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
 
     conn.query_row(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id,
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
-                pp.ease_factor, pp.interval_days, pp.next_review_at
+                pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count
          FROM phrases p
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
          WHERE p.id = ?1",
@@ -168,7 +168,7 @@ pub fn create_phrase(
     let id = conn.last_insert_rowid();
 
     conn.query_row(
-        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id
+        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,
@@ -233,7 +233,7 @@ pub fn create_phrases_batch(
     for id in &created_ids {
         let phrase = tx
             .query_row(
-                "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id
+                "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id
                  FROM phrases WHERE id = ?1",
                 params![id],
                 row_to_phrase,
@@ -295,7 +295,7 @@ pub fn update_phrase(id: i64, request: UpdatePhraseRequest) -> Result<Phrase, St
     }
 
     conn.query_row(
-        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id
+        "SELECT id, conversation_id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,

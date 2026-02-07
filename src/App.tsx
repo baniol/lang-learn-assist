@@ -15,6 +15,9 @@ import { NotesView } from "./views/NotesView";
 import { MaterialsView } from "./views/MaterialsView";
 import { MaterialCreateView } from "./views/MaterialCreateView";
 import { MaterialReviewView } from "./views/MaterialReviewView";
+import { DecksView } from "./views/DecksView";
+import { DeckDetailView } from "./views/DeckDetailView";
+import { DeckStudyView } from "./views/DeckStudyView";
 import { QuickNotePopup } from "./components/QuickNotePopup";
 import { PageSpinner } from "./components/ui";
 import { useNavigation } from "./hooks";
@@ -22,6 +25,8 @@ import {
   isConversationView,
   isConversationReviewView,
   isMaterialReviewView,
+  isDeckDetailView,
+  isDeckStudyView,
 } from "./types/navigation";
 
 /**
@@ -81,6 +86,22 @@ function AppContent() {
         />
       );
     }
+    if (isDeckDetailView(viewState)) {
+      return (
+        <DeckDetailView
+          deckId={viewState.deckId}
+          onNavigate={legacyNavigate}
+        />
+      );
+    }
+    if (isDeckStudyView(viewState)) {
+      return (
+        <DeckStudyView
+          deckId={viewState.deckId}
+          onNavigate={legacyNavigate}
+        />
+      );
+    }
 
     // Views without data
     switch (currentView) {
@@ -102,6 +123,8 @@ function AppContent() {
         return <MaterialsView onNavigate={legacyNavigate} />;
       case "material-create":
         return <MaterialCreateView onNavigate={legacyNavigate} />;
+      case "decks":
+        return <DecksView onNavigate={legacyNavigate} />;
       default:
         return <DashboardView onNavigate={legacyNavigate} />;
     }

@@ -49,6 +49,7 @@ pub struct Phrase {
     pub id: i64,
     pub conversation_id: Option<i64>,
     pub material_id: Option<i64>,
+    pub deck_id: Option<i64>,
     pub prompt: String,
     pub answer: String,
     pub accepted: Vec<String>,
@@ -74,6 +75,9 @@ pub struct PhraseProgress {
     pub ease_factor: f64,
     pub interval_days: i32,
     pub next_review_at: Option<String>,
+    // Deck graduation fields
+    pub in_srs_pool: bool,
+    pub deck_correct_count: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,6 +111,63 @@ pub struct SessionState {
     pub in_retry_mode: bool,
     pub retry_count: i32,
     pub requires_retry: bool,
+    // Deck study fields (optional, only used for deck study sessions)
+    #[serde(default)]
+    pub deck_id: Option<i64>,
+    #[serde(default)]
+    pub session_type: Option<String>,
+}
+
+// Deck models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Deck {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub target_language: String,
+    pub native_language: String,
+    pub graduation_threshold: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckWithStats {
+    pub deck: Deck,
+    pub total_phrases: i32,
+    pub graduated_count: i32,
+    pub learning_count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDeckRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub target_language: Option<String>,
+    pub native_language: Option<String>,
+    pub graduation_threshold: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateDeckRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub graduation_threshold: Option<i32>,
+}
+
+/// Result of recording an answer in deck study mode
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckAnswerResult {
+    pub progress: PhraseProgress,
+    pub deck_correct_count: i32,
+    pub just_graduated: bool,
+    pub graduation_threshold: i32,
 }
 
 /// Voice settings for a specific language (default voice + conversation voices A/B)
@@ -386,6 +447,8 @@ pub struct ExportData {
     pub materials: Vec<ExportMaterial>,
     #[serde(default)]
     pub material_threads: Vec<ExportMaterialThread>,
+    #[serde(default)]
+    pub decks: Vec<ExportDeck>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -417,6 +480,8 @@ pub struct ExportPhrase {
     pub id: i64,
     pub conversation_id: Option<i64>,
     pub material_id: Option<i64>,
+    #[serde(default)]
+    pub deck_id: Option<i64>,
     pub prompt: String,
     pub answer: String,
     pub accepted_json: String,
@@ -441,6 +506,14 @@ pub struct ExportPhraseProgress {
     pub ease_factor: f64,
     pub interval_days: i32,
     pub next_review_at: Option<String>,
+    #[serde(default = "default_true")]
+    pub in_srs_pool: bool,
+    #[serde(default)]
+    pub deck_correct_count: i32,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -520,6 +593,7 @@ pub struct ImportStats {
     pub practice_sessions_imported: i32,
     pub materials_imported: i32,
     pub material_threads_imported: i32,
+    pub decks_imported: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -546,6 +620,19 @@ pub struct ExportMaterialThread {
     pub segment_index: i32,
     pub messages_json: String,
     pub suggested_phrases_json: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportDeck {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub target_language: String,
+    pub native_language: String,
+    pub graduation_threshold: i32,
     pub created_at: String,
     pub updated_at: String,
 }

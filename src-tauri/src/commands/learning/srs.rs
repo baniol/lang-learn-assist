@@ -142,6 +142,8 @@ mod tests {
             ease_factor: 2.5,
             interval_days: 0,
             next_review_at: None,
+            in_srs_pool: true,
+            deck_correct_count: 0,
         });
         let priority = calculate_priority(&progress);
         assert_eq!(priority, NEW_PHRASE);
@@ -200,6 +202,8 @@ mod tests {
             ease_factor: 2.5,
             interval_days: 0, // Still in learning phase
             next_review_at: Some(future_time.format("%Y-%m-%d %H:%M:%S").to_string()),
+            in_srs_pool: true,
+            deck_correct_count: 0,
         });
         let priority = calculate_priority(&progress);
         assert_eq!(priority, LEARNING_PHASE);
@@ -220,6 +224,8 @@ mod tests {
             ease_factor: 2.5,
             interval_days: 1, // Graduated
             next_review_at: Some(future_time.format("%Y-%m-%d %H:%M:%S").to_string()),
+            in_srs_pool: true,
+            deck_correct_count: 0,
         });
         let priority = calculate_priority(&progress);
         assert_eq!(priority, NOT_DUE);

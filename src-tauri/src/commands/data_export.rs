@@ -1,6 +1,6 @@
 use crate::db::get_conn;
 use crate::models::{
-    ExportConversation, ExportData, ExportMaterial, ExportMaterialThread, ExportNote,
+    ExportConversation, ExportData, ExportDeck, ExportMaterial, ExportMaterialThread, ExportNote,
     ExportPhrase, ExportPhraseProgress, ExportPhraseThread, ExportPracticeSession,
     ExportQuestionThread, ExportSetting, ImportMode, ImportResult, ImportStats,
 };
@@ -65,7 +65,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, conversation_id, prompt, answer, accepted_json, target_language,
-                    native_language, audio_path, notes, starred, excluded, created_at, material_id
+                    native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id
              FROM phrases",
         )
         .map_err(|e| format!("Failed to prepare phrases query: {}", e))?;
@@ -77,6 +77,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
                 id: row.get(0)?,
                 conversation_id: row.get(1)?,
                 material_id: row.get(12).ok(),
+                deck_id: row.get(13).ok(),
                 prompt: row.get(2)?,
                 answer: row.get(3)?,
                 accepted_json: row.get(4)?,
@@ -98,12 +99,13 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, phrase_id, correct_streak, total_attempts, success_count,
-                    last_seen, ease_factor, interval_days, next_review_at
+                    last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count
              FROM phrase_progress",
         )
         .map_err(|e| format!("Failed to prepare phrase_progress query: {}", e))?;
     let phrase_progress = stmt
         .query_map([], |row| {
+            let in_srs_pool_int: i32 = row.get(9).unwrap_or(1);
             Ok(ExportPhraseProgress {
                 id: row.get(0)?,
                 phrase_id: row.get(1)?,
@@ -114,6 +116,8 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
                 ease_factor: row.get(6).unwrap_or(2.5),
                 interval_days: row.get(7).unwrap_or(1),
                 next_review_at: row.get(8).ok(),
+                in_srs_pool: in_srs_pool_int != 0,
+                deck_correct_count: row.get(10).unwrap_or(0),
             })
         })
         .map_err(|e| format!("Failed to query phrase_progress: {}", e))?
@@ -270,6 +274,31 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to collect material_threads: {}", e))?;
     drop(stmt);
 
+    // Export decks
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, description, target_language, native_language, graduation_threshold, created_at, updated_at
+             FROM decks",
+        )
+        .map_err(|e| format!("Failed to prepare decks query: {}", e))?;
+    let decks = stmt
+        .query_map([], |row| {
+            Ok(ExportDeck {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                target_language: row.get(3)?,
+                native_language: row.get(4)?,
+                graduation_threshold: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query decks: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect decks: {}", e))?;
+    drop(stmt);
+
     Ok(ExportData {
         version: 2,
         exported_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
@@ -283,6 +312,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         practice_sessions,
         materials,
         material_threads,
+        decks,
     })
 }
 
@@ -329,6 +359,8 @@ pub fn import_data_with_conn(
                 .map_err(|e| format!("Failed to delete material_threads: {}", e))?;
             tx.execute("DELETE FROM phrases", [])
                 .map_err(|e| format!("Failed to delete phrases: {}", e))?;
+            tx.execute("DELETE FROM decks", [])
+                .map_err(|e| format!("Failed to delete decks: {}", e))?;
             tx.execute("DELETE FROM materials", [])
                 .map_err(|e| format!("Failed to delete materials: {}", e))?;
             tx.execute("DELETE FROM conversations", [])
@@ -371,13 +403,34 @@ pub fn import_data_with_conn(
                 stats.conversations_imported += 1;
             }
 
+            // Import decks with original IDs
+            for deck in &data.decks {
+                tx.execute(
+                    "INSERT INTO decks (id, name, description, target_language, native_language,
+                                       graduation_threshold, created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    params![
+                        deck.id,
+                        deck.name,
+                        deck.description,
+                        deck.target_language,
+                        deck.native_language,
+                        deck.graduation_threshold,
+                        deck.created_at,
+                        deck.updated_at
+                    ],
+                )
+                .map_err(|e| format!("Failed to import deck: {}", e))?;
+                stats.decks_imported += 1;
+            }
+
             // Import phrases with original IDs
             for phrase in &data.phrases {
                 tx.execute(
                     "INSERT INTO phrases (id, conversation_id, prompt, answer, accepted_json,
                                          target_language, native_language, audio_path, notes,
-                                         starred, excluded, created_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                                         starred, excluded, created_at, material_id, deck_id)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                     params![
                         phrase.id,
                         phrase.conversation_id,
@@ -390,7 +443,9 @@ pub fn import_data_with_conn(
                         phrase.notes,
                         phrase.starred as i32,
                         phrase.excluded as i32,
-                        phrase.created_at
+                        phrase.created_at,
+                        phrase.material_id,
+                        phrase.deck_id
                     ],
                 )
                 .map_err(|e| format!("Failed to import phrase: {}", e))?;
@@ -402,8 +457,8 @@ pub fn import_data_with_conn(
                 tx.execute(
                     "INSERT INTO phrase_progress (id, phrase_id, correct_streak, total_attempts,
                                                  success_count, last_seen, ease_factor,
-                                                 interval_days, next_review_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                                                 interval_days, next_review_at, in_srs_pool, deck_correct_count)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                     params![
                         progress.id,
                         progress.phrase_id,
@@ -413,7 +468,9 @@ pub fn import_data_with_conn(
                         progress.last_seen,
                         progress.ease_factor,
                         progress.interval_days,
-                        progress.next_review_at
+                        progress.next_review_at,
+                        progress.in_srs_pool as i32,
+                        progress.deck_correct_count
                     ],
                 )
                 .map_err(|e| format!("Failed to import phrase_progress: {}", e))?;
@@ -553,6 +610,41 @@ pub fn import_data_with_conn(
             // Build ID mappings for relationships
             let mut conversation_id_map: HashMap<i64, i64> = HashMap::new();
             let mut phrase_id_map: HashMap<i64, i64> = HashMap::new();
+            let mut deck_id_map: HashMap<i64, i64> = HashMap::new();
+
+            // Import decks (check by created_at + name for uniqueness)
+            for deck in &data.decks {
+                let existing: Option<i64> = tx
+                    .query_row(
+                        "SELECT id FROM decks WHERE created_at = ?1 AND name = ?2",
+                        params![deck.created_at, deck.name],
+                        |row| row.get(0),
+                    )
+                    .ok();
+
+                if let Some(existing_id) = existing {
+                    deck_id_map.insert(deck.id, existing_id);
+                } else {
+                    tx.execute(
+                        "INSERT INTO decks (name, description, target_language, native_language,
+                                           graduation_threshold, created_at, updated_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                        params![
+                            deck.name,
+                            deck.description,
+                            deck.target_language,
+                            deck.native_language,
+                            deck.graduation_threshold,
+                            deck.created_at,
+                            deck.updated_at
+                        ],
+                    )
+                    .map_err(|e| format!("Failed to import deck: {}", e))?;
+                    let new_id = tx.last_insert_rowid();
+                    deck_id_map.insert(deck.id, new_id);
+                    stats.decks_imported += 1;
+                }
+            }
 
             // Import conversations (check by created_at + title for uniqueness)
             for conv in &data.conversations {
@@ -619,6 +711,9 @@ pub fn import_data_with_conn(
                 let mapped_conversation_id = phrase
                     .conversation_id
                     .and_then(|cid| conversation_id_map.get(&cid).copied());
+                let mapped_deck_id = phrase
+                    .deck_id
+                    .and_then(|did| deck_id_map.get(&did).copied());
 
                 let existing: Option<i64> = tx
                     .query_row(
@@ -636,8 +731,8 @@ pub fn import_data_with_conn(
                     tx.execute(
                         "INSERT INTO phrases (conversation_id, prompt, answer, accepted_json,
                                              target_language, native_language, audio_path, notes,
-                                             starred, excluded, created_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                                             starred, excluded, created_at, material_id, deck_id)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                         params![
                             mapped_conversation_id,
                             phrase.prompt,
@@ -649,7 +744,9 @@ pub fn import_data_with_conn(
                             phrase.notes,
                             phrase.starred as i32,
                             phrase.excluded as i32,
-                            phrase.created_at
+                            phrase.created_at,
+                            phrase.material_id,
+                            mapped_deck_id
                         ],
                     )
                     .map_err(|e| format!("Failed to import phrase: {}", e))?;
@@ -675,8 +772,8 @@ pub fn import_data_with_conn(
                         tx.execute(
                             "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts,
                                                          success_count, last_seen, ease_factor,
-                                                         interval_days, next_review_at)
-                             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                                                         interval_days, next_review_at, in_srs_pool, deck_correct_count)
+                             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                             params![
                                 new_phrase_id,
                                 progress.correct_streak,
@@ -685,7 +782,9 @@ pub fn import_data_with_conn(
                                 progress.last_seen,
                                 progress.ease_factor,
                                 progress.interval_days,
-                                progress.next_review_at
+                                progress.next_review_at,
+                                progress.in_srs_pool as i32,
+                                progress.deck_correct_count
                             ],
                         )
                         .map_err(|e| format!("Failed to import phrase_progress: {}", e))?;
@@ -924,6 +1023,7 @@ mod tests {
                 id: 1,
                 conversation_id: Some(1),
                 material_id: None,
+                deck_id: None,
                 prompt: "Hello".to_string(),
                 answer: "Hallo".to_string(),
                 accepted_json: "[]".to_string(),
@@ -945,6 +1045,8 @@ mod tests {
                 ease_factor: 2.5,
                 interval_days: 3,
                 next_review_at: Some("2024-01-04T00:00:00Z".to_string()),
+                in_srs_pool: true,
+                deck_correct_count: 0,
             }],
             phrase_threads: vec![],
             question_threads: vec![],
@@ -957,6 +1059,7 @@ mod tests {
             practice_sessions: vec![],
             materials: vec![],
             material_threads: vec![],
+            decks: vec![],
         }
     }
 

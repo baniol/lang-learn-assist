@@ -6,6 +6,7 @@
 use crate::db::get_conn;
 use crate::models::{PracticeSession, SessionState};
 use rusqlite::params;
+use std::collections::HashMap;
 
 /// Start a new practice session.
 #[tauri::command]
@@ -17,6 +18,40 @@ pub fn start_practice_session(exercise_mode: String) -> Result<PracticeSession, 
         params![exercise_mode],
     )
     .map_err(|e| format!("Failed to create session: {}", e))?;
+
+    let id = conn.last_insert_rowid();
+
+    get_session_by_id(&conn, id)
+}
+
+/// Start a new deck study session.
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn start_deck_session(deckId: i64, exerciseMode: String) -> Result<PracticeSession, String> {
+    let conn = get_conn()?;
+
+    // Create session with initial state containing deck_id and session_type
+    let initial_state = SessionState {
+        seen_phrase_ids: vec![],
+        session_streaks: HashMap::new(),
+        session_learned_ids: vec![],
+        new_phrase_count: 0,
+        current_phrase_id: None,
+        in_retry_mode: false,
+        retry_count: 0,
+        requires_retry: false,
+        deck_id: Some(deckId),
+        session_type: Some("deck_study".to_string()),
+    };
+
+    let state_json = serde_json::to_string(&initial_state)
+        .map_err(|e| format!("Failed to serialize state: {}", e))?;
+
+    conn.execute(
+        "INSERT INTO practice_sessions (exercise_mode, state_json) VALUES (?1, ?2)",
+        params![exerciseMode, state_json],
+    )
+    .map_err(|e| format!("Failed to create deck session: {}", e))?;
 
     let id = conn.last_insert_rowid();
 

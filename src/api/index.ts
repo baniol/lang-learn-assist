@@ -26,13 +26,16 @@ export * as dataExportApi from "../lib/dataExport";
 export {
   // Learning
   startPracticeSession,
+  startDeckSession,
   getActiveSession,
   updatePracticeSession,
   finishPracticeSession,
   getPracticeSessions,
   getNextPhrase,
+  getNextDeckPhrase,
   validateAnswer,
   recordAnswer,
+  recordDeckAnswer,
   getLearningStats,
   getSrsStats,
 } from "./learning";

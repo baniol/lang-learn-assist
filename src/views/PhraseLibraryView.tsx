@@ -12,7 +12,9 @@ import {
   type ExcludedFilter,
   type LanguageFilter,
 } from "../components/phrases";
+import { DeckSelector } from "../components/decks";
 import { useSettings } from "../contexts/SettingsContext";
+import { useToast } from "../contexts/ToastContext";
 import {
   getPhrases,
   createPhrase,
@@ -23,6 +25,7 @@ import {
   updatePhraseAudio,
   getLearningStats,
 } from "../api";
+import { assignPhraseToDeck } from "../lib/decks";
 import type {
   PhraseWithProgress,
   CreatePhraseRequest,
@@ -32,6 +35,7 @@ import type {
 
 export function PhraseLibraryView() {
   const { settings } = useSettings();
+  const toast = useToast();
   const [phrases, setPhrases] = useState<PhraseWithProgress[]>([]);
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +53,7 @@ export function PhraseLibraryView() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [refiningPhrase, setRefiningPhrase] = useState<Phrase | null>(null);
+  const [deckSelectorPhrase, setDeckSelectorPhrase] = useState<PhraseWithProgress | null>(null);
 
   const handleAudioGenerated = useCallback(
     async (phraseId: number, audioPath: string) => {
@@ -269,6 +274,27 @@ export function PhraseLibraryView() {
     );
   };
 
+  const handleAssignToDeck = async (deckId: number | null) => {
+    if (!deckSelectorPhrase) return;
+
+    try {
+      await assignPhraseToDeck(deckSelectorPhrase.phrase.id, deckId);
+      setPhrases((prev) =>
+        prev.map((p) =>
+          p.phrase.id === deckSelectorPhrase.phrase.id
+            ? { ...p, phrase: { ...p.phrase, deckId } }
+            : p
+        )
+      );
+      toast.success(deckId ? "Phrase added to deck" : "Phrase removed from deck");
+    } catch (err) {
+      console.error("Failed to assign phrase to deck:", err);
+      toast.error("Failed to update deck assignment");
+    } finally {
+      setDeckSelectorPhrase(null);
+    }
+  };
+
   return (
     <div className="p-6">
       {/* Header */}
@@ -338,6 +364,7 @@ export function PhraseLibraryView() {
               onPlay={() => handlePlay(item)}
               onRefine={() => setRefiningPhrase(item.phrase)}
               onDelete={() => setDeleteConfirmId(item.phrase.id)}
+              onAssignToDeck={() => setDeckSelectorPhrase(item)}
             />
           ))}
         </div>
@@ -379,6 +406,15 @@ export function PhraseLibraryView() {
           }}
         />
       )}
+
+      {/* Deck Selector */}
+      <DeckSelector
+        isOpen={deckSelectorPhrase !== null}
+        onClose={() => setDeckSelectorPhrase(null)}
+        onSelect={handleAssignToDeck}
+        currentDeckId={deckSelectorPhrase?.phrase.deckId ?? null}
+        title="Assign to Deck"
+      />
     </div>
   );
 }

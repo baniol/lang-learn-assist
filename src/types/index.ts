@@ -12,6 +12,8 @@ export {
   isConversationView,
   isConversationReviewView,
   isMaterialReviewView,
+  isDeckDetailView,
+  isDeckStudyView,
   viewRequiresData,
   getParentView,
   isSubViewOf,
@@ -44,6 +46,7 @@ export interface Phrase {
   id: number;
   conversationId: number | null;
   materialId: number | null;
+  deckId: number | null;
   prompt: string;
   answer: string;
   accepted: string[];
@@ -67,12 +70,56 @@ export interface PhraseProgress {
   easeFactor: number;
   intervalDays: number;
   nextReviewAt: string | null;
+  // Deck graduation fields
+  inSrsPool: boolean;
+  deckCorrectCount: number;
 }
 
 export interface AnswerResult {
   progress: PhraseProgress;
   sessionStreak: number;
   isLearnedInSession: boolean;
+}
+
+// Deck types
+
+export interface Deck {
+  id: number;
+  name: string;
+  description: string | null;
+  targetLanguage: string;
+  nativeLanguage: string;
+  graduationThreshold: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeckWithStats {
+  deck: Deck;
+  totalPhrases: number;
+  graduatedCount: number;
+  learningCount: number;
+}
+
+export interface CreateDeckRequest {
+  name: string;
+  description?: string;
+  targetLanguage?: string;
+  nativeLanguage?: string;
+  graduationThreshold?: number;
+}
+
+export interface UpdateDeckRequest {
+  name?: string;
+  description?: string;
+  graduationThreshold?: number;
+}
+
+export interface DeckAnswerResult {
+  progress: PhraseProgress;
+  deckCorrectCount: number;
+  justGraduated: boolean;
+  graduationThreshold: number;
 }
 
 export interface PhraseWithProgress {
@@ -99,7 +146,12 @@ export interface SessionState {
   inRetryMode: boolean;
   retryCount: number;
   requiresRetry: boolean;
+  // Deck study fields
+  deckId?: number;
+  sessionType?: StudyMode;
 }
+
+export type StudyMode = "srs_review" | "deck_study";
 
 export type ExerciseMode = "speaking" | "typing" | "manual";
 

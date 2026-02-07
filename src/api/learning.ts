@@ -4,6 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AnswerResult,
+  DeckAnswerResult,
   LearningStats,
   PhraseWithProgress,
   PracticeSession,
@@ -19,6 +20,13 @@ export async function startPracticeSession(
   exerciseMode: ExerciseMode
 ): Promise<PracticeSession> {
   return invoke<PracticeSession>("start_practice_session", { exerciseMode });
+}
+
+export async function startDeckSession(
+  deckId: number,
+  exerciseMode: ExerciseMode
+): Promise<PracticeSession> {
+  return invoke<PracticeSession>("start_deck_session", { deckId, exerciseMode });
 }
 
 export async function getActiveSession(
@@ -90,6 +98,34 @@ export async function recordAnswer(
   return invoke<AnswerResult>("record_answer", {
     phraseId,
     isCorrect,
+    sessionId: sessionId ?? null,
+  });
+}
+
+// ============================================================================
+// Deck Study
+// ============================================================================
+
+export async function getNextDeckPhrase(
+  deckId: number,
+  excludeIds?: number[]
+): Promise<PhraseWithProgress | null> {
+  return invoke<PhraseWithProgress | null>("get_next_deck_phrase", {
+    deckId,
+    excludeIds: excludeIds?.length ? excludeIds : null,
+  });
+}
+
+export async function recordDeckAnswer(
+  phraseId: number,
+  isCorrect: boolean,
+  deckId: number,
+  sessionId?: number
+): Promise<DeckAnswerResult> {
+  return invoke<DeckAnswerResult>("record_deck_answer", {
+    phraseId,
+    isCorrect,
+    deckId,
     sessionId: sessionId ?? null,
   });
 }
