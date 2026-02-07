@@ -1,6 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { generateTts, getAudioBase64, getVoiceForLanguage } from "../lib/tts";
-import type { ChatMessage } from "../types";
+
+/** Chat message type for audio playback */
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
 
 /** Maximum number of audio files to keep in cache */
 const MAX_AUDIO_CACHE_SIZE = 50;

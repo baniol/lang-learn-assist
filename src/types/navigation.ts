@@ -10,9 +10,6 @@
  * Each view type has its associated data requirements.
  */
 export type ViewState =
-  | { type: "dashboard" }
-  | { type: "conversation"; conversationId: number }
-  | { type: "conversation-review"; conversationId: number }
   | { type: "phrase-library" }
   | { type: "learn" }
   | { type: "stats" }
@@ -49,7 +46,6 @@ export type ViewDataFor<T extends ViewType> = Extract<
  */
 export type ViewWithData = Extract<
   ViewState,
-  | { type: string; conversationId: number }
   | { type: string; materialId: number }
   | { type: string; deckId: number }
 >["type"];
@@ -88,24 +84,6 @@ export function createViewState(
 // ============================================================================
 
 /**
- * Check if the current view is the conversation view.
- */
-export function isConversationView(
-  state: ViewState
-): state is { type: "conversation"; conversationId: number } {
-  return state.type === "conversation";
-}
-
-/**
- * Check if the current view is the conversation review view.
- */
-export function isConversationReviewView(
-  state: ViewState
-): state is { type: "conversation-review"; conversationId: number } {
-  return state.type === "conversation-review";
-}
-
-/**
  * Check if the current view is the material review view.
  */
 export function isMaterialReviewView(
@@ -137,8 +115,6 @@ export function isDeckStudyView(
  */
 export function viewRequiresData(view: ViewType): view is ViewWithData {
   return (
-    view === "conversation" ||
-    view === "conversation-review" ||
     view === "material-review" ||
     view === "deck-detail" ||
     view === "deck-study"
@@ -154,9 +130,6 @@ export function viewRequiresData(view: ViewType): view is ViewWithData {
  */
 export function getParentView(view: ViewType): ViewType | null {
   switch (view) {
-    case "conversation":
-    case "conversation-review":
-      return "dashboard";
     case "material-create":
     case "material-review":
       return "materials";
@@ -180,9 +153,6 @@ export function isSubViewOf(view: ViewType, parent: ViewType): boolean {
  */
 export function getActiveNavItem(view: ViewType): ViewType {
   switch (view) {
-    case "conversation":
-    case "conversation-review":
-      return "dashboard";
     case "material-create":
     case "material-review":
       return "materials";

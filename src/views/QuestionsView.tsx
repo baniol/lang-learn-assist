@@ -7,7 +7,8 @@ import {
   askGrammarQuestion,
   updateQuestionThreadTitle,
 } from "../lib/questions";
-import { generateTitle, createPhrase } from "../api";
+import { generateTitle } from "../lib/llm";
+import { createPhrase } from "../api";
 import { Button, Spinner, ConfirmDialog, AIChatPanel } from "../components/ui";
 import type { ChatMessage } from "../components/ui";
 import { EmptyState } from "../components/shared";

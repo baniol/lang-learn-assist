@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { cn } from "../lib/utils";
 import {
-  ChatIcon,
   BookIcon,
   ArchiveIcon,
   LightbulbIcon,
@@ -41,7 +40,6 @@ interface NavItem {
 }
 
 const baseNavItems: NavItem[] = [
-  { id: "dashboard", label: "Conversations", icon: <ChatIcon /> },
   { id: "phrase-library", label: "Phrases", icon: <BookIcon /> },
   { id: "materials", label: "Materials", icon: <ArchiveIcon /> },
   { id: "decks", label: "Decks", icon: <DecksIcon /> },
@@ -172,9 +170,6 @@ export function Layout({
           {navItems.map((item) => {
             const isActive =
               currentView === item.id ||
-              (item.id === "dashboard" &&
-                (currentView === "conversation" ||
-                  currentView === "conversation-review")) ||
               (item.id === "materials" &&
                 (currentView === "material-create" ||
                   currentView === "material-review")) ||

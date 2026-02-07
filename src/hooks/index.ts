@@ -9,7 +9,6 @@ export type { UseMutationOptions, UseMutationResult } from "./useMutation";
 export { useNavigation } from "./useNavigation";
 
 // Existing hooks - re-export for convenience
-export { useConversation } from "./useConversation";
 export { useVoiceRecording } from "./useVoiceRecording";
 export type { RecordingStatus } from "./useVoiceRecording";
 export { useTTS } from "./useTTS";

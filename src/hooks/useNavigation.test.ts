@@ -4,12 +4,12 @@ import { useNavigation } from "./useNavigation";
 
 describe("useNavigation", () => {
   describe("initial state", () => {
-    it("should default to dashboard view", () => {
+    it("should default to phrase-library view", () => {
       const { result } = renderHook(() => useNavigation());
 
-      expect(result.current.viewState).toEqual({ type: "dashboard" });
-      expect(result.current.currentView).toBe("dashboard");
-      expect(result.current.activeNavItem).toBe("dashboard");
+      expect(result.current.viewState).toEqual({ type: "phrase-library" });
+      expect(result.current.currentView).toBe("phrase-library");
+      expect(result.current.activeNavItem).toBe("phrase-library");
     });
 
     it("should accept custom initial view", () => {
@@ -23,41 +23,31 @@ describe("useNavigation", () => {
 
     it("should accept initial view with data", () => {
       const { result } = renderHook(() =>
-        useNavigation({ type: "conversation", conversationId: 123 })
+        useNavigation({ type: "material-review", materialId: 123 })
       );
 
       expect(result.current.viewState).toEqual({
-        type: "conversation",
-        conversationId: 123,
+        type: "material-review",
+        materialId: 123,
       });
-      expect(result.current.currentView).toBe("conversation");
-      expect(result.current.activeNavItem).toBe("dashboard");
+      expect(result.current.currentView).toBe("material-review");
+      expect(result.current.activeNavItem).toBe("materials");
     });
   });
 
   describe("navigate", () => {
     describe("views without data", () => {
-      it("should navigate to dashboard", () => {
+      it("should navigate to phrase-library", () => {
         const { result } = renderHook(() =>
           useNavigation({ type: "learn" })
         );
-
-        act(() => {
-          result.current.navigate("dashboard");
-        });
-
-        expect(result.current.viewState).toEqual({ type: "dashboard" });
-        expect(result.current.currentView).toBe("dashboard");
-      });
-
-      it("should navigate to phrase-library", () => {
-        const { result } = renderHook(() => useNavigation());
 
         act(() => {
           result.current.navigate("phrase-library");
         });
 
         expect(result.current.viewState).toEqual({ type: "phrase-library" });
+        expect(result.current.currentView).toBe("phrase-library");
       });
 
       it("should navigate to learn", () => {
@@ -129,35 +119,19 @@ describe("useNavigation", () => {
 
         expect(result.current.viewState).toEqual({ type: "material-create" });
       });
+
+      it("should navigate to decks", () => {
+        const { result } = renderHook(() => useNavigation());
+
+        act(() => {
+          result.current.navigate("decks");
+        });
+
+        expect(result.current.viewState).toEqual({ type: "decks" });
+      });
     });
 
     describe("views with data", () => {
-      it("should navigate to conversation with conversationId", () => {
-        const { result } = renderHook(() => useNavigation());
-
-        act(() => {
-          result.current.navigate("conversation", { conversationId: 42 });
-        });
-
-        expect(result.current.viewState).toEqual({
-          type: "conversation",
-          conversationId: 42,
-        });
-      });
-
-      it("should navigate to conversation-review with conversationId", () => {
-        const { result } = renderHook(() => useNavigation());
-
-        act(() => {
-          result.current.navigate("conversation-review", { conversationId: 99 });
-        });
-
-        expect(result.current.viewState).toEqual({
-          type: "conversation-review",
-          conversationId: 99,
-        });
-      });
-
       it("should navigate to material-review with materialId", () => {
         const { result } = renderHook(() => useNavigation());
 
@@ -170,30 +144,36 @@ describe("useNavigation", () => {
           materialId: 77,
         });
       });
+
+      it("should navigate to deck-detail with deckId", () => {
+        const { result } = renderHook(() => useNavigation());
+
+        act(() => {
+          result.current.navigate("deck-detail", { deckId: 42 });
+        });
+
+        expect(result.current.viewState).toEqual({
+          type: "deck-detail",
+          deckId: 42,
+        });
+      });
+
+      it("should navigate to deck-study with deckId", () => {
+        const { result } = renderHook(() => useNavigation());
+
+        act(() => {
+          result.current.navigate("deck-study", { deckId: 99 });
+        });
+
+        expect(result.current.viewState).toEqual({
+          type: "deck-study",
+          deckId: 99,
+        });
+      });
     });
   });
 
   describe("activeNavItem", () => {
-    it("should return dashboard when on conversation", () => {
-      const { result } = renderHook(() => useNavigation());
-
-      act(() => {
-        result.current.navigate("conversation", { conversationId: 1 });
-      });
-
-      expect(result.current.activeNavItem).toBe("dashboard");
-    });
-
-    it("should return dashboard when on conversation-review", () => {
-      const { result } = renderHook(() => useNavigation());
-
-      act(() => {
-        result.current.navigate("conversation-review", { conversationId: 1 });
-      });
-
-      expect(result.current.activeNavItem).toBe("dashboard");
-    });
-
     it("should return materials when on material-create", () => {
       const { result } = renderHook(() => useNavigation());
 
@@ -214,11 +194,30 @@ describe("useNavigation", () => {
       expect(result.current.activeNavItem).toBe("materials");
     });
 
+    it("should return decks when on deck-detail", () => {
+      const { result } = renderHook(() => useNavigation());
+
+      act(() => {
+        result.current.navigate("deck-detail", { deckId: 1 });
+      });
+
+      expect(result.current.activeNavItem).toBe("decks");
+    });
+
+    it("should return decks when on deck-study", () => {
+      const { result } = renderHook(() => useNavigation());
+
+      act(() => {
+        result.current.navigate("deck-study", { deckId: 1 });
+      });
+
+      expect(result.current.activeNavItem).toBe("decks");
+    });
+
     it("should return the view itself for top-level views", () => {
       const { result } = renderHook(() => useNavigation());
 
       const topLevelViews = [
-        "dashboard",
         "phrase-library",
         "learn",
         "stats",
@@ -226,6 +225,7 @@ describe("useNavigation", () => {
         "settings",
         "notes",
         "materials",
+        "decks",
       ] as const;
 
       for (const view of topLevelViews) {
@@ -252,14 +252,14 @@ describe("useNavigation", () => {
       expect(result.current.currentView).toBe("stats");
 
       act(() => {
-        result.current.navigate("conversation", { conversationId: 1 });
+        result.current.navigate("material-review", { materialId: 1 });
       });
-      expect(result.current.currentView).toBe("conversation");
+      expect(result.current.currentView).toBe("material-review");
 
       act(() => {
-        result.current.navigate("dashboard");
+        result.current.navigate("phrase-library");
       });
-      expect(result.current.currentView).toBe("dashboard");
+      expect(result.current.currentView).toBe("phrase-library");
     });
   });
 });

@@ -18,7 +18,6 @@ use tauri::State;
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn get_phrases(
-    conversationId: Option<i64>,
     starredOnly: Option<bool>,
     excludedOnly: Option<bool>,
     targetLanguage: Option<String>,
@@ -30,11 +29,6 @@ pub fn get_phrases(
     // Build query with parameter placeholders
     let mut conditions = Vec::new();
     let mut param_values: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
-
-    if let Some(cid) = conversationId {
-        conditions.push("p.conversation_id = ?");
-        param_values.push(Box::new(cid));
-    }
 
     if starredOnly.unwrap_or(false) {
         conditions.push("p.starred = 1");
@@ -150,10 +144,9 @@ pub fn create_phrase(
         .unwrap_or_else(|| settings.native_language.clone());
 
     conn.execute(
-        "INSERT INTO phrases (conversation_id, material_id, prompt, answer, accepted_json, target_language, native_language, notes)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO phrases (material_id, prompt, answer, accepted_json, target_language, native_language, notes)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
-            request.conversation_id,
             request.material_id,
             request.prompt,
             request.answer,
@@ -210,10 +203,9 @@ pub fn create_phrases_batch(
             .unwrap_or_else(|| default_native_lang.clone());
 
         tx.execute(
-            "INSERT INTO phrases (conversation_id, material_id, prompt, answer, accepted_json, target_language, native_language, notes)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO phrases (material_id, prompt, answer, accepted_json, target_language, native_language, notes)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
-                request.conversation_id,
                 request.material_id,
                 request.prompt,
                 request.answer,

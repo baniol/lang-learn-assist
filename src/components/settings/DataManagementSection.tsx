@@ -147,16 +147,6 @@ export function DataManagementSection({
                     imported
                   </p>
                 )}
-                {(operationResult.details.stats.conversationsImported > 0 ||
-                  operationResult.details.stats.conversationsUpdated > 0) && (
-                  <p>
-                    Conversations:{" "}
-                    {operationResult.details.stats.conversationsImported}{" "}
-                    imported
-                    {operationResult.details.stats.conversationsUpdated > 0 &&
-                      `, ${operationResult.details.stats.conversationsUpdated} updated`}
-                  </p>
-                )}
                 {operationResult.details.stats.phrasesImported > 0 && (
                   <p>
                     Phrases: {operationResult.details.stats.phrasesImported}{" "}

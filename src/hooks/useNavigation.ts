@@ -13,7 +13,7 @@ interface UseNavigationResult {
   viewState: ViewState;
   /** Current view type */
   currentView: ViewType;
-  /** Active nav item (handles sub-views like conversation -> dashboard) */
+  /** Active nav item (handles sub-views like deck-detail -> decks) */
   activeNavItem: ViewType;
   /** Navigate to a view without data */
   navigate: {
@@ -30,19 +30,19 @@ interface UseNavigationResult {
  * const { viewState, navigate, currentView } = useNavigation();
  *
  * // Navigate to a simple view
- * navigate("dashboard");
+ * navigate("phrase-library");
  *
  * // Navigate with required data (TypeScript enforces this)
- * navigate("conversation", { conversationId: 123 });
+ * navigate("material-review", { materialId: 123 });
  *
  * // Access view data with type guards
- * if (isConversationView(viewState)) {
- *   console.log(viewState.conversationId); // number
+ * if (isMaterialReviewView(viewState)) {
+ *   console.log(viewState.materialId); // number
  * }
  * ```
  */
 export function useNavigation(
-  initialView: ViewState = { type: "dashboard" }
+  initialView: ViewState = { type: "phrase-library" }
 ): UseNavigationResult {
   const [viewState, setViewState] = useState<ViewState>(initialView);
 

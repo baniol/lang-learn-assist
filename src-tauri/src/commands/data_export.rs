@@ -1,6 +1,6 @@
 use crate::db::get_conn;
 use crate::models::{
-    ExportConversation, ExportData, ExportDeck, ExportMaterial, ExportMaterialThread, ExportNote,
+    ExportData, ExportDeck, ExportMaterial, ExportMaterialThread, ExportNote,
     ExportPhrase, ExportPhraseProgress, ExportPhraseThread, ExportPracticeSession,
     ExportQuestionThread, ExportSetting, ImportMode, ImportResult, ImportStats,
 };
@@ -30,35 +30,6 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to query settings: {}", e))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect settings: {}", e))?;
-    drop(stmt);
-
-    // Export conversations
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, title, subject, target_language, native_language, status,
-                    raw_messages_json, final_messages_json, llm_summary, created_at, updated_at
-             FROM conversations",
-        )
-        .map_err(|e| format!("Failed to prepare conversations query: {}", e))?;
-    let conversations = stmt
-        .query_map([], |row| {
-            Ok(ExportConversation {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                subject: row.get(2)?,
-                target_language: row.get(3)?,
-                native_language: row.get(4)?,
-                status: row.get(5)?,
-                raw_messages_json: row.get(6)?,
-                final_messages_json: row.get(7)?,
-                llm_summary: row.get(8)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
-            })
-        })
-        .map_err(|e| format!("Failed to query conversations: {}", e))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect conversations: {}", e))?;
     drop(stmt);
 
     // Export phrases
@@ -304,10 +275,9 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
     drop(stmt);
 
     Ok(ExportData {
-        version: 2,
+        version: 3,
         exported_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         settings,
-        conversations,
         phrases,
         phrase_progress,
         phrase_threads,
@@ -333,7 +303,7 @@ pub fn import_data_with_conn(
     mode: ImportMode,
 ) -> Result<ImportResult, String> {
     // Check version compatibility
-    if data.version > 2 {
+    if data.version > 3 {
         return Err(format!(
             "Export version {} is not supported. Please update the application.",
             data.version
@@ -367,8 +337,6 @@ pub fn import_data_with_conn(
                 .map_err(|e| format!("Failed to delete decks: {}", e))?;
             tx.execute("DELETE FROM materials", [])
                 .map_err(|e| format!("Failed to delete materials: {}", e))?;
-            tx.execute("DELETE FROM conversations", [])
-                .map_err(|e| format!("Failed to delete conversations: {}", e))?;
             tx.execute("DELETE FROM settings", [])
                 .map_err(|e| format!("Failed to delete settings: {}", e))?;
 
@@ -380,31 +348,6 @@ pub fn import_data_with_conn(
                 )
                 .map_err(|e| format!("Failed to import setting: {}", e))?;
                 stats.settings_imported += 1;
-            }
-
-            // Import conversations with original IDs
-            for conv in &data.conversations {
-                tx.execute(
-                    "INSERT INTO conversations (id, title, subject, target_language, native_language,
-                                               status, raw_messages_json, final_messages_json, llm_summary,
-                                               created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                    params![
-                        conv.id,
-                        conv.title,
-                        conv.subject,
-                        conv.target_language,
-                        conv.native_language,
-                        conv.status,
-                        conv.raw_messages_json,
-                        conv.final_messages_json,
-                        conv.llm_summary,
-                        conv.created_at,
-                        conv.updated_at
-                    ],
-                )
-                .map_err(|e| format!("Failed to import conversation: {}", e))?;
-                stats.conversations_imported += 1;
             }
 
             // Import decks with original IDs
@@ -613,7 +556,6 @@ pub fn import_data_with_conn(
             }
 
             // Build ID mappings for relationships
-            let mut conversation_id_map: HashMap<i64, i64> = HashMap::new();
             let mut phrase_id_map: HashMap<i64, i64> = HashMap::new();
             let mut deck_id_map: HashMap<i64, i64> = HashMap::new();
 
@@ -651,71 +593,8 @@ pub fn import_data_with_conn(
                 }
             }
 
-            // Import conversations (check by created_at + title for uniqueness)
-            for conv in &data.conversations {
-                let existing: Option<(i64, String)> = tx
-                    .query_row(
-                        "SELECT id, updated_at FROM conversations WHERE created_at = ?1 AND title = ?2",
-                        params![conv.created_at, conv.title],
-                        |row| Ok((row.get(0)?, row.get(1)?)),
-                    )
-                    .ok();
-
-                if let Some((existing_id, existing_updated_at)) = existing {
-                    // Update if imported data is newer
-                    if conv.updated_at > existing_updated_at {
-                        tx.execute(
-                            "UPDATE conversations SET subject = ?1, target_language = ?2,
-                                    native_language = ?3, status = ?4, raw_messages_json = ?5,
-                                    final_messages_json = ?6, llm_summary = ?7, updated_at = ?8
-                             WHERE id = ?9",
-                            params![
-                                conv.subject,
-                                conv.target_language,
-                                conv.native_language,
-                                conv.status,
-                                conv.raw_messages_json,
-                                conv.final_messages_json,
-                                conv.llm_summary,
-                                conv.updated_at,
-                                existing_id
-                            ],
-                        )
-                        .map_err(|e| format!("Failed to update conversation: {}", e))?;
-                        stats.conversations_updated += 1;
-                    }
-                    conversation_id_map.insert(conv.id, existing_id);
-                } else {
-                    tx.execute(
-                        "INSERT INTO conversations (title, subject, target_language, native_language,
-                                                   status, raw_messages_json, final_messages_json, llm_summary,
-                                                   created_at, updated_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                        params![
-                            conv.title,
-                            conv.subject,
-                            conv.target_language,
-                            conv.native_language,
-                            conv.status,
-                            conv.raw_messages_json,
-                            conv.final_messages_json,
-                            conv.llm_summary,
-                            conv.created_at,
-                            conv.updated_at
-                        ],
-                    )
-                    .map_err(|e| format!("Failed to import conversation: {}", e))?;
-                    let new_id = tx.last_insert_rowid();
-                    conversation_id_map.insert(conv.id, new_id);
-                    stats.conversations_imported += 1;
-                }
-            }
-
             // Import phrases (check by created_at + prompt + answer for uniqueness)
             for phrase in &data.phrases {
-                let mapped_conversation_id = phrase
-                    .conversation_id
-                    .and_then(|cid| conversation_id_map.get(&cid).copied());
                 let mapped_deck_id = phrase
                     .deck_id
                     .and_then(|did| deck_id_map.get(&did).copied());
@@ -734,12 +613,11 @@ pub fn import_data_with_conn(
                     // Could update here if we track updated_at for phrases
                 } else {
                     tx.execute(
-                        "INSERT INTO phrases (conversation_id, prompt, answer, accepted_json,
+                        "INSERT INTO phrases (prompt, answer, accepted_json,
                                              target_language, native_language, audio_path, notes,
                                              starred, excluded, created_at, material_id, deck_id)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                         params![
-                            mapped_conversation_id,
                             phrase.prompt,
                             phrase.answer,
                             phrase.accepted_json,
@@ -1006,28 +884,15 @@ mod tests {
     /// Create minimal test export data
     fn create_test_export_data() -> ExportData {
         ExportData {
-            version: 2,
+            version: 3,
             exported_at: "2024-01-01T00:00:00Z".to_string(),
             settings: vec![ExportSetting {
                 key: "test_key".to_string(),
                 value: "test_value".to_string(),
             }],
-            conversations: vec![ExportConversation {
-                id: 1,
-                title: "Test Conversation".to_string(),
-                subject: "Testing".to_string(),
-                target_language: "de".to_string(),
-                native_language: "en".to_string(),
-                status: "draft".to_string(),
-                raw_messages_json: "[]".to_string(),
-                final_messages_json: None,
-                llm_summary: None,
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            }],
             phrases: vec![ExportPhrase {
                 id: 1,
-                conversation_id: Some(1),
+                conversation_id: None,
                 material_id: None,
                 deck_id: None,
                 prompt: "Hello".to_string(),
@@ -1077,9 +942,8 @@ mod tests {
         assert!(result.is_ok());
 
         let data = result.unwrap();
-        assert_eq!(data.version, 2);
+        assert_eq!(data.version, 3);
         assert!(data.settings.is_empty());
-        assert!(data.conversations.is_empty());
         assert!(data.phrases.is_empty());
     }
 
@@ -1094,7 +958,6 @@ mod tests {
         let import_result = result.unwrap();
         assert!(import_result.success);
         assert_eq!(import_result.stats.settings_imported, 1);
-        assert_eq!(import_result.stats.conversations_imported, 1);
         assert_eq!(import_result.stats.phrases_imported, 1);
         assert_eq!(import_result.stats.phrase_progress_imported, 1);
         assert_eq!(import_result.stats.notes_imported, 1);
@@ -1114,8 +977,6 @@ mod tests {
 
         assert_eq!(exported.settings.len(), 1);
         assert_eq!(exported.settings[0].key, "test_key");
-        assert_eq!(exported.conversations.len(), 1);
-        assert_eq!(exported.conversations[0].title, "Test Conversation");
         assert_eq!(exported.phrases.len(), 1);
         assert_eq!(exported.phrases[0].prompt, "Hello");
         assert_eq!(exported.phrases[0].answer, "Hallo");
@@ -1134,11 +995,7 @@ mod tests {
 
         // Second import with different data
         let mut data2 = create_test_export_data();
-        data2.conversations[0].id = 2;
-        data2.conversations[0].title = "Another Conversation".to_string();
-        data2.conversations[0].created_at = "2024-01-02T00:00:00Z".to_string();
         data2.phrases[0].id = 2;
-        data2.phrases[0].conversation_id = Some(2);
         data2.phrases[0].prompt = "Goodbye".to_string();
         data2.phrases[0].answer = "Tschüss".to_string();
         data2.phrases[0].created_at = "2024-01-02T00:00:00Z".to_string();
@@ -1153,7 +1010,6 @@ mod tests {
 
         // Verify both sets of data exist
         let exported = export_data_with_conn(&conn).expect("Export failed");
-        assert_eq!(exported.conversations.len(), 2);
         assert_eq!(exported.phrases.len(), 2);
         assert_eq!(exported.notes.len(), 2);
     }
@@ -1173,13 +1029,11 @@ mod tests {
         let import_result = result.unwrap();
 
         // Should not create duplicates
-        assert_eq!(import_result.stats.conversations_imported, 0);
         assert_eq!(import_result.stats.phrases_imported, 0);
         assert_eq!(import_result.stats.notes_imported, 0);
 
         // Verify no duplicates
         let exported = export_data_with_conn(&conn).expect("Export failed");
-        assert_eq!(exported.conversations.len(), 1);
         assert_eq!(exported.phrases.len(), 1);
         assert_eq!(exported.notes.len(), 1);
     }
@@ -1203,16 +1057,6 @@ mod tests {
         let data = create_test_export_data();
         import_data_with_conn(&mut conn, data, ImportMode::Overwrite).expect("Import failed");
 
-        // Verify phrase is linked to conversation
-        let phrase_conv_id: Option<i64> = conn
-            .query_row(
-                "SELECT conversation_id FROM phrases WHERE id = 1",
-                [],
-                |row| row.get(0),
-            )
-            .expect("Query failed");
-        assert_eq!(phrase_conv_id, Some(1));
-
         // Verify progress is linked to phrase
         let progress_phrase_id: i64 = conn
             .query_row(
@@ -1230,15 +1074,10 @@ mod tests {
 
         // Insert a phrase with all fields populated
         conn.execute(
-            "INSERT INTO conversations (id, title, subject) VALUES (1, 'Test', 'Test')",
-            [],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO phrases (id, conversation_id, prompt, answer, accepted_json,
+            "INSERT INTO phrases (id, prompt, answer, accepted_json,
                                   target_language, native_language, audio_path, notes,
                                   starred, excluded, created_at)
-             VALUES (1, 1, 'Hello', 'Hallo', '[\"Hi\"]', 'de', 'en', '/path/to/audio.mp3',
+             VALUES (1, 'Hello', 'Hallo', '[\"Hi\"]', 'de', 'en', '/path/to/audio.mp3',
                      'A greeting', 1, 0, '2024-01-01')",
             [],
         )

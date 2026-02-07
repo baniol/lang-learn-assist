@@ -68,30 +68,6 @@ pub fn get_language_name(code: &str) -> &str {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Conversation {
-    pub id: i64,
-    pub title: String,
-    pub subject: String,
-    pub target_language: String,
-    pub native_language: String,
-    pub status: String,
-    pub raw_messages_json: String,
-    pub final_messages_json: Option<String>,
-    pub llm_summary: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatMessage {
-    pub id: String,
-    pub role: String,
-    pub content: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Phrase {
     pub id: i64,
     pub conversation_id: Option<i64>,
@@ -414,14 +390,6 @@ pub struct IntervalDistribution {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ConversationCleanupResult {
-    pub title: String,
-    pub cleaned_messages: Vec<ChatMessage>,
-    pub suggested_phrases: Vec<SuggestedPhrase>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SuggestedPhrase {
     pub prompt: String,
     pub answer: String,
@@ -431,17 +399,7 @@ pub struct SuggestedPhrase {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateConversationRequest {
-    pub title: String,
-    pub subject: String,
-    pub target_language: Option<String>,
-    pub native_language: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CreatePhraseRequest {
-    pub conversation_id: Option<i64>,
     pub material_id: Option<i64>,
     pub prompt: String,
     pub answer: String,
@@ -539,7 +497,6 @@ pub struct ExportData {
     pub version: i32,
     pub exported_at: String,
     pub settings: Vec<ExportSetting>,
-    pub conversations: Vec<ExportConversation>,
     pub phrases: Vec<ExportPhrase>,
     pub phrase_progress: Vec<ExportPhraseProgress>,
     pub phrase_threads: Vec<ExportPhraseThread>,
@@ -559,22 +516,6 @@ pub struct ExportData {
 pub struct ExportSetting {
     pub key: String,
     pub value: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportConversation {
-    pub id: i64,
-    pub title: String,
-    pub subject: String,
-    pub target_language: String,
-    pub native_language: String,
-    pub status: String,
-    pub raw_messages_json: String,
-    pub final_messages_json: Option<String>,
-    pub llm_summary: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -691,8 +632,6 @@ pub struct ImportResult {
 #[serde(rename_all = "camelCase")]
 pub struct ImportStats {
     pub settings_imported: i32,
-    pub conversations_imported: i32,
-    pub conversations_updated: i32,
     pub phrases_imported: i32,
     pub phrases_updated: i32,
     pub phrase_progress_imported: i32,

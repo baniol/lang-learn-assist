@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "../test/test-utils";
 import { useAudioPlayback } from "./useAudioPlayback";
-import type { ChatMessage } from "../types";
+
+/** Chat message type for testing */
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
 
 // Mock the TTS module
 vi.mock("../lib/tts", () => ({

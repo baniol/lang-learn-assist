@@ -5,7 +5,7 @@ mod models;
 mod state;
 mod utils;
 
-use commands::{audio, conversations, data_export, decks, learning, llm, materials, notes, phrases, questions, settings, tts};
+use commands::{audio, data_export, decks, learning, llm, materials, notes, phrases, questions, settings, tts};
 use db::{get_db_path, init_db};
 use rusqlite::Connection;
 use state::AppState;
@@ -30,15 +30,6 @@ pub fn run() {
             // Settings
             settings::get_settings,
             settings::save_settings,
-            // Conversations
-            conversations::get_conversations,
-            conversations::get_conversation,
-            conversations::create_conversation,
-            conversations::update_conversation_messages,
-            conversations::update_conversation_title,
-            conversations::finalize_conversation,
-            conversations::archive_conversation,
-            conversations::delete_conversation,
             // Phrases
             phrases::get_phrases,
             phrases::get_phrase,
@@ -77,10 +68,7 @@ pub fn run() {
             learning::session::reset_learning_phrases,
             learning::session::reset_progress,
             // LLM
-            llm::conversation::send_conversation_message,
-            llm::conversation::suggest_conversation_cleanup,
-            llm::conversation::extract_phrases_from_conversation,
-            llm::conversation::test_llm_connection,
+            llm::client::test_llm_connection,
             llm::phrase::refine_phrase,
             llm::phrase::generate_title,
             llm::material::process_material,

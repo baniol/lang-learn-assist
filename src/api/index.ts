@@ -10,7 +10,6 @@
 
 // Core domain APIs
 export * as learningApi from "./learning";
-export * as conversationsApi from "./conversations";
 export * as phrasesApi from "./phrases";
 export * as settingsApi from "./settings";
 
@@ -43,21 +42,6 @@ export {
   resetPracticeSessions,
   resetPhraseProgress,
 } from "./learning";
-
-export {
-  // Conversations
-  getConversations,
-  getConversation,
-  createConversation,
-  deleteConversation,
-  updateConversationMessages,
-  updateConversationTitle,
-  sendConversationMessage,
-  generateTitle,
-  suggestConversationCleanup,
-  extractPhrasesFromConversation,
-  finalizeConversation,
-} from "./conversations";
 
 export {
   // Phrases

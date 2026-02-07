@@ -45,15 +45,6 @@ pub mod priority {
 
 /// LLM (Large Language Model) token limits and settings
 pub mod llm {
-    /// Maximum tokens for conversation messages
-    pub const CONVERSATION_MAX_TOKENS: i64 = 500;
-
-    /// Maximum tokens for cleanup/summary operations
-    pub const CLEANUP_MAX_TOKENS: i64 = 2000;
-
-    /// Maximum tokens for phrase extraction
-    pub const EXTRACT_PHRASES_MAX_TOKENS: i64 = 1500;
-
     /// Maximum tokens for phrase refinement
     pub const REFINE_PHRASE_MAX_TOKENS: i64 = 1000;
 

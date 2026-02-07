@@ -58,25 +58,8 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Conversations table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS conversations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            subject TEXT NOT NULL,
-            target_language TEXT NOT NULL DEFAULT 'de',
-            native_language TEXT NOT NULL DEFAULT 'pl',
-            status TEXT NOT NULL DEFAULT 'draft',
-            raw_messages_json TEXT NOT NULL DEFAULT '[]',
-            final_messages_json TEXT,
-            llm_summary TEXT,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )",
-        [],
-    )?;
-
     // Phrases table
+    // Note: conversation_id column kept for backwards compatibility but no longer used
     conn.execute(
         "CREATE TABLE IF NOT EXISTS phrases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,8 +72,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             audio_path TEXT,
             notes TEXT,
             starred INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )",
         [],
     )?;
@@ -273,19 +255,11 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
     // Create indexes for performance
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_phrases_conversation ON phrases(conversation_id)",
-        [],
-    )?;
-    conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_phrases_starred ON phrases(starred)",
         [],
     )?;
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_phrase_progress_phrase ON phrase_progress(phrase_id)",
-        [],
-    )?;
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status)",
         [],
     )?;
     conn.execute(
@@ -499,6 +473,28 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_phrase_progress_srs_pool ON phrase_progress(in_srs_pool)",
         [],
     )?;
+
+    // Migration: Drop conversations table (no longer needed)
+    // First clear conversation_id from phrases, then drop the table and index
+    log_migration_result(
+        "clear conversation_id from phrases",
+        conn.execute(
+            "UPDATE phrases SET conversation_id = NULL WHERE conversation_id IS NOT NULL",
+            [],
+        ),
+    );
+    log_migration_result(
+        "drop conversations table",
+        conn.execute("DROP TABLE IF EXISTS conversations", []),
+    );
+    log_migration_result(
+        "drop idx_conversations_status index",
+        conn.execute("DROP INDEX IF EXISTS idx_conversations_status", []),
+    );
+    log_migration_result(
+        "drop idx_phrases_conversation index",
+        conn.execute("DROP INDEX IF EXISTS idx_phrases_conversation", []),
+    );
 
     Ok(())
 }

@@ -1,32 +1,9 @@
 //! System prompt builders for LLM interactions.
 //!
 //! This module contains functions that build system prompts for various
-//! LLM use cases like conversation translation and phrase refinement.
+//! LLM use cases like phrase refinement and sentence Q&A.
 
 use crate::models::{get_language_name, Phrase};
-
-/// Build system prompt for conversation translation.
-pub fn build_conversation_system_prompt(subject: &str, target_lang: &str, native_lang: &str) -> String {
-    let target_name = get_language_name(target_lang);
-    let native_name = get_language_name(native_lang);
-
-    format!(
-        r#"You are a translator. Translate {} to natural spoken {}.
-Topic context: {}
-
-RULES:
-- Output ONLY the {} translation - no quotes, no explanations, no JSON, no formatting
-- Sound natural, like a native speaker in casual conversation
-- B1-B2 vocabulary level
-
-Input: Cześć, jak się masz?
-Output: Hallo! Wie geht's dir?
-
-Input: Byłem na zakupach
-Output: Ich war einkaufen."#,
-        native_name, target_name, subject, target_name
-    )
-}
 
 /// Build system prompt for phrase refinement.
 pub fn build_refinement_system_prompt(phrase: &Phrase) -> String {

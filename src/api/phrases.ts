@@ -17,13 +17,11 @@ import type {
 
 export async function getPhrases(options?: {
   targetLanguage?: string;
-  conversationId?: number;
   materialId?: number;
   status?: "all" | "starred" | "excluded";
 }): Promise<PhraseWithProgress[]> {
   return invoke<PhraseWithProgress[]>("get_phrases", {
     targetLanguage: options?.targetLanguage ?? null,
-    conversationId: options?.conversationId ?? null,
     materialId: options?.materialId ?? null,
     status: options?.status ?? "all",
   });

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   createViewState,
-  isConversationView,
-  isConversationReviewView,
   isMaterialReviewView,
+  isDeckDetailView,
+  isDeckStudyView,
   viewRequiresData,
   getParentView,
   isSubViewOf,
@@ -13,11 +13,6 @@ import {
 
 describe("createViewState", () => {
   describe("views without data", () => {
-    it("should create dashboard view state", () => {
-      const state = createViewState("dashboard");
-      expect(state).toEqual({ type: "dashboard" });
-    });
-
     it("should create phrase-library view state", () => {
       const state = createViewState("phrase-library");
       expect(state).toEqual({ type: "phrase-library" });
@@ -57,67 +52,32 @@ describe("createViewState", () => {
       const state = createViewState("material-create");
       expect(state).toEqual({ type: "material-create" });
     });
+
+    it("should create decks view state", () => {
+      const state = createViewState("decks");
+      expect(state).toEqual({ type: "decks" });
+    });
   });
 
   describe("views with data", () => {
-    it("should create conversation view state with conversationId", () => {
-      const state = createViewState("conversation", { conversationId: 123 });
-      expect(state).toEqual({ type: "conversation", conversationId: 123 });
-    });
-
-    it("should create conversation-review view state with conversationId", () => {
-      const state = createViewState("conversation-review", { conversationId: 456 });
-      expect(state).toEqual({ type: "conversation-review", conversationId: 456 });
-    });
-
     it("should create material-review view state with materialId", () => {
       const state = createViewState("material-review", { materialId: 789 });
       expect(state).toEqual({ type: "material-review", materialId: 789 });
+    });
+
+    it("should create deck-detail view state with deckId", () => {
+      const state = createViewState("deck-detail", { deckId: 123 });
+      expect(state).toEqual({ type: "deck-detail", deckId: 123 });
+    });
+
+    it("should create deck-study view state with deckId", () => {
+      const state = createViewState("deck-study", { deckId: 456 });
+      expect(state).toEqual({ type: "deck-study", deckId: 456 });
     });
   });
 });
 
 describe("type guards", () => {
-  describe("isConversationView", () => {
-    it("should return true for conversation view", () => {
-      const state: ViewState = { type: "conversation", conversationId: 1 };
-      expect(isConversationView(state)).toBe(true);
-    });
-
-    it("should return false for other views", () => {
-      expect(isConversationView({ type: "dashboard" })).toBe(false);
-      expect(isConversationView({ type: "conversation-review", conversationId: 1 })).toBe(false);
-      expect(isConversationView({ type: "learn" })).toBe(false);
-    });
-
-    it("should narrow type correctly", () => {
-      const state: ViewState = { type: "conversation", conversationId: 42 };
-      if (isConversationView(state)) {
-        // TypeScript should know conversationId exists
-        expect(state.conversationId).toBe(42);
-      }
-    });
-  });
-
-  describe("isConversationReviewView", () => {
-    it("should return true for conversation-review view", () => {
-      const state: ViewState = { type: "conversation-review", conversationId: 1 };
-      expect(isConversationReviewView(state)).toBe(true);
-    });
-
-    it("should return false for other views", () => {
-      expect(isConversationReviewView({ type: "dashboard" })).toBe(false);
-      expect(isConversationReviewView({ type: "conversation", conversationId: 1 })).toBe(false);
-    });
-
-    it("should narrow type correctly", () => {
-      const state: ViewState = { type: "conversation-review", conversationId: 42 };
-      if (isConversationReviewView(state)) {
-        expect(state.conversationId).toBe(42);
-      }
-    });
-  });
-
   describe("isMaterialReviewView", () => {
     it("should return true for material-review view", () => {
       const state: ViewState = { type: "material-review", materialId: 1 };
@@ -125,7 +85,7 @@ describe("type guards", () => {
     });
 
     it("should return false for other views", () => {
-      expect(isMaterialReviewView({ type: "dashboard" })).toBe(false);
+      expect(isMaterialReviewView({ type: "phrase-library" })).toBe(false);
       expect(isMaterialReviewView({ type: "materials" })).toBe(false);
       expect(isMaterialReviewView({ type: "material-create" })).toBe(false);
     });
@@ -137,23 +97,60 @@ describe("type guards", () => {
       }
     });
   });
+
+  describe("isDeckDetailView", () => {
+    it("should return true for deck-detail view", () => {
+      const state: ViewState = { type: "deck-detail", deckId: 1 };
+      expect(isDeckDetailView(state)).toBe(true);
+    });
+
+    it("should return false for other views", () => {
+      expect(isDeckDetailView({ type: "decks" })).toBe(false);
+      expect(isDeckDetailView({ type: "deck-study", deckId: 1 })).toBe(false);
+    });
+
+    it("should narrow type correctly", () => {
+      const state: ViewState = { type: "deck-detail", deckId: 42 };
+      if (isDeckDetailView(state)) {
+        expect(state.deckId).toBe(42);
+      }
+    });
+  });
+
+  describe("isDeckStudyView", () => {
+    it("should return true for deck-study view", () => {
+      const state: ViewState = { type: "deck-study", deckId: 1 };
+      expect(isDeckStudyView(state)).toBe(true);
+    });
+
+    it("should return false for other views", () => {
+      expect(isDeckStudyView({ type: "decks" })).toBe(false);
+      expect(isDeckStudyView({ type: "deck-detail", deckId: 1 })).toBe(false);
+    });
+
+    it("should narrow type correctly", () => {
+      const state: ViewState = { type: "deck-study", deckId: 42 };
+      if (isDeckStudyView(state)) {
+        expect(state.deckId).toBe(42);
+      }
+    });
+  });
 });
 
 describe("viewRequiresData", () => {
-  it("should return true for conversation", () => {
-    expect(viewRequiresData("conversation")).toBe(true);
-  });
-
-  it("should return true for conversation-review", () => {
-    expect(viewRequiresData("conversation-review")).toBe(true);
-  });
-
   it("should return true for material-review", () => {
     expect(viewRequiresData("material-review")).toBe(true);
   });
 
+  it("should return true for deck-detail", () => {
+    expect(viewRequiresData("deck-detail")).toBe(true);
+  });
+
+  it("should return true for deck-study", () => {
+    expect(viewRequiresData("deck-study")).toBe(true);
+  });
+
   it("should return false for views without data", () => {
-    expect(viewRequiresData("dashboard")).toBe(false);
     expect(viewRequiresData("phrase-library")).toBe(false);
     expect(viewRequiresData("learn")).toBe(false);
     expect(viewRequiresData("stats")).toBe(false);
@@ -162,18 +159,11 @@ describe("viewRequiresData", () => {
     expect(viewRequiresData("notes")).toBe(false);
     expect(viewRequiresData("materials")).toBe(false);
     expect(viewRequiresData("material-create")).toBe(false);
+    expect(viewRequiresData("decks")).toBe(false);
   });
 });
 
 describe("getParentView", () => {
-  it("should return dashboard for conversation", () => {
-    expect(getParentView("conversation")).toBe("dashboard");
-  });
-
-  it("should return dashboard for conversation-review", () => {
-    expect(getParentView("conversation-review")).toBe("dashboard");
-  });
-
   it("should return materials for material-create", () => {
     expect(getParentView("material-create")).toBe("materials");
   });
@@ -182,8 +172,15 @@ describe("getParentView", () => {
     expect(getParentView("material-review")).toBe("materials");
   });
 
+  it("should return decks for deck-detail", () => {
+    expect(getParentView("deck-detail")).toBe("decks");
+  });
+
+  it("should return decks for deck-study", () => {
+    expect(getParentView("deck-study")).toBe("decks");
+  });
+
   it("should return null for top-level views", () => {
-    expect(getParentView("dashboard")).toBe(null);
     expect(getParentView("phrase-library")).toBe(null);
     expect(getParentView("learn")).toBe(null);
     expect(getParentView("stats")).toBe(null);
@@ -191,18 +188,11 @@ describe("getParentView", () => {
     expect(getParentView("settings")).toBe(null);
     expect(getParentView("notes")).toBe(null);
     expect(getParentView("materials")).toBe(null);
+    expect(getParentView("decks")).toBe(null);
   });
 });
 
 describe("isSubViewOf", () => {
-  it("should return true for conversation -> dashboard", () => {
-    expect(isSubViewOf("conversation", "dashboard")).toBe(true);
-  });
-
-  it("should return true for conversation-review -> dashboard", () => {
-    expect(isSubViewOf("conversation-review", "dashboard")).toBe(true);
-  });
-
   it("should return true for material-create -> materials", () => {
     expect(isSubViewOf("material-create", "materials")).toBe(true);
   });
@@ -211,30 +201,37 @@ describe("isSubViewOf", () => {
     expect(isSubViewOf("material-review", "materials")).toBe(true);
   });
 
+  it("should return true for deck-detail -> decks", () => {
+    expect(isSubViewOf("deck-detail", "decks")).toBe(true);
+  });
+
+  it("should return true for deck-study -> decks", () => {
+    expect(isSubViewOf("deck-study", "decks")).toBe(true);
+  });
+
   it("should return false for incorrect parent", () => {
-    expect(isSubViewOf("conversation", "materials")).toBe(false);
-    expect(isSubViewOf("material-create", "dashboard")).toBe(false);
+    expect(isSubViewOf("material-create", "decks")).toBe(false);
+    expect(isSubViewOf("deck-detail", "materials")).toBe(false);
   });
 
   it("should return false for top-level views", () => {
-    expect(isSubViewOf("dashboard", "dashboard")).toBe(false);
-    expect(isSubViewOf("learn", "dashboard")).toBe(false);
+    expect(isSubViewOf("phrase-library", "phrase-library")).toBe(false);
+    expect(isSubViewOf("learn", "phrase-library")).toBe(false);
   });
 });
 
 describe("getActiveNavItem", () => {
-  it("should return dashboard for conversation views", () => {
-    expect(getActiveNavItem("conversation")).toBe("dashboard");
-    expect(getActiveNavItem("conversation-review")).toBe("dashboard");
-  });
-
   it("should return materials for material views", () => {
     expect(getActiveNavItem("material-create")).toBe("materials");
     expect(getActiveNavItem("material-review")).toBe("materials");
   });
 
+  it("should return decks for deck views", () => {
+    expect(getActiveNavItem("deck-detail")).toBe("decks");
+    expect(getActiveNavItem("deck-study")).toBe("decks");
+  });
+
   it("should return the view itself for top-level views", () => {
-    expect(getActiveNavItem("dashboard")).toBe("dashboard");
     expect(getActiveNavItem("phrase-library")).toBe("phrase-library");
     expect(getActiveNavItem("learn")).toBe("learn");
     expect(getActiveNavItem("stats")).toBe("stats");
@@ -242,5 +239,6 @@ describe("getActiveNavItem", () => {
     expect(getActiveNavItem("settings")).toBe("settings");
     expect(getActiveNavItem("notes")).toBe("notes");
     expect(getActiveNavItem("materials")).toBe("materials");
+    expect(getActiveNavItem("decks")).toBe("decks");
   });
 });

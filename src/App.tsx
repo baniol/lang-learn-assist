@@ -3,9 +3,6 @@ import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { ErrorBoundary } from "./components/shared";
 import { Layout } from "./components/Layout";
-import { DashboardView } from "./views/DashboardView";
-import { ConversationView } from "./views/ConversationView";
-import { ConversationReviewView } from "./views/ConversationReviewView";
 import { PhraseLibraryView } from "./views/PhraseLibraryView";
 import { StudyView } from "./views/StudyView";
 import { StatsView } from "./views/StatsView";
@@ -21,8 +18,6 @@ import { QuickNotePopup } from "./components/QuickNotePopup";
 import { PageSpinner } from "./components/ui";
 import { useNavigation } from "./hooks";
 import {
-  isConversationView,
-  isConversationReviewView,
   isMaterialReviewView,
   isDeckDetailView,
   isDeckStudyView,
@@ -61,22 +56,6 @@ function AppContent() {
 
   const renderView = () => {
     // Type-safe view rendering using discriminated unions
-    if (isConversationView(viewState)) {
-      return (
-        <ConversationView
-          conversationId={viewState.conversationId}
-          onNavigate={legacyNavigate}
-        />
-      );
-    }
-    if (isConversationReviewView(viewState)) {
-      return (
-        <ConversationReviewView
-          conversationId={viewState.conversationId}
-          onNavigate={legacyNavigate}
-        />
-      );
-    }
     if (isMaterialReviewView(viewState)) {
       return (
         <MaterialReviewView
@@ -104,8 +83,6 @@ function AppContent() {
 
     // Views without data
     switch (currentView) {
-      case "dashboard":
-        return <DashboardView onNavigate={legacyNavigate} />;
       case "phrase-library":
         return <PhraseLibraryView />;
       case "learn":
@@ -125,7 +102,7 @@ function AppContent() {
       case "decks":
         return <DecksView onNavigate={legacyNavigate} />;
       default:
-        return <DashboardView onNavigate={legacyNavigate} />;
+        return <PhraseLibraryView />;
     }
   };
 
@@ -137,7 +114,7 @@ function AppContent() {
         onQuickNoteOpen={() => setIsQuickNoteOpen(true)}
       >
         <ErrorBoundary
-          onReset={() => navigate("dashboard")}
+          onReset={() => navigate("phrase-library")}
           onError={(error) => console.error("View error:", error)}
         >
           {renderView()}

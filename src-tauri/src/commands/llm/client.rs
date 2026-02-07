@@ -1,10 +1,14 @@
 //! LLM API client implementations.
 //!
-//! This module provides HTTP client functions for calling OpenAI and Anthropic APIs.
+//! This module provides HTTP client functions for calling OpenAI and Anthropic APIs,
+//! and connection testing.
 
-use crate::constants::llm::REQUEST_TIMEOUT_SECS;
+use crate::constants::llm::{REQUEST_TIMEOUT_SECS, TEST_CONNECTION_MAX_TOKENS};
 use crate::models::AppSettings;
+use crate::state::AppState;
+use crate::utils::lock::SafeRwLock;
 use std::time::Duration;
+use tauri::State;
 
 use super::types::{
     AnthropicError, AnthropicResponse, LlmResponse, OpenAiError, OpenAiResponse,
@@ -175,4 +179,23 @@ pub async fn call_llm(
         }
         _ => Err(format!("Unknown LLM provider: {}", settings.llm_provider)),
     }
+}
+
+/// Test the LLM connection with a simple request.
+#[tauri::command]
+pub async fn test_llm_connection(state: State<'_, AppState>) -> Result<String, String> {
+    let settings = state.settings.safe_read()?.clone();
+
+    if settings.llm_api_key.is_empty() {
+        return Err("LLM API key not configured".to_string());
+    }
+
+    let test_messages = vec![serde_json::json!({"role": "user", "content": "Say hello in one word."})];
+
+    let response = call_llm(&settings, &test_messages, None, TEST_CONNECTION_MAX_TOKENS).await?;
+
+    Ok(format!(
+        "Connection successful! Response: {}",
+        response.content
+    ))
 }

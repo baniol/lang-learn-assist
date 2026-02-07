@@ -9,8 +9,6 @@ export type {
 } from "./navigation";
 export {
   createViewState,
-  isConversationView,
-  isConversationReviewView,
   isMaterialReviewView,
   isDeckDetailView,
   isDeckStudyView,
@@ -19,28 +17,6 @@ export {
   isSubViewOf,
   getActiveNavItem,
 } from "./navigation";
-
-export type ConversationStatus = "draft" | "finalized" | "archived";
-
-export interface Conversation {
-  id: number;
-  title: string;
-  subject: string;
-  targetLanguage: string;
-  nativeLanguage: string;
-  status: ConversationStatus;
-  rawMessagesJson: string;
-  finalMessagesJson: string | null;
-  llmSummary: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-}
 
 export interface Phrase {
   id: number;
@@ -264,27 +240,13 @@ export interface IntervalDistribution {
   twoWeeksPlus: number;
 }
 
-export interface ConversationCleanupResult {
-  title: string;
-  cleanedMessages: ChatMessage[];
-  suggestedPhrases: SuggestedPhrase[];
-}
-
 export interface SuggestedPhrase {
   prompt: string;
   answer: string;
   accepted: string[];
 }
 
-export interface CreateConversationRequest {
-  title: string;
-  subject: string;
-  targetLanguage?: string;
-  nativeLanguage?: string;
-}
-
 export interface CreatePhraseRequest {
-  conversationId?: number;
   materialId?: number;
   prompt: string;
   answer: string;
@@ -419,7 +381,6 @@ export interface ExportData {
   version: number;
   exportedAt: string;
   settings: ExportSetting[];
-  conversations: ExportConversation[];
   phrases: ExportPhrase[];
   phraseProgress: ExportPhraseProgress[];
   phraseThreads: ExportPhraseThread[];
@@ -433,20 +394,6 @@ export interface ExportData {
 export interface ExportSetting {
   key: string;
   value: string;
-}
-
-export interface ExportConversation {
-  id: number;
-  title: string;
-  subject: string;
-  targetLanguage: string;
-  nativeLanguage: string;
-  status: string;
-  rawMessagesJson: string;
-  finalMessagesJson: string | null;
-  llmSummary: string | null;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface ExportPhrase {
@@ -529,8 +476,6 @@ export interface ImportResult {
 
 export interface ImportStats {
   settingsImported: number;
-  conversationsImported: number;
-  conversationsUpdated: number;
   phrasesImported: number;
   phrasesUpdated: number;
   phraseProgressImported: number;
