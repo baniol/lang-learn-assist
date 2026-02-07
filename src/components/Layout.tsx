@@ -45,7 +45,7 @@ const baseNavItems: NavItem[] = [
   { id: "phrase-library", label: "Phrases", icon: <BookIcon /> },
   { id: "materials", label: "Materials", icon: <ArchiveIcon /> },
   { id: "decks", label: "Decks", icon: <DecksIcon /> },
-  { id: "learn", label: "Learn", icon: <LightbulbIcon /> },
+  { id: "learn", label: "Review", icon: <LightbulbIcon /> },
   { id: "stats", label: "Stats", icon: <ChartIcon /> },
   { id: "questions", label: "Questions", icon: <QuestionCircleIcon /> },
 ];

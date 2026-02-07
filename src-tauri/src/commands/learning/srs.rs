@@ -123,6 +123,7 @@ pub fn calculate_next_review(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::LearningStatus;
 
     #[test]
     fn test_calculate_priority_new_phrase() {
@@ -144,6 +145,7 @@ mod tests {
             next_review_at: None,
             in_srs_pool: true,
             deck_correct_count: 0,
+            learning_status: LearningStatus::SrsActive,
         });
         let priority = calculate_priority(&progress);
         assert_eq!(priority, NEW_PHRASE);
@@ -204,6 +206,7 @@ mod tests {
             next_review_at: Some(future_time.format("%Y-%m-%d %H:%M:%S").to_string()),
             in_srs_pool: true,
             deck_correct_count: 0,
+            learning_status: LearningStatus::SrsActive,
         });
         let priority = calculate_priority(&progress);
         assert_eq!(priority, LEARNING_PHASE);
@@ -226,6 +229,7 @@ mod tests {
             next_review_at: Some(future_time.format("%Y-%m-%d %H:%M:%S").to_string()),
             in_srs_pool: true,
             deck_correct_count: 0,
+            learning_status: LearningStatus::SrsActive,
         });
         let priority = calculate_priority(&progress);
         assert_eq!(priority, NOT_DUE);

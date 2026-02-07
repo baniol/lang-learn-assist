@@ -1,66 +1,87 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  startPracticeSession as apiStartSession,
+  startDeckSession,
+  startPracticeSession,
   getActiveSession,
   updatePracticeSession,
   finishPracticeSession,
-  getNextPhrase,
-  recordAnswer as apiRecordAnswer,
+  getStudyPhrase,
+  recordStudyAnswer,
 } from "../api";
 import type {
   PracticeSession,
   PhraseWithProgress,
   ExerciseMode,
   AppSettings,
-  AnswerResult,
+  StudyAnswerResult,
+  StudyModeType,
 } from "../types";
 
-interface UsePracticeSessionOptions {
+interface UseStudySessionOptions {
+  mode: StudyModeType;
   settings: AppSettings | null;
   onSettingsRefresh: () => Promise<void>;
 }
 
-interface UsePracticeSessionResult {
+interface UseStudySessionResult {
   session: PracticeSession | null;
   currentPhrase: PhraseWithProgress | null;
   isLoading: boolean;
   seenPhraseIds: number[];
+  // Deck-specific
+  graduatedCount: number;
+  // SRS-specific
   sessionLearnedCount: number;
   newPhraseCount: number;
+  // Retry mode
   retryCount: number;
   inRetryMode: boolean;
   requiresRetry: boolean;
-  startSession: (mode: ExerciseMode) => Promise<void>;
+  // Last answer result
+  lastAnswerResult: StudyAnswerResult | null;
+  // Actions
+  startSession: (exerciseMode: ExerciseMode) => Promise<void>;
   endSession: () => Promise<void>;
   loadNextPhrase: () => Promise<void>;
-  recordAnswer: (phraseId: number, isCorrect: boolean) => Promise<AnswerResult>;
+  recordAnswer: (phraseId: number, isCorrect: boolean) => Promise<StudyAnswerResult>;
   markPhraseSeen: (phraseId: number) => void;
   setRetryCount: (count: number) => void;
   setInRetryMode: (inRetry: boolean) => void;
   setRequiresRetry: (requires: boolean) => void;
   setCurrentPhrase: (phrase: PhraseWithProgress | null) => void;
+  clearLastAnswer: () => void;
 }
 
-export function usePracticeSession({
+export function useStudySession({
+  mode,
   settings,
   onSettingsRefresh,
-}: UsePracticeSessionOptions): UsePracticeSessionResult {
+}: UseStudySessionOptions): UseStudySessionResult {
   const [session, setSession] = useState<PracticeSession | null>(null);
-  const [currentPhrase, setCurrentPhrase] = useState<PhraseWithProgress | null>(
-    null
-  );
+  const [currentPhrase, setCurrentPhrase] = useState<PhraseWithProgress | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [seenPhraseIds, setSeenPhraseIds] = useState<number[]>([]);
+  const [graduatedCount, setGraduatedCount] = useState(0);
   const [sessionLearnedCount, setSessionLearnedCount] = useState(0);
   const [newPhraseCount, setNewPhraseCount] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const [inRetryMode, setInRetryMode] = useState(false);
   const [requiresRetry, setRequiresRetry] = useState(false);
+  const [lastAnswerResult, setLastAnswerResult] = useState<StudyAnswerResult | null>(null);
 
   // Refs to track current values during async operations
   const sessionIdRef = useRef<number | null>(null);
   const seenPhraseIdsRef = useRef<number[]>([]);
+  const mountedRef = useRef(true);
   const settingsRef = useRef<AppSettings | null>(settings);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     sessionIdRef.current = session?.id ?? null;
@@ -74,17 +95,17 @@ export function usePracticeSession({
     settingsRef.current = settings;
   }, [settings]);
 
+  const isDeckMode = mode.type === "deck_learning";
+  const deckId = isDeckMode ? (mode as { type: "deck_learning"; deckId: number }).deckId : null;
+
   const loadNextPhraseInternal = useCallback(
-    async (
-      excludeIds: number[],
-      currentNewCount: number,
-      sessionId?: number
-    ) => {
+    async (excludeIds: number[], currentNewCount: number, sessionId?: number) => {
       const activeSessionId = sessionId ?? session?.id;
-      // Use ref to get latest settings (avoids stale closure after settings refresh)
       const currentSettings = settingsRef.current;
 
+      // For SRS mode, check session phrase limit
       if (
+        !isDeckMode &&
         currentSettings &&
         currentSettings.sessionPhraseLimit > 0 &&
         excludeIds.length >= currentSettings.sessionPhraseLimit
@@ -99,20 +120,25 @@ export function usePracticeSession({
       setIsLoading(true);
 
       try {
-        const phrase = await getNextPhrase({
-          targetLanguage: currentSettings?.targetLanguage,
+        const phrase = await getStudyPhrase(mode, {
           excludeIds: excludeIds.length > 0 ? excludeIds : undefined,
           newPhraseCount: currentNewCount,
           newPhraseLimit: currentSettings?.newPhrasesPerSession ?? 0,
           sessionPosition: excludeIds.length,
           newPhraseInterval: currentSettings?.newPhraseInterval ?? 4,
         });
+
+        if (!mountedRef.current) return;
+
         setCurrentPhrase(phrase);
 
         if (phrase) {
-          const isNew = !phrase.progress || phrase.progress.totalAttempts === 0;
-          if (isNew) {
-            setNewPhraseCount(currentNewCount + 1);
+          // Track new phrases for SRS mode
+          if (!isDeckMode) {
+            const isNew = !phrase.progress || phrase.progress.totalAttempts === 0;
+            if (isNew) {
+              setNewPhraseCount(currentNewCount + 1);
+            }
           }
         } else {
           if (activeSessionId) {
@@ -122,62 +148,69 @@ export function usePracticeSession({
       } catch (err) {
         console.error("Failed to load next phrase:", err);
       } finally {
-        setIsLoading(false);
+        if (mountedRef.current) {
+          setIsLoading(false);
+        }
       }
     },
-    [session?.id]
+    [mode, isDeckMode, session?.id]
   );
 
   const restoreSession = useCallback(
     async (activeSession: PracticeSession) => {
-      const currentSettings = settingsRef.current;
-      if (!currentSettings) return;
-
       const state = activeSession.state;
+
+      // For deck mode, check if session matches the deck
+      if (isDeckMode && state?.deckId !== deckId) {
+        return false;
+      }
+
+      // For SRS mode, check if it's not a deck session
+      if (!isDeckMode && state?.deckId) {
+        return false;
+      }
+
       if (!state) {
         setSession(activeSession);
         await loadNextPhraseInternal([], 0, activeSession.id);
-        return;
+        return true;
       }
+
+      if (!mountedRef.current) return false;
 
       setSession(activeSession);
       setSeenPhraseIds(state.seenPhraseIds);
-      setSessionLearnedCount(state.sessionLearnedIds.length);
-      setNewPhraseCount(state.newPhraseCount);
+      setSessionLearnedCount(state.sessionLearnedIds?.length || 0);
+      setNewPhraseCount(state.newPhraseCount || 0);
       setInRetryMode(state.inRetryMode);
       setRetryCount(state.retryCount);
       setRequiresRetry(state.requiresRetry);
 
       if (state.currentPhraseId) {
         try {
-          const phrase = await getNextPhrase({
-            targetLanguage: currentSettings.targetLanguage,
-            excludeIds: state.seenPhraseIds.filter(
-              (id) => id !== state.currentPhraseId
-            ),
-            newPhraseCount: state.newPhraseCount,
-            newPhraseLimit: currentSettings.newPhrasesPerSession ?? 0,
+          const phrase = await getStudyPhrase(mode, {
+            excludeIds: state.seenPhraseIds.filter((id) => id !== state.currentPhraseId),
+            newPhraseCount: state.newPhraseCount || 0,
+            newPhraseLimit: settingsRef.current?.newPhrasesPerSession ?? 0,
             sessionPosition: state.seenPhraseIds.length,
-            newPhraseInterval: currentSettings.newPhraseInterval ?? 4,
+            newPhraseInterval: settingsRef.current?.newPhraseInterval ?? 4,
           });
+
+          if (!mountedRef.current) return false;
           setCurrentPhrase(phrase);
         } catch (err) {
           console.error("Failed to restore current phrase:", err);
-          await loadNextPhraseInternal(
-            state.seenPhraseIds,
-            state.newPhraseCount,
-            activeSession.id
-          );
+          if (mountedRef.current) {
+            await loadNextPhraseInternal(state.seenPhraseIds, state.newPhraseCount || 0, activeSession.id);
+          }
         }
       } else {
-        await loadNextPhraseInternal(
-          state.seenPhraseIds,
-          state.newPhraseCount,
-          activeSession.id
-        );
+        await loadNextPhraseInternal(state.seenPhraseIds, state.newPhraseCount || 0, activeSession.id);
       }
+
+      return true;
     },
-    [loadNextPhraseInternal]
+    [mode, isDeckMode, deckId, loadNextPhraseInternal]
   );
 
   // Initialize - check for active session
@@ -187,11 +220,16 @@ export function usePracticeSession({
     const initialize = async () => {
       try {
         const activeSession = await getActiveSession(settings.targetLanguage);
+        if (!mountedRef.current) return;
+
         if (activeSession) {
-          await restoreSession(activeSession);
+          const restored = await restoreSession(activeSession);
+          if (!restored) {
+            // Session is for different mode, don't restore
+          }
         }
       } catch (err) {
-        console.error("Failed to initialize:", err);
+        console.error("Failed to initialize study session:", err);
       }
     };
 
@@ -199,41 +237,57 @@ export function usePracticeSession({
   }, [settings, restoreSession]);
 
   const startSession = useCallback(
-    async (mode: ExerciseMode) => {
+    async (exerciseMode: ExerciseMode) => {
       setIsLoading(true);
       try {
         await onSettingsRefresh();
 
-        const newSession = await apiStartSession(mode);
+        if (!mountedRef.current) return;
+
+        const newSession = isDeckMode
+          ? await startDeckSession(deckId!, exerciseMode)
+          : await startPracticeSession(exerciseMode);
+
+        if (!mountedRef.current) return;
+
         setSession(newSession);
         setSeenPhraseIds([]);
+        setGraduatedCount(0);
         setSessionLearnedCount(0);
+        setNewPhraseCount(0);
         setRetryCount(0);
         setInRetryMode(false);
-        setNewPhraseCount(0);
         setRequiresRetry(false);
+        setLastAnswerResult(null);
         await loadNextPhraseInternal([], 0, newSession.id);
       } catch (err) {
         console.error("Failed to start session:", err);
       } finally {
-        setIsLoading(false);
+        if (mountedRef.current) {
+          setIsLoading(false);
+        }
       }
     },
-    [onSettingsRefresh, loadNextPhraseInternal]
+    [isDeckMode, deckId, onSettingsRefresh, loadNextPhraseInternal]
   );
 
   const endSession = useCallback(async () => {
     if (session) {
       await finishPracticeSession(session.id);
     }
+
+    if (!mountedRef.current) return;
+
     setSession(null);
     setCurrentPhrase(null);
     setSeenPhraseIds([]);
+    setGraduatedCount(0);
     setSessionLearnedCount(0);
+    setNewPhraseCount(0);
     setRetryCount(0);
     setInRetryMode(false);
-    setNewPhraseCount(0);
     setRequiresRetry(false);
+    setLastAnswerResult(null);
   }, [session]);
 
   const loadNextPhrase = useCallback(async () => {
@@ -241,11 +295,24 @@ export function usePracticeSession({
   }, [loadNextPhraseInternal, seenPhraseIds, newPhraseCount]);
 
   const recordAnswer = useCallback(
-    async (phraseId: number, isCorrect: boolean): Promise<AnswerResult> => {
-      // Call backend with session_id - it handles streak tracking
-      const result = await apiRecordAnswer(phraseId, isCorrect, session?.id);
+    async (phraseId: number, isCorrect: boolean): Promise<StudyAnswerResult> => {
+      const result = await recordStudyAnswer(phraseId, isCorrect, mode, session?.id);
 
-      // Update session stats using ref for current count
+      if (!mountedRef.current) return result;
+
+      setLastAnswerResult(result);
+
+      // Handle deck graduation
+      if (result.justGraduated) {
+        setGraduatedCount((prev) => prev + 1);
+      }
+
+      // Handle SRS session learning
+      if (result.isLearnedInSession) {
+        setSessionLearnedCount((prev) => prev + 1);
+      }
+
+      // Update session stats
       if (session) {
         const currentSeenCount = seenPhraseIdsRef.current.length;
         const newCorrectAnswers = isCorrect
@@ -258,6 +325,8 @@ export function usePracticeSession({
           newCorrectAnswers
         );
 
+        if (!mountedRef.current) return result;
+
         setSession((prev) =>
           prev
             ? {
@@ -267,21 +336,19 @@ export function usePracticeSession({
               }
             : null
         );
-
-        // Update learned count from backend
-        const updatedSession = await getActiveSession(settings?.targetLanguage);
-        if (updatedSession?.state) {
-          setSessionLearnedCount(updatedSession.state.sessionLearnedIds.length);
-        }
       }
 
       return result;
     },
-    [session, settings?.targetLanguage]
+    [mode, session]
   );
 
   const markPhraseSeen = useCallback((phraseId: number) => {
     setSeenPhraseIds((prev) => [...prev, phraseId]);
+  }, []);
+
+  const clearLastAnswer = useCallback(() => {
+    setLastAnswerResult(null);
   }, []);
 
   return {
@@ -289,11 +356,13 @@ export function usePracticeSession({
     currentPhrase,
     isLoading,
     seenPhraseIds,
+    graduatedCount,
     sessionLearnedCount,
     newPhraseCount,
     retryCount,
     inRetryMode,
     requiresRetry,
+    lastAnswerResult,
     startSession,
     endSession,
     loadNextPhrase,
@@ -303,5 +372,6 @@ export function usePracticeSession({
     setInRetryMode,
     setRequiresRetry,
     setCurrentPhrase,
+    clearLastAnswer,
   };
 }

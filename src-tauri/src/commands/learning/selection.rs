@@ -4,7 +4,7 @@
 
 use crate::constants::priority::NEW_PHRASE;
 use crate::db::get_conn;
-use crate::models::PhraseWithProgress;
+use crate::models::{PhraseWithProgress, StudyMode};
 use crate::utils::db::row_to_phrase_with_progress;
 
 use super::srs::calculate_priority;
@@ -35,9 +35,10 @@ pub fn get_next_phrase(
     // Always exclude phrases marked as excluded
     conditions.push("(p.excluded = 0 OR p.excluded IS NULL)".to_string());
 
-    // Only include phrases that are in the SRS pool (graduated from deck or never assigned to one)
-    // Phrases with in_srs_pool = 0 are still in deck learning phase
-    conditions.push("(pp.in_srs_pool = 1 OR pp.in_srs_pool IS NULL OR pp.id IS NULL)".to_string());
+    // Only include phrases that are in SRS active state (graduated from deck)
+    // Phrases with learning_status = 'srs_active' are ready for spaced repetition
+    // Also include phrases without progress (pp.id IS NULL) as they may be legacy phrases
+    conditions.push("(pp.learning_status = 'srs_active' OR pp.id IS NULL)".to_string());
 
     if let Some(ref lang) = target_language {
         conditions.push("p.target_language = ?".to_string());
@@ -65,7 +66,7 @@ pub fn get_next_phrase(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
-                pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count
+                pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count, pp.learning_status
          FROM phrases p
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
          WHERE 1=1{}",
@@ -164,6 +165,9 @@ pub fn get_next_deck_phrase(
     // Always exclude phrases marked as excluded
     conditions.push("(p.excluded = 0 OR p.excluded IS NULL)".to_string());
 
+    // Exclude graduated phrases (they've moved to SRS)
+    conditions.push("(pp.learning_status IS NULL OR pp.learning_status != 'srs_active')".to_string());
+
     // For exclude_ids, we build placeholders dynamically but values are still parameterized
     if let Some(ref ids) = excludeIds {
         if !ids.is_empty() {
@@ -182,7 +186,7 @@ pub fn get_next_deck_phrase(
         "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
-                pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count
+                pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count, pp.learning_status
          FROM phrases p
          LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
          WHERE 1=1{}
@@ -205,6 +209,39 @@ pub fn get_next_deck_phrase(
         })?;
 
     Ok(result)
+}
+
+/// Unified phrase selection command supporting both deck learning and SRS review modes.
+///
+/// This is the new unified API that replaces separate get_next_phrase and get_next_deck_phrase commands.
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn get_study_phrase(
+    mode: StudyMode,
+    excludeIds: Option<Vec<i64>>,
+    // SRS-specific options (ignored for deck learning)
+    newPhraseCount: Option<i32>,
+    newPhraseLimit: Option<i32>,
+    sessionPosition: Option<i32>,
+    newPhraseInterval: Option<i32>,
+) -> Result<Option<PhraseWithProgress>, String> {
+    match mode {
+        StudyMode::DeckLearning { deck_id } => {
+            get_next_deck_phrase(deck_id, excludeIds)
+        }
+        StudyMode::SrsReview => {
+            // For SRS review, we use the original get_next_phrase but without target_language filter
+            // since the frontend will handle filtering
+            get_next_phrase(
+                None, // target_language - let frontend handle filtering
+                excludeIds,
+                newPhraseCount,
+                newPhraseLimit,
+                sessionPosition,
+                newPhraseInterval,
+            )
+        }
+    }
 }
 
 #[cfg(test)]
@@ -279,7 +316,7 @@ mod tests {
                     "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
                             p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                             pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
-                            pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count
+                            pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count, pp.learning_status
                      FROM phrases p
                      LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
                      WHERE p.id = ?1",

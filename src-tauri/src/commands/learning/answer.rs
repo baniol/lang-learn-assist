@@ -5,7 +5,7 @@
 
 use crate::constants::srs::DEFAULT_EASE_FACTOR;
 use crate::db::get_conn;
-use crate::models::{AnswerResult, DeckAnswerResult, PhraseProgress, SessionState};
+use crate::models::{AnswerResult, DeckAnswerResult, LearningStatus, PhraseProgress, SessionState, StudyMode, StudyAnswerResult};
 use rusqlite::params;
 use std::collections::HashMap;
 
@@ -104,11 +104,12 @@ pub fn record_answer(
     // Get updated progress
     let progress: PhraseProgress = conn
         .query_row(
-            "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count
+            "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count, learning_status
          FROM phrase_progress WHERE phrase_id = ?1",
             params![phrase_id],
             |row| {
                 let in_srs_pool_int: i32 = row.get(9).unwrap_or(1);
+                let learning_status_str: String = row.get(11).unwrap_or_else(|_| "inactive".to_string());
                 Ok(PhraseProgress {
                     id: row.get(0)?,
                     phrase_id: row.get(1)?,
@@ -119,8 +120,9 @@ pub fn record_answer(
                     ease_factor: row.get(6)?,
                     interval_days: row.get(7)?,
                     next_review_at: row.get(8)?,
-                    in_srs_pool: in_srs_pool_int != 0,
+                    learning_status: LearningStatus::from_str(&learning_status_str),
                     deck_correct_count: row.get(10).unwrap_or(0),
+                    in_srs_pool: in_srs_pool_int != 0,
                 })
             },
         )
@@ -211,6 +213,9 @@ fn update_session_streak(
 ///
 /// Unlike SRS mode, this tracks deck_correct_count for graduation.
 /// When deck_correct_count reaches graduation_threshold, the phrase graduates to SRS pool.
+///
+/// Graduation mechanic: Wrong answer subtracts 1 from deck_correct_count (minimum 0).
+/// This is more balanced than resetting to 0.
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn record_deck_answer(
@@ -233,29 +238,33 @@ pub fn record_deck_answer(
         .map_err(|e| format!("Deck not found: {}", e))?;
 
     // Check if progress record exists
-    let existing: Option<(i64, i32, bool)> = conn
+    let existing: Option<(i64, i32, String)> = conn
         .query_row(
-            "SELECT id, deck_correct_count, in_srs_pool FROM phrase_progress WHERE phrase_id = ?1",
+            "SELECT id, deck_correct_count, learning_status FROM phrase_progress WHERE phrase_id = ?1",
             params![phraseId],
             |row| {
-                let in_srs_pool_int: i32 = row.get(2).unwrap_or(0);
-                Ok((row.get(0)?, row.get(1)?, in_srs_pool_int != 0))
+                let learning_status: String = row.get(2).unwrap_or_else(|_| "inactive".to_string());
+                Ok((row.get(0)?, row.get(1)?, learning_status))
             },
         )
         .ok();
 
-    let (new_deck_correct_count, just_graduated) = if let Some((_, current_count, was_graduated)) =
+    let (new_deck_correct_count, just_graduated) = if let Some((_, current_count, learning_status_str)) =
         existing
     {
+        let learning_status = LearningStatus::from_str(&learning_status_str);
+        let already_graduated = learning_status == LearningStatus::SrsActive;
+
         if isCorrect {
             let new_count = current_count + 1;
-            let should_graduate = !was_graduated && new_count >= graduation_threshold;
+            let should_graduate = !already_graduated && new_count >= graduation_threshold;
 
             if should_graduate {
-                // Graduate to SRS pool
+                // Graduate to SRS - set learning_status to srs_active and in_srs_pool = 1
                 conn.execute(
                     "UPDATE phrase_progress SET
                         deck_correct_count = ?1,
+                        learning_status = 'srs_active',
                         in_srs_pool = 1,
                         total_attempts = total_attempts + 1,
                         success_count = success_count + 1,
@@ -279,34 +288,38 @@ pub fn record_deck_answer(
 
             (new_count, should_graduate)
         } else {
-            // Wrong answer - reset deck_correct_count
+            // Wrong answer - subtract 1 from deck_correct_count (minimum 0)
+            // This is more balanced than resetting to 0
+            let new_count = (current_count - 1).max(0);
             conn.execute(
                 "UPDATE phrase_progress SET
-                    deck_correct_count = 0,
+                    deck_correct_count = ?1,
                     total_attempts = total_attempts + 1,
-                    last_seen = ?1
-                 WHERE phrase_id = ?2",
-                params![now, phraseId],
+                    last_seen = ?2
+                 WHERE phrase_id = ?3",
+                params![new_count, now, phraseId],
             )
             .map_err(|e| format!("Failed to update progress: {}", e))?;
 
-            (0, false)
+            (new_count, false)
         }
     } else {
-        // Create new progress record
+        // Create new progress record with learning_status = 'deck_learning'
         let new_count = if isCorrect { 1 } else { 0 };
         let should_graduate = isCorrect && new_count >= graduation_threshold;
+        let learning_status = if should_graduate { "srs_active" } else { "deck_learning" };
 
         conn.execute(
-            "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts, success_count, last_seen, in_srs_pool, deck_correct_count, ease_factor, interval_days)
-             VALUES (?1, 0, 1, ?2, ?3, ?4, ?5, ?6, 1)",
+            "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts, success_count, last_seen, in_srs_pool, deck_correct_count, ease_factor, interval_days, learning_status)
+             VALUES (?1, 0, 1, ?2, ?3, ?4, ?5, ?6, 1, ?7)",
             params![
                 phraseId,
                 if isCorrect { 1 } else { 0 },
                 now,
                 if should_graduate { 1 } else { 0 },
                 new_count,
-                DEFAULT_EASE_FACTOR
+                DEFAULT_EASE_FACTOR,
+                learning_status
             ],
         )
         .map_err(|e| format!("Failed to create progress: {}", e))?;
@@ -317,11 +330,12 @@ pub fn record_deck_answer(
     // Get updated progress
     let progress: PhraseProgress = conn
         .query_row(
-            "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count
+            "SELECT id, phrase_id, correct_streak, total_attempts, success_count, last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count, learning_status
              FROM phrase_progress WHERE phrase_id = ?1",
             params![phraseId],
             |row| {
                 let in_srs_pool_int: i32 = row.get(9).unwrap_or(1);
+                let learning_status_str: String = row.get(11).unwrap_or_else(|_| "inactive".to_string());
                 Ok(PhraseProgress {
                     id: row.get(0)?,
                     phrase_id: row.get(1)?,
@@ -332,8 +346,9 @@ pub fn record_deck_answer(
                     ease_factor: row.get(6)?,
                     interval_days: row.get(7)?,
                     next_review_at: row.get(8)?,
-                    in_srs_pool: in_srs_pool_int != 0,
+                    learning_status: LearningStatus::from_str(&learning_status_str),
                     deck_correct_count: row.get(10).unwrap_or(0),
+                    in_srs_pool: in_srs_pool_int != 0,
                 })
             },
         )
@@ -500,6 +515,29 @@ fn is_fuzzy_match(input: &str, expected: &str) -> bool {
     // Allow up to 20% error rate, minimum 1 char for short words, max 2 chars total
     let max_distance = (max_len / 5).max(1).min(2);
     distance <= max_distance
+}
+
+/// Unified answer recording command supporting both deck learning and SRS review modes.
+///
+/// This is the new unified API that replaces separate record_answer and record_deck_answer commands.
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn record_study_answer(
+    phraseId: i64,
+    isCorrect: bool,
+    mode: StudyMode,
+    sessionId: Option<i64>,
+) -> Result<StudyAnswerResult, String> {
+    match mode {
+        StudyMode::DeckLearning { deck_id } => {
+            let result = record_deck_answer(phraseId, isCorrect, deck_id, sessionId)?;
+            Ok(result.into())
+        }
+        StudyMode::SrsReview => {
+            let result = record_answer(phraseId, isCorrect, sessionId)?;
+            Ok(result.into())
+        }
+    }
 }
 
 #[cfg(test)]

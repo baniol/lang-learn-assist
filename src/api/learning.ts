@@ -10,6 +10,8 @@ import type {
   PracticeSession,
   SrsStats,
   ExerciseMode,
+  StudyModeType,
+  StudyAnswerResult,
 } from "../types";
 
 // ============================================================================
@@ -145,5 +147,51 @@ export async function getLearningStats(
 export async function getSrsStats(targetLanguage?: string): Promise<SrsStats> {
   return invoke<SrsStats>("get_srs_stats", {
     targetLanguage: targetLanguage ?? null,
+  });
+}
+
+// ============================================================================
+// Unified Study API (New)
+// ============================================================================
+
+/**
+ * Get the next phrase to study using the unified API.
+ * Supports both deck learning and SRS review modes.
+ */
+export async function getStudyPhrase(
+  mode: StudyModeType,
+  options?: {
+    excludeIds?: number[];
+    newPhraseCount?: number;
+    newPhraseLimit?: number;
+    sessionPosition?: number;
+    newPhraseInterval?: number;
+  }
+): Promise<PhraseWithProgress | null> {
+  return invoke<PhraseWithProgress | null>("get_study_phrase", {
+    mode,
+    excludeIds: options?.excludeIds?.length ? options.excludeIds : null,
+    newPhraseCount: options?.newPhraseCount ?? 0,
+    newPhraseLimit: options?.newPhraseLimit ?? 0,
+    sessionPosition: options?.sessionPosition ?? 0,
+    newPhraseInterval: options?.newPhraseInterval ?? 4,
+  });
+}
+
+/**
+ * Record an answer using the unified API.
+ * Supports both deck learning and SRS review modes.
+ */
+export async function recordStudyAnswer(
+  phraseId: number,
+  isCorrect: boolean,
+  mode: StudyModeType,
+  sessionId?: number
+): Promise<StudyAnswerResult> {
+  return invoke<StudyAnswerResult>("record_study_answer", {
+    phraseId,
+    isCorrect,
+    mode,
+    sessionId: sessionId ?? null,
   });
 }

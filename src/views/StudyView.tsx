@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { getDeck } from "../lib/decks";
-import { validateAnswer, updatePhraseAudio, updatePhrase } from "../api";
+import { validateAnswer, updatePhraseAudio, updatePhrase, getLearningStats } from "../api";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
 import { useTTS } from "../hooks/useTTS";
-import { useDeckStudySession } from "../hooks/useDeckStudySession";
+import { useStudySession } from "../hooks/useStudySession";
 import { useSettings } from "../contexts/SettingsContext";
 import { useToast } from "../contexts/ToastContext";
 import { Button, Spinner } from "../components/ui";
@@ -11,6 +11,9 @@ import { EmptyState } from "../components/shared";
 import { PhraseRefinementDialog } from "../components/PhraseRefinementDialog";
 import { BookIcon } from "../components/icons";
 import {
+  SessionHeader,
+  SessionStats,
+  SessionComplete,
   ModeSelector,
   FeedbackDisplay,
   ManualExercise,
@@ -20,18 +23,28 @@ import {
   RetryModeMessage,
 } from "../components/learning";
 import { DeckStudyHeader } from "../components/decks";
-import type { ViewType, ExerciseMode, Deck, Phrase } from "../types";
+import type { ViewType, ExerciseMode, Deck, Phrase, LearningStats, StudyModeType } from "../types";
 
-interface DeckStudyViewProps {
-  deckId: number;
+interface StudyViewProps {
+  // Either deckId (for deck learning) or nothing (for SRS review)
+  deckId?: number;
   onNavigate: (view: ViewType, data?: unknown) => void;
 }
 
-export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
+export function StudyView({ deckId, onNavigate }: StudyViewProps) {
   const { settings, refreshSettings } = useSettings();
   const toast = useToast();
+
+  // Determine study mode - memoize to prevent infinite re-renders
+  const studyMode: StudyModeType = useMemo(
+    () => (deckId ? { type: "deck_learning", deckId } : { type: "srs_review" }),
+    [deckId]
+  );
+  const isDeckMode = studyMode.type === "deck_learning";
+
   const [deck, setDeck] = useState<Deck | null>(null);
-  const [deckLoading, setDeckLoading] = useState(true);
+  const [deckLoading, setDeckLoading] = useState(isDeckMode);
+  const [stats, setStats] = useState<LearningStats | null>(null);
   const [mode, setMode] = useState<ExerciseMode>("manual");
   const [showAnswer, setShowAnswer] = useState(false);
   const [inputAnswer, setInputAnswer] = useState("");
@@ -42,18 +55,23 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
     userAnswer: string;
   } | null>(null);
 
-  const deckStudy = useDeckStudySession({
-    deckId,
+  const studySession = useStudySession({
+    mode: studyMode,
     settings,
     onSettingsRefresh: refreshSettings,
   });
 
   // Ref to track current phrase for use in callbacks
-  const currentPhraseRef = useRef(deckStudy.currentPhrase);
-  currentPhraseRef.current = deckStudy.currentPhrase;
+  const currentPhraseRef = useRef(studySession.currentPhrase);
+  currentPhraseRef.current = studySession.currentPhrase;
 
-  // Load deck info
+  // Load deck info (for deck mode)
   useEffect(() => {
+    if (!isDeckMode || !deckId) {
+      setDeckLoading(false);
+      return;
+    }
+
     const loadDeck = async () => {
       try {
         const deckData = await getDeck(deckId);
@@ -66,7 +84,23 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
       }
     };
     loadDeck();
-  }, [deckId, toast]);
+  }, [isDeckMode, deckId, toast]);
+
+  // Load stats (for SRS mode)
+  useEffect(() => {
+    if (isDeckMode) return;
+    loadStats(settings?.targetLanguage);
+  }, [isDeckMode, settings?.targetLanguage]);
+
+  const loadStats = async (targetLanguage?: string) => {
+    try {
+      const data = await getLearningStats(targetLanguage || settings?.targetLanguage);
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to load stats:", err);
+      toast.error("Failed to load learning stats");
+    }
+  };
 
   useEffect(() => {
     if (settings) {
@@ -80,7 +114,7 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
     setInputAnswer("");
     setFeedback(null);
     setAwaitingProceed(false);
-      }, [deckStudy.currentPhrase?.phrase.id]);
+  }, [studySession.currentPhrase?.phrase.id]);
 
   const handleAudioGenerated = useCallback(
     async (phraseId: number, audioPath: string) => {
@@ -88,7 +122,7 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
         await updatePhraseAudio(phraseId, audioPath);
         const currentPhrase = currentPhraseRef.current;
         if (currentPhrase?.phrase.id === phraseId) {
-          deckStudy.setCurrentPhrase({
+          studySession.setCurrentPhrase({
             ...currentPhrase,
             phrase: { ...currentPhrase.phrase, audioPath },
           });
@@ -97,7 +131,7 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
         console.error("Failed to save audio path:", err);
       }
     },
-    [deckStudy]
+    [studySession]
   );
 
   const tts = useTTS({
@@ -107,14 +141,14 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
   });
 
   const voiceLanguage =
-    deckStudy.currentPhrase?.phrase.targetLanguage ||
+    studySession.currentPhrase?.phrase.targetLanguage ||
     settings?.targetLanguage ||
     "de";
 
   const voiceRecording = useVoiceRecording({
     enabled: mode === "speaking",
     language: voiceLanguage,
-    prompt: deckStudy.currentPhrase?.phrase.answer,
+    prompt: studySession.currentPhrase?.phrase.answer,
     onTranscription: (text) => {
       setInputAnswer(text);
       handleCheckAnswer(text);
@@ -125,12 +159,12 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
 
   const handleCheckAnswer = useCallback(
     async (answer?: string) => {
-      if (!deckStudy.currentPhrase || !settings) return;
+      if (!studySession.currentPhrase || !settings) return;
 
       const answerToCheck = answer || inputAnswer;
       if (!answerToCheck.trim()) return;
 
-      const phraseId = deckStudy.currentPhrase.phrase.id;
+      const phraseId = studySession.currentPhrase.phrase.id;
 
       try {
         const isCorrect = await validateAnswer(phraseId, answerToCheck);
@@ -138,14 +172,14 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
         setFeedback(isCorrect ? "correct" : "incorrect");
 
         if (isCorrect) {
-          if (deckStudy.inRetryMode && mode === "speaking") {
-            const newRetryCount = deckStudy.retryCount + 1;
-            deckStudy.setRetryCount(newRetryCount);
+          if (studySession.inRetryMode && mode === "speaking") {
+            const newRetryCount = studySession.retryCount + 1;
+            studySession.setRetryCount(newRetryCount);
 
             if (newRetryCount >= (settings.failureRepetitions || 3)) {
-              deckStudy.setInRetryMode(false);
-              deckStudy.setRetryCount(0);
-              deckStudy.setRequiresRetry(false);
+              studySession.setInRetryMode(false);
+              studySession.setRetryCount(0);
+              studySession.setRequiresRetry(false);
               setAwaitingProceed(true);
             } else {
               setTimeout(() => {
@@ -155,42 +189,42 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
             }
           } else {
             try {
-              await deckStudy.recordAnswer(phraseId, true);
+              await studySession.recordAnswer(phraseId, true);
             } catch (recordErr) {
               console.error("Failed to record correct answer:", recordErr);
             }
-            deckStudy.setRequiresRetry(false);
+            studySession.setRequiresRetry(false);
             setAwaitingProceed(true);
           }
         } else {
           try {
-            await deckStudy.recordAnswer(phraseId, false);
+            await studySession.recordAnswer(phraseId, false);
           } catch (recordErr) {
             console.error("Failed to record incorrect answer:", recordErr);
           }
 
           if (mode === "speaking") {
-            deckStudy.setInRetryMode(true);
-            deckStudy.setRetryCount(0);
+            studySession.setInRetryMode(true);
+            studySession.setRetryCount(0);
           }
-          deckStudy.setRequiresRetry(true);
+          studySession.setRequiresRetry(true);
         }
       } catch (err) {
         console.error("Failed to check answer:", err);
         toast.error("Failed to check answer");
       }
     },
-    [deckStudy, inputAnswer, settings, mode, toast]
+    [studySession, inputAnswer, settings, mode, toast]
   );
 
   const handleManualAnswer = async (isCorrect: boolean) => {
-    if (!deckStudy.currentPhrase) return;
+    if (!studySession.currentPhrase) return;
 
-    const phraseId = deckStudy.currentPhrase.phrase.id;
+    const phraseId = studySession.currentPhrase.phrase.id;
     setFeedback(isCorrect ? "correct" : "incorrect");
 
     try {
-      await deckStudy.recordAnswer(phraseId, isCorrect);
+      await studySession.recordAnswer(phraseId, isCorrect);
     } catch (err) {
       console.error("Failed to record answer:", err);
     }
@@ -198,28 +232,36 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
   };
 
   const handlePlayAnswer = useCallback(() => {
-    if (!deckStudy.currentPhrase) return;
+    if (!studySession.currentPhrase) return;
     tts.speak(
-      deckStudy.currentPhrase.phrase.answer,
-      deckStudy.currentPhrase.phrase.id,
-      deckStudy.currentPhrase.phrase.audioPath || undefined,
-      deckStudy.currentPhrase.phrase.targetLanguage
+      studySession.currentPhrase.phrase.answer,
+      studySession.currentPhrase.phrase.id,
+      studySession.currentPhrase.phrase.audioPath || undefined,
+      studySession.currentPhrase.phrase.targetLanguage
     );
-  }, [deckStudy.currentPhrase, tts]);
+  }, [studySession.currentPhrase, tts]);
 
   const handleProceedToNext = useCallback(() => {
-    if (!deckStudy.currentPhrase || !awaitingProceed) return;
+    if (!studySession.currentPhrase || !awaitingProceed) return;
 
-    // For deck study, we don't exclude phrases permanently
-    // They can come back after their next_review_at time
-    deckStudy.markPhraseSeen(deckStudy.currentPhrase.phrase.id);
+    // For SRS mode: only exclude graduated phrases
+    // For deck mode: mark as seen but phrases can come back
+    const lastResult = studySession.lastAnswerResult;
+    const shouldExclude = isDeckMode
+      ? true // Always mark seen in deck mode
+      : lastResult && lastResult.progress.intervalDays >= 1; // Only exclude graduated in SRS
+
+    if (shouldExclude) {
+      studySession.markPhraseSeen(studySession.currentPhrase.phrase.id);
+    }
 
     setAwaitingProceed(false);
     setFeedback(null);
     setInputAnswer("");
-        setShowAnswer(false);
-    deckStudy.loadNextPhrase();
-  }, [deckStudy, awaitingProceed]);
+    setShowAnswer(false);
+    studySession.clearLastAnswer();
+    studySession.loadNextPhrase();
+  }, [studySession, awaitingProceed, isDeckMode]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -246,39 +288,47 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
   }, [awaitingProceed, handleProceedToNext, handlePlayAnswer]);
 
   const handleEndSession = async () => {
-    await deckStudy.endSession();
-    onNavigate("deck-detail", { deckId });
+    await studySession.endSession();
+    if (isDeckMode && deckId) {
+      onNavigate("deck-detail", { deckId });
+    } else {
+      loadStats(settings?.targetLanguage);
+    }
   };
 
   const handleBack = () => {
-    onNavigate("deck-detail", { deckId });
+    if (isDeckMode && deckId) {
+      onNavigate("deck-detail", { deckId });
+    } else {
+      onNavigate("learn");
+    }
   };
 
   const handleShowAnswerSkip = async () => {
-    if (!deckStudy.currentPhrase) return;
-    const phraseId = deckStudy.currentPhrase.phrase.id;
+    if (!studySession.currentPhrase) return;
+    const phraseId = studySession.currentPhrase.phrase.id;
 
-    await deckStudy.recordAnswer(phraseId, false);
+    await studySession.recordAnswer(phraseId, false);
 
     setShowAnswer(true);
     setFeedback("incorrect");
-    deckStudy.setInRetryMode(true);
-    deckStudy.setRetryCount(0);
-    deckStudy.setRequiresRetry(true);
+    studySession.setInRetryMode(true);
+    studySession.setRetryCount(0);
+    studySession.setRequiresRetry(true);
   };
 
   const handleSpeakingNext = () => {
-    if (!deckStudy.currentPhrase) return;
-    deckStudy.markPhraseSeen(deckStudy.currentPhrase.phrase.id);
+    if (!studySession.currentPhrase) return;
+    studySession.markPhraseSeen(studySession.currentPhrase.phrase.id);
     setShowAnswer(false);
     setFeedback(null);
     setInputAnswer("");
-        setAwaitingProceed(false);
-    deckStudy.loadNextPhrase();
+    setAwaitingProceed(false);
+    studySession.loadNextPhrase();
   };
 
   const handleStartSession = async () => {
-    await deckStudy.startSession(mode);
+    await studySession.startSession(mode);
   };
 
   // Loading state
@@ -290,7 +340,8 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
     );
   }
 
-  if (!deck) {
+  // Deck not found (deck mode only)
+  if (isDeckMode && !deck) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-slate-500 dark:text-slate-400">Deck not found</div>
@@ -299,100 +350,144 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
   }
 
   // Not in a session - show start options
-  if (!deckStudy.session) {
+  if (!studySession.session) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
-        <div className="flex items-center gap-2 mb-6">
-          <Button variant="ghost" size="sm" onClick={handleBack}>
-            Back
-          </Button>
-        </div>
+        {isDeckMode ? (
+          <>
+            <div className="flex items-center gap-2 mb-6">
+              <Button variant="ghost" size="sm" onClick={handleBack}>
+                Back
+              </Button>
+            </div>
 
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
-          Study: {deck.name}
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 mb-6">
-          {deck.graduationThreshold} correct answers to graduate a phrase to SRS
-        </p>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
+              Study: {deck?.name}
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">
+              {deck?.graduationThreshold} correct answers to graduate a phrase to SRS
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-6">
+              SRS Review
+            </h1>
+            {stats && <SessionStats stats={stats} />}
+          </>
+        )}
 
         <ModeSelector mode={mode} onModeChange={setMode} />
 
         <Button
           onClick={handleStartSession}
-          disabled={deckStudy.isLoading}
-          isLoading={deckStudy.isLoading}
+          disabled={studySession.isLoading || (!isDeckMode && (stats?.totalPhrases ?? 0) === 0)}
+          isLoading={studySession.isLoading}
           className="w-full py-4 text-lg"
         >
-          Start Studying
+          {isDeckMode ? "Start Studying" : "Start Practice"}
         </Button>
+
+        {!isDeckMode && stats?.totalPhrases === 0 && (
+          <p className="text-center text-slate-500 dark:text-slate-400 mt-4">
+            Add some phrases first to start practicing!
+          </p>
+        )}
       </div>
     );
   }
 
   // No more phrases
-  if (!deckStudy.currentPhrase && !deckStudy.isLoading) {
+  if (!studySession.currentPhrase && !studySession.isLoading) {
+    const practicedAny =
+      studySession.session.totalPhrases > 0 || studySession.seenPhraseIds.length > 0;
+
+    if (isDeckMode) {
+      return (
+        <div className="p-6 max-w-2xl mx-auto">
+          <EmptyState
+            icon={
+              <BookIcon size="xl" className="text-slate-300 dark:text-slate-600" />
+            }
+            title="Session Complete"
+            description={
+              practicedAny
+                ? `Great work! You practiced ${studySession.seenPhraseIds.length} phrases and graduated ${studySession.graduatedCount}.`
+                : "No phrases to study right now. Add more phrases to this deck."
+            }
+            action={{
+              label: "Back to Deck",
+              onClick: handleEndSession,
+            }}
+          />
+        </div>
+      );
+    }
+
     return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <EmptyState
-          icon={
-            <BookIcon size="xl" className="text-slate-300 dark:text-slate-600" />
-          }
-          title="Session Complete"
-          description={
-            deckStudy.seenPhraseIds.length > 0
-              ? `Great work! You practiced ${deckStudy.seenPhraseIds.length} phrases and graduated ${deckStudy.graduatedCount}.`
-              : "No phrases to study right now. Add more phrases to this deck."
-          }
-          action={{
-            label: "Back to Deck",
-            onClick: handleEndSession,
-          }}
-        />
-      </div>
+      <SessionComplete
+        totalPhrases={studySession.session.totalPhrases}
+        correctAnswers={studySession.session.correctAnswers || 0}
+        practicedAny={practicedAny}
+        onEndSession={handleEndSession}
+      />
     );
   }
 
-  const currentPhrase = deckStudy.currentPhrase;
+  const currentPhrase = studySession.currentPhrase;
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
-      <DeckStudyHeader
-        deckName={deck.name}
-        seenCount={deckStudy.seenPhraseIds.length}
-        correctCount={deckStudy.session.correctAnswers || 0}
-        graduatedCount={deckStudy.graduatedCount}
-        graduationThreshold={deck.graduationThreshold}
-        onEndSession={handleEndSession}
-        onBack={handleBack}
-      />
+      {isDeckMode && deck ? (
+        <DeckStudyHeader
+          deckName={deck.name}
+          seenCount={studySession.seenPhraseIds.length}
+          correctCount={studySession.session.correctAnswers || 0}
+          graduatedCount={studySession.graduatedCount}
+          graduationThreshold={deck.graduationThreshold}
+          onEndSession={handleEndSession}
+          onBack={handleBack}
+        />
+      ) : (
+        <SessionHeader
+          seenCount={studySession.seenPhraseIds.length}
+          totalLimit={settings?.sessionPhraseLimit ?? 0}
+          correctCount={studySession.session.correctAnswers || 0}
+          newCount={studySession.newPhraseCount}
+          newLimit={settings?.newPhrasesPerSession ?? 0}
+          learnedCount={studySession.sessionLearnedCount}
+          onEndSession={handleEndSession}
+        />
+      )}
 
-      {deckStudy.isLoading ? (
+      {studySession.isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Spinner size="lg" />
         </div>
       ) : currentPhrase ? (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
-          {/* Progress indicator for current phrase */}
-          <div className="mb-4 flex items-center justify-between">
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              Progress: {currentPhrase.progress?.deckCorrectCount ?? 0}/{deck.graduationThreshold}
-            </span>
-            <div className="w-24 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                style={{
-                  width: `${Math.min(100, ((currentPhrase.progress?.deckCorrectCount ?? 0) / deck.graduationThreshold) * 100)}%`,
-                }}
-              />
+          {/* Progress indicator for deck mode */}
+          {isDeckMode && deck && (
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                Progress: {currentPhrase.progress?.deckCorrectCount ?? 0}/{deck.graduationThreshold}
+              </span>
+              <div className="w-24 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.min(100, ((currentPhrase.progress?.deckCorrectCount ?? 0) / deck.graduationThreshold) * 100)}%`,
+                  }}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <ExercisePrompt
             prompt={currentPhrase.phrase.prompt}
             onExclude={() => {
-              // For deck study, phrases stay in deck - just skip this one
-              deckStudy.markPhraseSeen(currentPhrase.phrase.id);
-              deckStudy.loadNextPhrase();
+              studySession.markPhraseSeen(currentPhrase.phrase.id);
+              studySession.loadNextPhrase();
             }}
           />
 
@@ -420,14 +515,14 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
             />
           )}
 
-          {deckStudy.inRetryMode && mode === "speaking" && settings && (
+          {studySession.inRetryMode && mode === "speaking" && settings && (
             <RetryModeMessage
-              remainingRetries={(settings.failureRepetitions || 3) - deckStudy.retryCount}
+              remainingRetries={(settings.failureRepetitions || 3) - studySession.retryCount}
             />
           )}
 
           {feedback === "incorrect" &&
-            !(deckStudy.inRetryMode && mode === "speaking") && (
+            !(studySession.inRetryMode && mode === "speaking") && (
               <Button
                 onClick={() => {
                   setShowAnswer(false);
@@ -462,12 +557,12 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
             />
           )}
 
-          {mode === "speaking" && (!feedback || deckStudy.inRetryMode) && (
+          {mode === "speaking" && (!feedback || studySession.inRetryMode) && (
             <SpeakingExercise
               inputAnswer={inputAnswer}
               answer={currentPhrase.phrase.answer}
               showAnswer={showAnswer}
-              inRetryMode={deckStudy.inRetryMode}
+              inRetryMode={studySession.inRetryMode}
               isAvailable={voiceRecording.isAvailable}
               status={voiceRecording.status}
               isPlaying={tts.isPlaying}
@@ -483,7 +578,7 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
           {mode === "speaking" &&
             showAnswer &&
             feedback === "incorrect" &&
-            !deckStudy.inRetryMode && (
+            !studySession.inRetryMode && (
               <SpeakingExercise
                 inputAnswer={inputAnswer}
                 answer={currentPhrase.phrase.answer}
@@ -501,7 +596,7 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
               />
             )}
 
-          {deckStudy.requiresRetry && !feedback && !deckStudy.inRetryMode && (
+          {studySession.requiresRetry && !feedback && !studySession.inRetryMode && (
             <p className="text-center text-sm text-amber-600 dark:text-amber-400 mt-4">
               Retry mode: answer correctly to continue
             </p>
@@ -527,23 +622,23 @@ export function DeckStudyView({ deckId, onNavigate }: DeckStudyViewProps) {
             });
 
             if (
-              deckStudy.currentPhrase &&
-              deckStudy.currentPhrase.phrase.id === refiningPhrase.phrase.id
+              studySession.currentPhrase &&
+              studySession.currentPhrase.phrase.id === refiningPhrase.phrase.id
             ) {
-              deckStudy.setCurrentPhrase({
-                ...deckStudy.currentPhrase,
-                phrase: { ...deckStudy.currentPhrase.phrase, prompt, answer, accepted, refined: true },
+              studySession.setCurrentPhrase({
+                ...studySession.currentPhrase,
+                phrase: { ...studySession.currentPhrase.phrase, prompt, answer, accepted, refined: true },
               });
             }
           }}
           onAudioRegenerated={(audioPath) => {
             if (
-              deckStudy.currentPhrase &&
-              deckStudy.currentPhrase.phrase.id === refiningPhrase.phrase.id
+              studySession.currentPhrase &&
+              studySession.currentPhrase.phrase.id === refiningPhrase.phrase.id
             ) {
-              deckStudy.setCurrentPhrase({
-                ...deckStudy.currentPhrase,
-                phrase: { ...deckStudy.currentPhrase.phrase, audioPath },
+              studySession.setCurrentPhrase({
+                ...studySession.currentPhrase,
+                phrase: { ...studySession.currentPhrase.phrase, audioPath },
               });
             }
             setRefiningPhrase((prev) =>

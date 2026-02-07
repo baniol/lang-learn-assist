@@ -99,13 +99,14 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, phrase_id, correct_streak, total_attempts, success_count,
-                    last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count
+                    last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count, learning_status
              FROM phrase_progress",
         )
         .map_err(|e| format!("Failed to prepare phrase_progress query: {}", e))?;
     let phrase_progress = stmt
         .query_map([], |row| {
             let in_srs_pool_int: i32 = row.get(9).unwrap_or(1);
+            let learning_status: String = row.get(11).unwrap_or_else(|_| "inactive".to_string());
             Ok(ExportPhraseProgress {
                 id: row.get(0)?,
                 phrase_id: row.get(1)?,
@@ -118,6 +119,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
                 next_review_at: row.get(8).ok(),
                 in_srs_pool: in_srs_pool_int != 0,
                 deck_correct_count: row.get(10).unwrap_or(0),
+                learning_status,
             })
         })
         .map_err(|e| format!("Failed to query phrase_progress: {}", e))?
@@ -277,7 +279,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
     // Export decks
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, description, target_language, native_language, graduation_threshold, created_at, updated_at
+            "SELECT id, name, description, target_language, native_language, graduation_threshold, created_at, updated_at, level, category
              FROM decks",
         )
         .map_err(|e| format!("Failed to prepare decks query: {}", e))?;
@@ -290,6 +292,8 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
                 target_language: row.get(3)?,
                 native_language: row.get(4)?,
                 graduation_threshold: row.get(5)?,
+                level: row.get(8)?,
+                category: row.get(9)?,
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
             })
@@ -457,8 +461,8 @@ pub fn import_data_with_conn(
                 tx.execute(
                     "INSERT INTO phrase_progress (id, phrase_id, correct_streak, total_attempts,
                                                  success_count, last_seen, ease_factor,
-                                                 interval_days, next_review_at, in_srs_pool, deck_correct_count)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                                                 interval_days, next_review_at, in_srs_pool, deck_correct_count, learning_status)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                     params![
                         progress.id,
                         progress.phrase_id,
@@ -470,7 +474,8 @@ pub fn import_data_with_conn(
                         progress.interval_days,
                         progress.next_review_at,
                         progress.in_srs_pool as i32,
-                        progress.deck_correct_count
+                        progress.deck_correct_count,
+                        progress.learning_status
                     ],
                 )
                 .map_err(|e| format!("Failed to import phrase_progress: {}", e))?;
@@ -772,8 +777,8 @@ pub fn import_data_with_conn(
                         tx.execute(
                             "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts,
                                                          success_count, last_seen, ease_factor,
-                                                         interval_days, next_review_at, in_srs_pool, deck_correct_count)
-                             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                                                         interval_days, next_review_at, in_srs_pool, deck_correct_count, learning_status)
+                             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                             params![
                                 new_phrase_id,
                                 progress.correct_streak,
@@ -784,7 +789,8 @@ pub fn import_data_with_conn(
                                 progress.interval_days,
                                 progress.next_review_at,
                                 progress.in_srs_pool as i32,
-                                progress.deck_correct_count
+                                progress.deck_correct_count,
+                                progress.learning_status
                             ],
                         )
                         .map_err(|e| format!("Failed to import phrase_progress: {}", e))?;
@@ -1047,6 +1053,7 @@ mod tests {
                 next_review_at: Some("2024-01-04T00:00:00Z".to_string()),
                 in_srs_pool: true,
                 deck_correct_count: 0,
+                learning_status: "srs_active".to_string(),
             }],
             phrase_threads: vec![],
             question_threads: vec![],

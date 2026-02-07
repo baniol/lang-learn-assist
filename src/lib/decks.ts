@@ -32,6 +32,10 @@ export async function deleteDeck(deckId: number): Promise<void> {
   return invoke("delete_deck", { deckId });
 }
 
+export async function resetDeck(deckId: number): Promise<void> {
+  return invoke("reset_deck", { deckId });
+}
+
 export async function assignPhraseToDeck(
   phraseId: number,
   deckId: number | null

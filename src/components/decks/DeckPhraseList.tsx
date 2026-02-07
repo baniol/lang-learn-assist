@@ -28,7 +28,7 @@ export function DeckPhraseList({
       {phrases.map((item) => {
         const { phrase, progress } = item;
         const deckCorrectCount = progress?.deckCorrectCount ?? 0;
-        const isGraduated = progress?.inSrsPool ?? false;
+        const isGraduated = progress?.learningStatus === "srs_active";
         const progressPercent = Math.min(
           100,
           Math.round((deckCorrectCount / graduationThreshold) * 100)

@@ -60,6 +60,9 @@ export interface Phrase {
   createdAt: string;
 }
 
+// Learning status - determines where phrase is in the learning lifecycle
+export type LearningStatus = "inactive" | "deck_learning" | "srs_active";
+
 export interface PhraseProgress {
   id: number;
   phraseId: number;
@@ -71,9 +74,12 @@ export interface PhraseProgress {
   easeFactor: number;
   intervalDays: number;
   nextReviewAt: string | null;
+  // Learning status - new unified field
+  learningStatus: LearningStatus;
   // Deck graduation fields
-  inSrsPool: boolean;
   deckCorrectCount: number;
+  // Legacy field - kept for backwards compatibility
+  inSrsPool: boolean;
 }
 
 export interface AnswerResult {
@@ -91,6 +97,9 @@ export interface Deck {
   targetLanguage: string;
   nativeLanguage: string;
   graduationThreshold: number;
+  // Future metadata fields for levels/themes
+  level: string | null;
+  category: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -123,6 +132,23 @@ export interface DeckAnswerResult {
   graduationThreshold: number;
 }
 
+// Unified study mode for the new API
+export type StudyModeType =
+  | { type: "deck_learning"; deckId: number }
+  | { type: "srs_review" };
+
+// Unified result of recording an answer in study mode
+export interface StudyAnswerResult {
+  progress: PhraseProgress;
+  // SRS-specific fields
+  sessionStreak?: number;
+  isLearnedInSession?: boolean;
+  // Deck-specific fields
+  deckCorrectCount?: number;
+  justGraduated?: boolean;
+  graduationThreshold?: number;
+}
+
 export interface PhraseWithProgress {
   phrase: Phrase;
   progress: PhraseProgress | null;
@@ -152,6 +178,7 @@ export interface SessionState {
   sessionType?: StudyMode;
 }
 
+// Legacy study mode type (simple string)
 export type StudyMode = "srs_review" | "deck_study";
 
 export type ExerciseMode = "speaking" | "typing" | "manual";
@@ -445,6 +472,9 @@ export interface ExportPhraseProgress {
   easeFactor: number;
   intervalDays: number;
   nextReviewAt: string | null;
+  inSrsPool: boolean;
+  deckCorrectCount: number;
+  learningStatus: string;
 }
 
 export interface ExportPhraseThread {

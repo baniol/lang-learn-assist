@@ -3,7 +3,7 @@
 //! This module provides shared functions to eliminate duplication in row-to-model
 //! conversions across different command modules.
 
-use crate::models::{Phrase, PhraseProgress, PhraseWithProgress};
+use crate::models::{LearningStatus, Phrase, PhraseProgress, PhraseWithProgress};
 use rusqlite::Row;
 
 /// Convert a database row to a Phrase model.
@@ -45,10 +45,11 @@ pub fn row_to_phrase(row: &Row) -> Result<Phrase, rusqlite::Error> {
 /// Expected columns at offset:
 /// +0: progress_id, +1: correct_streak, +2: total_attempts, +3: success_count,
 /// +4: last_seen, +5: ease_factor, +6: interval_days, +7: next_review_at,
-/// +8: in_srs_pool, +9: deck_correct_count
+/// +8: in_srs_pool, +9: deck_correct_count, +10: learning_status
 pub fn row_to_phrase_progress(row: &Row, offset: usize, phrase_id: i64) -> Option<PhraseProgress> {
     row.get::<_, Option<i64>>(offset).ok().flatten().map(|progress_id| {
         let in_srs_pool_int: i32 = row.get(offset + 8).unwrap_or(1);
+        let learning_status_str: String = row.get(offset + 10).unwrap_or_else(|_| "inactive".to_string());
         PhraseProgress {
             id: progress_id,
             phrase_id,
@@ -59,8 +60,9 @@ pub fn row_to_phrase_progress(row: &Row, offset: usize, phrase_id: i64) -> Optio
             ease_factor: row.get(offset + 5).unwrap_or(2.5),
             interval_days: row.get(offset + 6).unwrap_or(1),
             next_review_at: row.get(offset + 7).ok(),
-            in_srs_pool: in_srs_pool_int != 0,
+            learning_status: LearningStatus::from_str(&learning_status_str),
             deck_correct_count: row.get(offset + 9).unwrap_or(0),
+            in_srs_pool: in_srs_pool_int != 0,
         }
     })
 }
@@ -69,7 +71,7 @@ pub fn row_to_phrase_progress(row: &Row, offset: usize, phrase_id: i64) -> Optio
 ///
 /// Expects columns:
 /// - Phrase columns at indices 0-14 (including deck_id, refined)
-/// - Progress columns at indices 15-24 (including in_srs_pool, deck_correct_count)
+/// - Progress columns at indices 15-25 (including in_srs_pool, deck_correct_count, learning_status)
 pub fn row_to_phrase_with_progress(row: &Row) -> Result<PhraseWithProgress, rusqlite::Error> {
     let phrase = row_to_phrase(row)?;
     let progress = row_to_phrase_progress(row, 15, phrase.id);

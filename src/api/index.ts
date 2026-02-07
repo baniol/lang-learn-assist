@@ -33,9 +33,11 @@ export {
   getPracticeSessions,
   getNextPhrase,
   getNextDeckPhrase,
+  getStudyPhrase, // Unified API
   validateAnswer,
   recordAnswer,
   recordDeckAnswer,
+  recordStudyAnswer, // Unified API
   getLearningStats,
   getSrsStats,
 } from "./learning";

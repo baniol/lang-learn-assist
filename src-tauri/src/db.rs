@@ -369,6 +369,31 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Migration: Add deck metadata columns (for future levels/themes feature)
+    let deck_columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(decks)")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    if !deck_columns.contains(&"level".to_string()) {
+        log_migration_result(
+            "add level to decks",
+            conn.execute("ALTER TABLE decks ADD COLUMN level TEXT", []),
+        );
+    }
+
+    if !deck_columns.contains(&"category".to_string()) {
+        log_migration_result(
+            "add category to decks",
+            conn.execute("ALTER TABLE decks ADD COLUMN category TEXT", []),
+        );
+    }
+
     // Migration: Add deck_id column to phrases if it doesn't exist
     // Re-read phrase_columns as we may have added columns above
     let phrase_columns_updated: Vec<String> = conn
@@ -418,6 +443,37 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             "add deck_correct_count to phrase_progress",
             conn.execute(
                 "ALTER TABLE phrase_progress ADD COLUMN deck_correct_count INTEGER NOT NULL DEFAULT 0",
+                [],
+            ),
+        );
+    }
+
+    // Migration: Add learning_status column to phrase_progress
+    // Values: 'inactive', 'deck_learning', 'srs_active'
+    // New phrases start as 'inactive' (not learnable until added to a deck)
+    if !progress_columns_updated.contains(&"learning_status".to_string()) {
+        log_migration_result(
+            "add learning_status to phrase_progress",
+            conn.execute(
+                "ALTER TABLE phrase_progress ADD COLUMN learning_status TEXT NOT NULL DEFAULT 'inactive'",
+                [],
+            ),
+        );
+
+        // Migrate existing data from in_srs_pool to learning_status
+        // in_srs_pool = 0 (in deck learning) -> 'deck_learning'
+        // in_srs_pool = 1 (graduated to SRS) -> 'srs_active'
+        log_migration_result(
+            "migrate in_srs_pool=0 to learning_status=deck_learning",
+            conn.execute(
+                "UPDATE phrase_progress SET learning_status = 'deck_learning' WHERE in_srs_pool = 0",
+                [],
+            ),
+        );
+        log_migration_result(
+            "migrate in_srs_pool=1 to learning_status=srs_active",
+            conn.execute(
+                "UPDATE phrase_progress SET learning_status = 'srs_active' WHERE in_srs_pool = 1",
                 [],
             ),
         );

@@ -7,7 +7,7 @@ import { DashboardView } from "./views/DashboardView";
 import { ConversationView } from "./views/ConversationView";
 import { ConversationReviewView } from "./views/ConversationReviewView";
 import { PhraseLibraryView } from "./views/PhraseLibraryView";
-import { LearnView } from "./views/LearnView";
+import { StudyView } from "./views/StudyView";
 import { StatsView } from "./views/StatsView";
 import { QuestionsView } from "./views/QuestionsView";
 import { SettingsView } from "./views/SettingsView";
@@ -17,7 +17,6 @@ import { MaterialCreateView } from "./views/MaterialCreateView";
 import { MaterialReviewView } from "./views/MaterialReviewView";
 import { DecksView } from "./views/DecksView";
 import { DeckDetailView } from "./views/DeckDetailView";
-import { DeckStudyView } from "./views/DeckStudyView";
 import { QuickNotePopup } from "./components/QuickNotePopup";
 import { PageSpinner } from "./components/ui";
 import { useNavigation } from "./hooks";
@@ -96,7 +95,7 @@ function AppContent() {
     }
     if (isDeckStudyView(viewState)) {
       return (
-        <DeckStudyView
+        <StudyView
           deckId={viewState.deckId}
           onNavigate={legacyNavigate}
         />
@@ -110,7 +109,7 @@ function AppContent() {
       case "phrase-library":
         return <PhraseLibraryView />;
       case "learn":
-        return <LearnView />;
+        return <StudyView onNavigate={legacyNavigate} />;
       case "stats":
         return <StatsView />;
       case "questions":

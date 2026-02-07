@@ -58,8 +58,10 @@ pub fn run() {
             // Learning
             learning::selection::get_next_phrase,
             learning::selection::get_next_deck_phrase,
+            learning::selection::get_study_phrase,  // Unified command
             learning::answer::record_answer,
             learning::answer::record_deck_answer,
+            learning::answer::record_study_answer,  // Unified command
             learning::answer::validate_answer,
             learning::stats::get_learning_stats,
             learning::stats::get_srs_stats,
@@ -131,6 +133,7 @@ pub fn run() {
             decks::create_deck,
             decks::update_deck,
             decks::delete_deck,
+            decks::reset_deck,
             decks::assign_phrase_to_deck,
             decks::assign_phrases_to_deck,
             decks::get_deck_phrases,

@@ -4,6 +4,7 @@ import {
   getDeckPhrases,
   updateDeck,
   deleteDeck,
+  resetDeck,
   assignPhraseToDeck,
 } from "../lib/decks";
 import { Button, Spinner, ConfirmDialog, Input, Badge } from "../components/ui";
@@ -14,6 +15,7 @@ import {
   EditIcon,
   TrashIcon,
   BookIcon,
+  RefreshIcon,
 } from "../components/icons";
 import { DeckPhraseList } from "../components/decks";
 import { useToast } from "../contexts/ToastContext";
@@ -32,6 +34,7 @@ export function DeckDetailView({ deckId, onNavigate }: DeckDetailViewProps) {
   const [editDescription, setEditDescription] = useState("");
   const [editThreshold, setEditThreshold] = useState(2);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Fetch deck
   const {
@@ -80,6 +83,19 @@ export function DeckDetailView({ deckId, onNavigate }: DeckDetailViewProps) {
     onError: (err) => {
       setShowDeleteConfirm(false);
       toast.error(`Failed to delete deck: ${err.message}`);
+    },
+  });
+
+  // Reset deck mutation
+  const resetMutation = useMutation(() => resetDeck(deckId), {
+    onSuccess: () => {
+      setShowResetConfirm(false);
+      refetchPhrases();
+      toast.success("Deck reset - all phrases ready to study again");
+    },
+    onError: (err) => {
+      setShowResetConfirm(false);
+      toast.error(`Failed to reset deck: ${err.message}`);
     },
   });
 
@@ -137,9 +153,9 @@ export function DeckDetailView({ deckId, onNavigate }: DeckDetailViewProps) {
   }
 
   const learningCount =
-    phrases?.filter((p) => !p.progress?.inSrsPool).length ?? 0;
+    phrases?.filter((p) => !p.progress || p.progress.learningStatus !== "srs_active").length ?? 0;
   const graduatedCount =
-    phrases?.filter((p) => p.progress?.inSrsPool).length ?? 0;
+    phrases?.filter((p) => p.progress?.learningStatus === "srs_active").length ?? 0;
 
   return (
     <div className="h-full flex flex-col">
@@ -248,6 +264,16 @@ export function DeckDetailView({ deckId, onNavigate }: DeckDetailViewProps) {
               >
                 <EditIcon size="sm" />
               </Button>
+              {graduatedCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowResetConfirm(true)}
+                  title="Reset deck progress"
+                >
+                  <RefreshIcon size="sm" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -301,6 +327,18 @@ export function DeckDetailView({ deckId, onNavigate }: DeckDetailViewProps) {
         confirmLabel="Delete"
         variant="danger"
         isLoading={deleteMutation.isLoading}
+      />
+
+      {/* Reset Confirmation */}
+      <ConfirmDialog
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={() => resetMutation.mutate()}
+        title="Reset Deck?"
+        message="This will reset all phrase progress in this deck. Graduated phrases will need to be studied again from scratch."
+        confirmLabel="Reset"
+        variant="danger"
+        isLoading={resetMutation.isLoading}
       />
     </div>
   );

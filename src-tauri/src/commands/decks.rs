@@ -34,11 +34,11 @@ pub fn get_decks(targetLanguage: Option<String>) -> Result<Vec<DeckWithStats>, S
 
     let query = format!(
         "SELECT d.id, d.name, d.description, d.target_language, d.native_language,
-                d.graduation_threshold, d.created_at, d.updated_at,
+                d.graduation_threshold, d.created_at, d.updated_at, d.level, d.category,
                 (SELECT COUNT(*) FROM phrases p WHERE p.deck_id = d.id) as total_phrases,
                 (SELECT COUNT(*) FROM phrases p
                  JOIN phrase_progress pp ON p.id = pp.phrase_id
-                 WHERE p.deck_id = d.id AND pp.in_srs_pool = 1) as graduated_count
+                 WHERE p.deck_id = d.id AND pp.learning_status = 'srs_active') as graduated_count
          FROM decks d{}
          ORDER BY d.created_at DESC",
         where_clause
@@ -51,8 +51,8 @@ pub fn get_decks(targetLanguage: Option<String>) -> Result<Vec<DeckWithStats>, S
     let params: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
     let decks = stmt
         .query_map(params.as_slice(), |row| {
-            let total_phrases: i32 = row.get(8)?;
-            let graduated_count: i32 = row.get(9)?;
+            let total_phrases: i32 = row.get(10)?;
+            let graduated_count: i32 = row.get(11)?;
             Ok(DeckWithStats {
                 deck: Deck {
                     id: row.get(0)?,
@@ -61,6 +61,8 @@ pub fn get_decks(targetLanguage: Option<String>) -> Result<Vec<DeckWithStats>, S
                     target_language: row.get(3)?,
                     native_language: row.get(4)?,
                     graduation_threshold: row.get(5)?,
+                    level: row.get(8)?,
+                    category: row.get(9)?,
                     created_at: row.get(6)?,
                     updated_at: row.get(7)?,
                 },
@@ -84,7 +86,7 @@ pub fn get_deck(deckId: i64) -> Result<Deck, String> {
 
     conn.query_row(
         "SELECT id, name, description, target_language, native_language,
-                graduation_threshold, created_at, updated_at
+                graduation_threshold, created_at, updated_at, level, category
          FROM decks WHERE id = ?1",
         params![deckId],
         |row| {
@@ -95,6 +97,8 @@ pub fn get_deck(deckId: i64) -> Result<Deck, String> {
                 target_language: row.get(3)?,
                 native_language: row.get(4)?,
                 graduation_threshold: row.get(5)?,
+                level: row.get(8)?,
+                category: row.get(9)?,
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
             })
@@ -136,7 +140,7 @@ pub fn create_deck(state: State<'_, AppState>, request: CreateDeckRequest) -> Re
 
     conn.query_row(
         "SELECT id, name, description, target_language, native_language,
-                graduation_threshold, created_at, updated_at
+                graduation_threshold, created_at, updated_at, level, category
          FROM decks WHERE id = ?1",
         params![id],
         |row| {
@@ -147,6 +151,8 @@ pub fn create_deck(state: State<'_, AppState>, request: CreateDeckRequest) -> Re
                 target_language: row.get(3)?,
                 native_language: row.get(4)?,
                 graduation_threshold: row.get(5)?,
+                level: row.get(8)?,
+                category: row.get(9)?,
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
             })
@@ -187,7 +193,7 @@ pub fn update_deck(deckId: i64, request: UpdateDeckRequest) -> Result<Deck, Stri
 
     conn.query_row(
         "SELECT id, name, description, target_language, native_language,
-                graduation_threshold, created_at, updated_at
+                graduation_threshold, created_at, updated_at, level, category
          FROM decks WHERE id = ?1",
         params![deckId],
         |row| {
@@ -198,6 +204,8 @@ pub fn update_deck(deckId: i64, request: UpdateDeckRequest) -> Result<Deck, Stri
                 target_language: row.get(3)?,
                 native_language: row.get(4)?,
                 graduation_threshold: row.get(5)?,
+                level: row.get(8)?,
+                category: row.get(9)?,
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
             })
@@ -218,6 +226,27 @@ pub fn delete_deck(deckId: i64) -> Result<(), String> {
     Ok(())
 }
 
+/// Reset all phrases in a deck to start learning from scratch.
+/// This sets learning_status back to 'deck_learning' and resets deck_correct_count to 0.
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn reset_deck(deckId: i64) -> Result<(), String> {
+    let conn = get_conn()?;
+
+    // Reset all phrase progress for phrases in this deck
+    conn.execute(
+        "UPDATE phrase_progress
+         SET learning_status = 'deck_learning',
+             in_srs_pool = 0,
+             deck_correct_count = 0
+         WHERE phrase_id IN (SELECT id FROM phrases WHERE deck_id = ?1)",
+        params![deckId],
+    )
+    .map_err(|e| format!("Failed to reset deck: {}", e))?;
+
+    Ok(())
+}
+
 /// Assign a single phrase to a deck (or remove from deck if deck_id is None).
 #[tauri::command]
 #[allow(non_snake_case)]
@@ -230,9 +259,9 @@ pub fn assign_phrase_to_deck(phraseId: i64, deckId: Option<i64>) -> Result<(), S
     )
     .map_err(|e| format!("Failed to assign phrase to deck: {}", e))?;
 
-    // If assigning to a deck, reset the phrase's SRS pool status and deck correct count
+    // If assigning to a deck, set learning_status to 'deck_learning' and reset deck_correct_count
     if deckId.is_some() {
-        // Create or update phrase progress with in_srs_pool = 0
+        // Create or update phrase progress with learning_status = 'deck_learning'
         let existing: Option<i64> = conn
             .query_row(
                 "SELECT id FROM phrase_progress WHERE phrase_id = ?1",
@@ -241,16 +270,16 @@ pub fn assign_phrase_to_deck(phraseId: i64, deckId: Option<i64>) -> Result<(), S
             )
             .ok();
 
-        if let Some(_) = existing {
+        if existing.is_some() {
             conn.execute(
-                "UPDATE phrase_progress SET in_srs_pool = 0, deck_correct_count = 0 WHERE phrase_id = ?1",
+                "UPDATE phrase_progress SET learning_status = 'deck_learning', in_srs_pool = 0, deck_correct_count = 0 WHERE phrase_id = ?1",
                 params![phraseId],
             )
             .map_err(|e| format!("Failed to update phrase progress: {}", e))?;
         } else {
             conn.execute(
-                "INSERT INTO phrase_progress (phrase_id, in_srs_pool, deck_correct_count)
-                 VALUES (?1, 0, 0)",
+                "INSERT INTO phrase_progress (phrase_id, learning_status, in_srs_pool, deck_correct_count)
+                 VALUES (?1, 'deck_learning', 0, 0)",
                 params![phraseId],
             )
             .map_err(|e| format!("Failed to create phrase progress: {}", e))?;
@@ -276,7 +305,7 @@ pub fn assign_phrases_to_deck(phraseIds: Vec<i64>, deckId: Option<i64>) -> Resul
         )
         .map_err(|e| format!("Failed to assign phrase {} to deck: {}", phrase_id, e))?;
 
-        // If assigning to a deck, reset the phrase's SRS pool status
+        // If assigning to a deck, set learning_status to 'deck_learning'
         if deckId.is_some() {
             let existing: Option<i64> = tx
                 .query_row(
@@ -286,16 +315,16 @@ pub fn assign_phrases_to_deck(phraseIds: Vec<i64>, deckId: Option<i64>) -> Resul
                 )
                 .ok();
 
-            if let Some(_) = existing {
+            if existing.is_some() {
                 tx.execute(
-                    "UPDATE phrase_progress SET in_srs_pool = 0, deck_correct_count = 0 WHERE phrase_id = ?1",
+                    "UPDATE phrase_progress SET learning_status = 'deck_learning', in_srs_pool = 0, deck_correct_count = 0 WHERE phrase_id = ?1",
                     params![phrase_id],
                 )
                 .map_err(|e| format!("Failed to update phrase progress: {}", e))?;
             } else {
                 tx.execute(
-                    "INSERT INTO phrase_progress (phrase_id, in_srs_pool, deck_correct_count)
-                     VALUES (?1, 0, 0)",
+                    "INSERT INTO phrase_progress (phrase_id, learning_status, in_srs_pool, deck_correct_count)
+                     VALUES (?1, 'deck_learning', 0, 0)",
                     params![phrase_id],
                 )
                 .map_err(|e| format!("Failed to create phrase progress: {}", e))?;
@@ -320,7 +349,7 @@ pub fn get_deck_phrases(deckId: i64) -> Result<Vec<PhraseWithProgress>, String> 
             "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
                     p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                     pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
-                    pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count
+                    pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count, pp.learning_status
              FROM phrases p
              LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
              WHERE p.deck_id = ?1
@@ -407,6 +436,8 @@ mod tests {
                             target_language: row.get(3)?,
                             native_language: row.get(4)?,
                             graduation_threshold: row.get(5)?,
+                            level: None,
+                            category: None,
                             created_at: row.get(6)?,
                             updated_at: row.get(7)?,
                         },
@@ -452,6 +483,8 @@ mod tests {
                                 target_language: row.get(3)?,
                                 native_language: row.get(4)?,
                                 graduation_threshold: row.get(5)?,
+                                level: None,
+                                category: None,
                                 created_at: row.get(6)?,
                                 updated_at: row.get(7)?,
                             },
@@ -495,6 +528,8 @@ mod tests {
                         graduation_threshold: row.get(5)?,
                         created_at: row.get(6)?,
                         updated_at: row.get(7)?,
+                        level: row.get::<_, Option<String>>(8)?,
+                        category: row.get::<_, Option<String>>(9)?,
                     })
                 })
                 .expect("Failed to query deck");
@@ -535,6 +570,8 @@ mod tests {
                             graduation_threshold: row.get(5)?,
                             created_at: row.get(6)?,
                             updated_at: row.get(7)?,
+                            level: row.get::<_, Option<String>>(8)?,
+                            category: row.get::<_, Option<String>>(9)?,
                         })
                     },
                 )
