@@ -150,6 +150,14 @@ export async function getSrsStats(targetLanguage?: string): Promise<SrsStats> {
   });
 }
 
+export async function resetPracticeSessions(): Promise<number> {
+  return invoke<number>("reset_practice_sessions");
+}
+
+export async function resetPhraseProgress(): Promise<number> {
+  return invoke<number>("reset_phrase_progress");
+}
+
 // ============================================================================
 // Unified Study API (New)
 // ============================================================================
@@ -166,6 +174,7 @@ export async function getStudyPhrase(
     newPhraseLimit?: number;
     sessionPosition?: number;
     newPhraseInterval?: number;
+    targetLanguage?: string;
   }
 ): Promise<PhraseWithProgress | null> {
   return invoke<PhraseWithProgress | null>("get_study_phrase", {
@@ -175,6 +184,7 @@ export async function getStudyPhrase(
     newPhraseLimit: options?.newPhraseLimit ?? 0,
     sessionPosition: options?.sessionPosition ?? 0,
     newPhraseInterval: options?.newPhraseInterval ?? 4,
+    targetLanguage: options?.targetLanguage ?? null,
   });
 }
 

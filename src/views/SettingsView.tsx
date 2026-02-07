@@ -20,7 +20,9 @@ import {
   LearningSettingsSection,
   NotesSettingsSection,
   DataManagementSection,
+  ResetSection,
 } from "../components/settings";
+import { resetPracticeSessions, resetPhraseProgress } from "../api";
 import type {
   AppSettings,
   WhisperModel,
@@ -387,6 +389,11 @@ export function SettingsView() {
           onImportModeChange={setImportMode}
           onExport={handleExport}
           onImport={handleImport}
+        />
+
+        <ResetSection
+          onResetSessions={resetPracticeSessions}
+          onResetProgress={resetPhraseProgress}
         />
       </div>
 

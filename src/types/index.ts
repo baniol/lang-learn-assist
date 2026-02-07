@@ -240,6 +240,9 @@ export interface LearningStats {
   newCount: number;
   averageSuccessRate: number;
   totalSessions: number;
+  // Deck-specific stats
+  inDecksCount: number;
+  graduatedToSrsCount: number;
 }
 
 export interface SrsStats {

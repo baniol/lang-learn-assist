@@ -35,10 +35,9 @@ pub fn get_next_phrase(
     // Always exclude phrases marked as excluded
     conditions.push("(p.excluded = 0 OR p.excluded IS NULL)".to_string());
 
-    // Only include phrases that are in SRS active state (graduated from deck)
-    // Phrases with learning_status = 'srs_active' are ready for spaced repetition
-    // Also include phrases without progress (pp.id IS NULL) as they may be legacy phrases
-    conditions.push("(pp.learning_status = 'srs_active' OR pp.id IS NULL)".to_string());
+    // Only include phrases that have graduated to SRS pool
+    // Phrases must have in_srs_pool = 1 to appear in SRS review
+    conditions.push("pp.in_srs_pool = 1".to_string());
 
     if let Some(ref lang) = target_language {
         conditions.push("p.target_language = ?".to_string());
@@ -224,16 +223,15 @@ pub fn get_study_phrase(
     newPhraseLimit: Option<i32>,
     sessionPosition: Option<i32>,
     newPhraseInterval: Option<i32>,
+    targetLanguage: Option<String>,
 ) -> Result<Option<PhraseWithProgress>, String> {
     match mode {
         StudyMode::DeckLearning { deck_id } => {
             get_next_deck_phrase(deck_id, excludeIds)
         }
         StudyMode::SrsReview => {
-            // For SRS review, we use the original get_next_phrase but without target_language filter
-            // since the frontend will handle filtering
             get_next_phrase(
-                None, // target_language - let frontend handle filtering
+                targetLanguage,
                 excludeIds,
                 newPhraseCount,
                 newPhraseLimit,

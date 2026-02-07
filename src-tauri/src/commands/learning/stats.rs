@@ -89,6 +89,35 @@ pub fn get_learning_stats(target_language: Option<String>) -> Result<LearningSta
         })
         .unwrap_or(0);
 
+    // Phrases in decks (have deck_id, not yet graduated to SRS)
+    let in_decks_count: i32 = conn
+        .query_row(
+            &format!(
+                "SELECT COUNT(*) FROM phrases p
+                 LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
+                 WHERE p.deck_id IS NOT NULL
+                 AND (pp.in_srs_pool = 0 OR pp.in_srs_pool IS NULL){}",
+                lang_filter
+            ),
+            params.as_slice(),
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    // Phrases graduated to SRS (in_srs_pool = 1)
+    let graduated_to_srs_count: i32 = conn
+        .query_row(
+            &format!(
+                "SELECT COUNT(*) FROM phrases p
+                 JOIN phrase_progress pp ON p.id = pp.phrase_id
+                 WHERE pp.in_srs_pool = 1{}",
+                lang_filter
+            ),
+            params.as_slice(),
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
     Ok(LearningStats {
         total_phrases,
         learned_count,
@@ -96,6 +125,8 @@ pub fn get_learning_stats(target_language: Option<String>) -> Result<LearningSta
         new_count,
         average_success_rate,
         total_sessions,
+        in_decks_count,
+        graduated_to_srs_count,
     })
 }
 
@@ -117,6 +148,7 @@ pub fn get_srs_stats(target_language: Option<String>) -> Result<SrsStats, String
     let week_str = week_end.format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Build language filter clause
+    // All SRS stats filter by in_srs_pool = 1 to only count graduated phrases
     let (lang_join, lang_filter) = match &target_language {
         Some(_) => (
             "INNER JOIN phrases p ON pp.phrase_id = p.id",
@@ -125,61 +157,61 @@ pub fn get_srs_stats(target_language: Option<String>) -> Result<SrsStats, String
         None => ("", ""),
     };
 
-    // Due now (overdue)
+    // Due now (overdue) - only phrases in SRS pool
     let overdue: i32 = query_srs_count(
         &conn,
         &format!(
-            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at < ?1 {}",
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.in_srs_pool = 1 AND pp.next_review_at < ?1 {}",
             lang_join, lang_filter
         ),
-        "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at < ?1",
+        "SELECT COUNT(*) FROM phrase_progress WHERE in_srs_pool = 1 AND next_review_at < ?1",
         &target_language,
         &[&now_str as &dyn rusqlite::ToSql],
     );
 
-    // Due today (including overdue)
+    // Due today (including overdue) - only phrases in SRS pool
     let due_today: i32 = query_srs_count(
         &conn,
         &format!(
-            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at <= ?1 {}",
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.in_srs_pool = 1 AND pp.next_review_at <= ?1 {}",
             lang_join, lang_filter
         ),
-        "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at <= ?1",
+        "SELECT COUNT(*) FROM phrase_progress WHERE in_srs_pool = 1 AND next_review_at <= ?1",
         &target_language,
         &[&today_str as &dyn rusqlite::ToSql],
     );
 
-    // Due tomorrow
+    // Due tomorrow - only phrases in SRS pool
     let due_tomorrow: i32 = query_srs_count_range(
         &conn,
         &format!(
-            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at > ?1 AND pp.next_review_at <= ?2 {}",
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.in_srs_pool = 1 AND pp.next_review_at > ?1 AND pp.next_review_at <= ?2 {}",
             lang_join, lang_filter
         ),
-        "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at > ?1 AND next_review_at <= ?2",
+        "SELECT COUNT(*) FROM phrase_progress WHERE in_srs_pool = 1 AND next_review_at > ?1 AND next_review_at <= ?2",
         &target_language,
         &today_str,
         &tomorrow_str,
     );
 
-    // Due this week
+    // Due this week - only phrases in SRS pool
     let due_this_week: i32 = query_srs_count_range(
         &conn,
         &format!(
-            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at > ?1 AND pp.next_review_at <= ?2 {}",
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.in_srs_pool = 1 AND pp.next_review_at > ?1 AND pp.next_review_at <= ?2 {}",
             lang_join, lang_filter
         ),
-        "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at > ?1 AND next_review_at <= ?2",
+        "SELECT COUNT(*) FROM phrase_progress WHERE in_srs_pool = 1 AND next_review_at > ?1 AND next_review_at <= ?2",
         &target_language,
         &today_str,
         &week_str,
     );
 
-    // Total phrases with reviews scheduled
+    // Total phrases with reviews scheduled - only phrases in SRS pool
     let total_reviews: i32 = query_srs_count_no_date(
         &conn,
         &format!(
-            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.next_review_at IS NOT NULL {}",
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.in_srs_pool = 1 AND pp.next_review_at IS NOT NULL {}",
             lang_join,
             if target_language.is_some() {
                 "AND p.target_language = ?1"
@@ -187,27 +219,27 @@ pub fn get_srs_stats(target_language: Option<String>) -> Result<SrsStats, String
                 ""
             }
         ),
-        "SELECT COUNT(*) FROM phrase_progress WHERE next_review_at IS NOT NULL",
+        "SELECT COUNT(*) FROM phrase_progress WHERE in_srs_pool = 1 AND next_review_at IS NOT NULL",
         &target_language,
     );
 
-    // Average ease factor
+    // Average ease factor - only phrases in SRS pool
     let average_ease_factor: f64 = query_srs_avg(
         &conn,
         &format!(
-            "SELECT COALESCE(AVG(pp.ease_factor), 2.5) FROM phrase_progress pp {} {}",
+            "SELECT COALESCE(AVG(pp.ease_factor), 2.5) FROM phrase_progress pp {} WHERE pp.in_srs_pool = 1 {}",
             lang_join,
             if target_language.is_some() {
-                "WHERE p.target_language = ?1"
+                "AND p.target_language = ?1"
             } else {
                 ""
             }
         ),
-        "SELECT COALESCE(AVG(ease_factor), 2.5) FROM phrase_progress",
+        "SELECT COALESCE(AVG(ease_factor), 2.5) FROM phrase_progress WHERE in_srs_pool = 1",
         &target_language,
     );
 
-    // Interval distribution
+    // Interval distribution - only phrases in SRS pool
     let interval_distribution = get_interval_distribution(&conn, lang_join, &target_language);
 
     Ok(SrsStats {
@@ -302,7 +334,7 @@ fn query_srs_avg(
     }
 }
 
-/// Get interval distribution statistics.
+/// Get interval distribution statistics (only for phrases in SRS pool).
 fn get_interval_distribution(
     conn: &rusqlite::Connection,
     lang_join: &str,
@@ -310,7 +342,7 @@ fn get_interval_distribution(
 ) -> IntervalDistribution {
     let interval_count = |condition: &str| -> i32 {
         let query = format!(
-            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE {} {}",
+            "SELECT COUNT(*) FROM phrase_progress pp {} WHERE pp.in_srs_pool = 1 AND {} {}",
             lang_join,
             condition,
             if target_language.is_some() {
@@ -325,7 +357,7 @@ fn get_interval_distribution(
                 .unwrap_or(0),
             None => {
                 let simple_query = format!(
-                    "SELECT COUNT(*) FROM phrase_progress WHERE {}",
+                    "SELECT COUNT(*) FROM phrase_progress WHERE in_srs_pool = 1 AND {}",
                     condition
                 );
                 conn.query_row(&simple_query, [], |row| row.get(0))
@@ -341,4 +373,37 @@ fn get_interval_distribution(
         one_to_two_weeks: interval_count("pp.interval_days >= 8 AND pp.interval_days <= 14"),
         two_weeks_plus: interval_count("pp.interval_days > 14"),
     }
+}
+
+/// Reset all practice sessions (clears session history).
+#[tauri::command]
+pub fn reset_practice_sessions() -> Result<i32, String> {
+    let conn = get_conn()?;
+    let deleted = conn
+        .execute("DELETE FROM practice_sessions", [])
+        .map_err(|e| format!("Failed to delete sessions: {}", e))?;
+    Ok(deleted as i32)
+}
+
+/// Reset all phrase progress (clears learning history, keeps phrases).
+#[tauri::command]
+pub fn reset_phrase_progress() -> Result<i32, String> {
+    let conn = get_conn()?;
+    let updated = conn
+        .execute(
+            "UPDATE phrase_progress SET
+                correct_streak = 0,
+                total_attempts = 0,
+                success_count = 0,
+                last_seen = NULL,
+                ease_factor = 2.5,
+                interval_days = 0,
+                next_review_at = NULL,
+                in_srs_pool = 0,
+                deck_correct_count = 0,
+                learning_status = 'new'",
+            [],
+        )
+        .map_err(|e| format!("Failed to reset progress: {}", e))?;
+    Ok(updated as i32)
 }

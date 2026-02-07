@@ -126,6 +126,7 @@ export function useStudySession({
           newPhraseLimit: currentSettings?.newPhrasesPerSession ?? 0,
           sessionPosition: excludeIds.length,
           newPhraseInterval: currentSettings?.newPhraseInterval ?? 4,
+          targetLanguage: currentSettings?.targetLanguage,
         });
 
         if (!mountedRef.current) return;
@@ -194,6 +195,7 @@ export function useStudySession({
             newPhraseLimit: settingsRef.current?.newPhrasesPerSession ?? 0,
             sessionPosition: state.seenPhraseIds.length,
             newPhraseInterval: settingsRef.current?.newPhraseInterval ?? 4,
+            targetLanguage: settingsRef.current?.targetLanguage,
           });
 
           if (!mountedRef.current) return false;

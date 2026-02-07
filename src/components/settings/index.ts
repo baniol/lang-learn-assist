@@ -6,3 +6,4 @@ export { LanguageSettingsSection } from "./LanguageSettingsSection";
 export { LearningSettingsSection } from "./LearningSettingsSection";
 export { NotesSettingsSection } from "./NotesSettingsSection";
 export { DataManagementSection } from "./DataManagementSection";
+export { ResetSection } from "./ResetSection";

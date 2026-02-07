@@ -40,6 +40,8 @@ export {
   recordStudyAnswer, // Unified API
   getLearningStats,
   getSrsStats,
+  resetPracticeSessions,
+  resetPhraseProgress,
 } from "./learning";
 
 export {

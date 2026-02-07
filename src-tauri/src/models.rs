@@ -384,6 +384,9 @@ pub struct LearningStats {
     pub new_count: i32,
     pub average_success_rate: f64,
     pub total_sessions: i32,
+    // Deck-specific stats
+    pub in_decks_count: i32,
+    pub graduated_to_srs_count: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

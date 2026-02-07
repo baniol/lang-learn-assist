@@ -65,6 +65,8 @@ pub fn run() {
             learning::answer::validate_answer,
             learning::stats::get_learning_stats,
             learning::stats::get_srs_stats,
+            learning::stats::reset_practice_sessions,
+            learning::stats::reset_phrase_progress,
             learning::session::get_practice_sessions,
             learning::session::start_practice_session,
             learning::session::start_deck_session,
