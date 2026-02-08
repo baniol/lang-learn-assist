@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { getDecks, createDeck, deleteDeck } from "../lib/decks";
+import { getDecks, createDeck, deleteDeck, importDeck } from "../lib/decks";
 import { Button, Spinner, ConfirmDialog } from "../components/ui";
 import { EmptyState } from "../components/shared";
-import { PlusIcon, ArchiveIcon } from "../components/icons";
-import { DeckCard, CreateDeckDialog } from "../components/decks";
+import { PlusIcon, ArchiveIcon, UploadIcon } from "../components/icons";
+import { DeckCard, CreateDeckDialog, ImportDeckDialog } from "../components/decks";
 import { useSettings } from "../contexts/SettingsContext";
 import { useToast } from "../contexts/ToastContext";
 import { useQuery, useMutation } from "../hooks";
-import type { ViewType, CreateDeckRequest } from "../types";
+import type { ViewType, CreateDeckRequest, DeckImportData } from "../types";
 
 interface DecksViewProps {
   onNavigate: (view: ViewType, data?: unknown) => void;
@@ -17,6 +17,7 @@ export function DecksView({ onNavigate }: DecksViewProps) {
   const { settings } = useSettings();
   const toast = useToast();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   // Fetch decks
@@ -63,6 +64,21 @@ export function DecksView({ onNavigate }: DecksViewProps) {
     }
   );
 
+  // Import mutation
+  const importMutation = useMutation(
+    (data: DeckImportData) => importDeck(data),
+    {
+      onSuccess: (result) => {
+        setShowImportDialog(false);
+        refetch();
+        toast.success(result.message);
+      },
+      onError: (err) => {
+        toast.error(`Failed to import deck: ${err.message}`);
+      },
+    }
+  );
+
   const handleStudy = (deckId: number) => {
     onNavigate("deck-study", { deckId });
   };
@@ -92,10 +108,16 @@ export function DecksView({ onNavigate }: DecksViewProps) {
               Organize new phrases for learning before they graduate to SRS
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <PlusIcon size="sm" />
-            New Deck
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setShowImportDialog(true)}>
+              <UploadIcon size="sm" />
+              Import
+            </Button>
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <PlusIcon size="sm" />
+              New Deck
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -150,6 +172,14 @@ export function DecksView({ onNavigate }: DecksViewProps) {
         confirmLabel="Delete"
         variant="danger"
         isLoading={deleteMutation.isLoading}
+      />
+
+      {/* Import Dialog */}
+      <ImportDeckDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onSubmit={importMutation.mutate}
+        isLoading={importMutation.isLoading}
       />
     </div>
   );

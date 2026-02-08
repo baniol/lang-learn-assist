@@ -108,6 +108,34 @@ export interface DeckAnswerResult {
   graduationThreshold: number;
 }
 
+// Deck import types - simplified format for importing pre-made decks
+
+export interface DeckImportPhrase {
+  prompt: string;
+  answer: string;
+  accepted?: string[];
+  notes?: string;
+}
+
+export interface DeckImportData {
+  name: string;
+  description?: string;
+  targetLanguage?: string;
+  nativeLanguage?: string;
+  graduationThreshold?: number;
+  level?: string;
+  category?: string;
+  phrases: DeckImportPhrase[];
+}
+
+export interface DeckImportResult {
+  success: boolean;
+  deckId: number;
+  deckName: string;
+  phrasesImported: number;
+  message: string;
+}
+
 // Unified study mode for the new API
 export type StudyModeType =
   | { type: "deck_learning"; deckId: number }

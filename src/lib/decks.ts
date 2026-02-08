@@ -5,6 +5,8 @@ import type {
   CreateDeckRequest,
   UpdateDeckRequest,
   PhraseWithProgress,
+  DeckImportData,
+  DeckImportResult,
 } from "../types";
 
 export async function getDecks(
@@ -54,4 +56,10 @@ export async function getDeckPhrases(
   deckId: number
 ): Promise<PhraseWithProgress[]> {
   return invoke<PhraseWithProgress[]>("get_deck_phrases", { deckId });
+}
+
+export async function importDeck(
+  data: DeckImportData
+): Promise<DeckImportResult> {
+  return invoke<DeckImportResult>("import_deck", { data });
 }

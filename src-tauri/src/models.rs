@@ -764,3 +764,60 @@ pub struct AskAboutSentenceResponse {
     pub explanation: String,
     pub phrases: Vec<SuggestedPhrase>,
 }
+
+// Deck import types - simplified format for importing pre-made decks
+
+/// Simplified phrase format for deck import (no IDs, no progress)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckImportPhrase {
+    pub prompt: String,
+    pub answer: String,
+    #[serde(default)]
+    pub accepted: Vec<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+}
+
+/// Simplified deck format for importing pre-made decks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckImportData {
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default = "default_target_language")]
+    pub target_language: String,
+    #[serde(default = "default_native_language")]
+    pub native_language: String,
+    #[serde(default = "default_graduation_threshold")]
+    pub graduation_threshold: i32,
+    #[serde(default)]
+    pub level: Option<String>,
+    #[serde(default)]
+    pub category: Option<String>,
+    pub phrases: Vec<DeckImportPhrase>,
+}
+
+fn default_target_language() -> String {
+    "de".to_string()
+}
+
+fn default_native_language() -> String {
+    "en".to_string()
+}
+
+fn default_graduation_threshold() -> i32 {
+    2
+}
+
+/// Result of importing a deck
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckImportResult {
+    pub success: bool,
+    pub deck_id: i64,
+    pub deck_name: String,
+    pub phrases_imported: i32,
+    pub message: String,
+}

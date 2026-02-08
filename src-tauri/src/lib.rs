@@ -119,6 +119,7 @@ pub fn run() {
             // Data Export/Import
             data_export::export_data,
             data_export::import_data,
+            data_export::import_deck,
             // Decks
             decks::get_decks,
             decks::get_deck,

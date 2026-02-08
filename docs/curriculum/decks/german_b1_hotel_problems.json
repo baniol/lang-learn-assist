@@ -1,0 +1,131 @@
+{
+  "name": "German B1: Hotel - Problemy i reklamacje",
+  "description": "Zgłaszanie problemów w hotelu, skargi i prośby o rozwiązanie na poziomie B1.",
+  "targetLanguage": "de",
+  "nativeLanguage": "pl",
+  "graduationThreshold": 2,
+  "level": "B1",
+  "category": "Travel",
+  "phrases": [
+    {
+      "prompt": "Pokój nie został posprzątany.",
+      "answer": "Das Zimmer wurde nicht gereinigt.",
+      "accepted": ["Das Zimmer ist nicht sauber gemacht worden."],
+      "notes": "Passiv: wurde + Partizip II"
+    },
+    {
+      "prompt": "Klimatyzacja nie działa.",
+      "answer": "Die Klimaanlage funktioniert nicht.",
+      "accepted": ["Die Klimaanlage ist kaputt.", "Die Klimaanlage geht nicht."],
+      "notes": ""
+    },
+    {
+      "prompt": "Czy mógłby pan to naprawić?",
+      "answer": "Könnten Sie das reparieren?",
+      "accepted": ["Wäre es möglich, das zu reparieren?", "Könnten Sie das bitte reparieren lassen?"],
+      "notes": "Konjunktiv II: könnten dla grzecznych próśb"
+    },
+    {
+      "prompt": "Nie ma ciepłej wody, bo bojler jest zepsuty.",
+      "answer": "Es gibt kein warmes Wasser, weil der Boiler kaputt ist.",
+      "accepted": ["Es kommt kein warmes Wasser, weil der Boiler defekt ist."],
+      "notes": "weil-Satz: przyczyna"
+    },
+    {
+      "prompt": "Ręczniki nie zostały wymienione.",
+      "answer": "Die Handtücher wurden nicht gewechselt.",
+      "accepted": ["Die Handtücher sind nicht ausgetauscht worden."],
+      "notes": "Passiv: wurden + Partizip II"
+    },
+    {
+      "prompt": "Jest bardzo głośno, bo trwa remont.",
+      "answer": "Es ist sehr laut, weil renoviert wird.",
+      "accepted": ["Es ist sehr laut, weil Bauarbeiten stattfinden."],
+      "notes": "weil + Passiv"
+    },
+    {
+      "prompt": "Chciałbym zmienić pokój.",
+      "answer": "Ich würde gerne das Zimmer wechseln.",
+      "accepted": ["Ich möchte gerne ein anderes Zimmer.", "Könnte ich bitte ein anderes Zimmer bekommen?"],
+      "notes": "Konjunktiv II: würde gerne"
+    },
+    {
+      "prompt": "Okno nie zostało naprawione.",
+      "answer": "Das Fenster wurde nicht repariert.",
+      "accepted": ["Das Fenster ist immer noch kaputt."],
+      "notes": "Passiv"
+    },
+    {
+      "prompt": "Nie mogę spać, bo jest za głośno.",
+      "answer": "Ich kann nicht schlafen, weil es zu laut ist.",
+      "accepted": ["Ich kann nicht einschlafen, weil es so laut ist."],
+      "notes": "weil-Satz"
+    },
+    {
+      "prompt": "Czy mógłbym dostać zniżkę, bo pokój był brudny?",
+      "answer": "Könnte ich einen Rabatt bekommen, weil das Zimmer schmutzig war?",
+      "accepted": ["Wäre eine Ermäßigung möglich, weil das Zimmer nicht sauber war?"],
+      "notes": "Konjunktiv II + weil"
+    },
+    {
+      "prompt": "Telewizor jest zepsuty.",
+      "answer": "Der Fernseher ist kaputt.",
+      "accepted": ["Der Fernseher funktioniert nicht.", "Der Fernseher geht nicht."],
+      "notes": ""
+    },
+    {
+      "prompt": "Proszę o nowy pokój, bo ten jest za mały.",
+      "answer": "Ich bitte um ein neues Zimmer, weil dieses zu klein ist.",
+      "accepted": ["Ich hätte gerne ein anderes Zimmer, weil dieses zu klein ist."],
+      "notes": "weil-Satz"
+    },
+    {
+      "prompt": "Łóżko nie zostało pościelone.",
+      "answer": "Das Bett wurde nicht gemacht.",
+      "accepted": ["Das Bett ist nicht gemacht worden."],
+      "notes": "Passiv"
+    },
+    {
+      "prompt": "Czy moglibyście wysłać kogoś do naprawy?",
+      "answer": "Könnten Sie jemanden zur Reparatur schicken?",
+      "accepted": ["Wäre es möglich, jemanden zu schicken?"],
+      "notes": "Konjunktiv II"
+    },
+    {
+      "prompt": "WiFi nie działa od wczoraj.",
+      "answer": "Das WLAN funktioniert seit gestern nicht.",
+      "accepted": ["Das WLAN geht seit gestern nicht."],
+      "notes": ""
+    },
+    {
+      "prompt": "Zamówiłem śniadanie do pokoju, ale nie zostało dostarczone.",
+      "answer": "Ich habe Frühstück aufs Zimmer bestellt, aber es wurde nicht geliefert.",
+      "accepted": ["Ich habe Zimmerservice bestellt, aber es kam nicht."],
+      "notes": "Passiv: wurde nicht geliefert"
+    },
+    {
+      "prompt": "Muszę złożyć reklamację, bo obsługa była nieuprzejma.",
+      "answer": "Ich muss mich beschweren, weil das Personal unfreundlich war.",
+      "accepted": ["Ich möchte mich beschweren, weil der Service unhöflich war."],
+      "notes": "weil-Satz"
+    },
+    {
+      "prompt": "Prysznic jest zatkany.",
+      "answer": "Die Dusche ist verstopft.",
+      "accepted": ["Der Abfluss in der Dusche ist verstopft."],
+      "notes": ""
+    },
+    {
+      "prompt": "Czy mogę rozmawiać z kierownikiem?",
+      "answer": "Könnte ich mit dem Manager sprechen?",
+      "accepted": ["Kann ich bitte den Manager sprechen?", "Ich würde gerne mit dem Geschäftsführer sprechen."],
+      "notes": "Konjunktiv II"
+    },
+    {
+      "prompt": "Moja skarga nie została rozpatrzona.",
+      "answer": "Meine Beschwerde wurde nicht bearbeitet.",
+      "accepted": ["Auf meine Beschwerde wurde nicht reagiert."],
+      "notes": "Passiv"
+    }
+  ]
+}

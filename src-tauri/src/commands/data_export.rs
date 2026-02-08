@@ -1,8 +1,9 @@
 use crate::db::get_conn;
 use crate::models::{
-    ExportData, ExportDeck, ExportMaterial, ExportMaterialThread, ExportNote,
-    ExportPhrase, ExportPhraseProgress, ExportPhraseThread, ExportPracticeSession,
-    ExportQuestionThread, ExportSetting, ImportMode, ImportResult, ImportStats,
+    DeckImportData, DeckImportResult, ExportData, ExportDeck, ExportMaterial,
+    ExportMaterialThread, ExportNote, ExportPhrase, ExportPhraseProgress, ExportPhraseThread,
+    ExportPracticeSession, ExportQuestionThread, ExportSetting, ImportMode, ImportResult,
+    ImportStats,
 };
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
@@ -869,6 +870,117 @@ pub fn import_data_with_conn(
     })
 }
 
+/// Import a deck from simplified JSON format
+/// Creates a new deck and all phrases with progress initialized for deck learning
+#[tauri::command]
+pub fn import_deck(data: DeckImportData) -> Result<DeckImportResult, String> {
+    let mut conn = get_conn()?;
+    import_deck_with_conn(&mut conn, data)
+}
+
+/// Core deck import logic that can be tested with any connection
+pub fn import_deck_with_conn(
+    conn: &mut Connection,
+    data: DeckImportData,
+) -> Result<DeckImportResult, String> {
+    // Disable foreign key checks - needed because old databases have orphaned FK constraint
+    // on conversation_id after conversations table was dropped
+    conn.execute("PRAGMA foreign_keys = OFF", [])
+        .map_err(|e| format!("Failed to disable foreign keys: {}", e))?;
+
+    let result = import_deck_inner(conn, data);
+
+    // Re-enable foreign key checks
+    let _ = conn.execute("PRAGMA foreign_keys = ON", []);
+
+    result
+}
+
+fn import_deck_inner(
+    conn: &mut Connection,
+    data: DeckImportData,
+) -> Result<DeckImportResult, String> {
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Failed to begin transaction: {}", e))?;
+
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    // Create the deck
+    tx.execute(
+        "INSERT INTO decks (name, description, target_language, native_language,
+                           graduation_threshold, level, category, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        params![
+            data.name,
+            data.description,
+            data.target_language,
+            data.native_language,
+            data.graduation_threshold,
+            data.level,
+            data.category,
+            now,
+            now
+        ],
+    )
+    .map_err(|e| format!("Failed to create deck: {}", e))?;
+
+    let deck_id = tx.last_insert_rowid();
+    let mut phrases_imported = 0;
+
+    // Create phrases and their progress records
+    for phrase in &data.phrases {
+        let accepted_json =
+            serde_json::to_string(&phrase.accepted).unwrap_or_else(|_| "[]".to_string());
+
+        // Insert phrase
+        tx.execute(
+            "INSERT INTO phrases (prompt, answer, accepted_json, target_language, native_language,
+                                 notes, starred, excluded, refined, created_at, deck_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 0, 0, ?7, ?8)",
+            params![
+                phrase.prompt,
+                phrase.answer,
+                accepted_json,
+                data.target_language,
+                data.native_language,
+                phrase.notes,
+                now,
+                deck_id
+            ],
+        )
+        .map_err(|e| format!("Failed to create phrase: {}", e))?;
+
+        let phrase_id = tx.last_insert_rowid();
+
+        // Create progress record with deck_learning status
+        tx.execute(
+            "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts, success_count,
+                                         ease_factor, interval_days, in_srs_pool, deck_correct_count,
+                                         learning_status)
+             VALUES (?1, 0, 0, 0, 2.5, 1, 0, 0, 'deck_learning')",
+            params![phrase_id],
+        )
+        .map_err(|e| format!("Failed to create phrase progress: {}", e))?;
+
+        phrases_imported += 1;
+    }
+
+    tx.commit()
+        .map_err(|e| format!("Failed to commit transaction: {}", e))?;
+
+    Ok(DeckImportResult {
+        success: true,
+        deck_id,
+        deck_name: data.name.clone(),
+        phrases_imported,
+        message: format!(
+            "Successfully imported deck '{}' with {} phrases",
+            data.name, phrases_imported
+        ),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1093,5 +1205,102 @@ mod tests {
         assert_eq!(phrase.notes, Some("A greeting".to_string()));
         assert!(phrase.starred);
         assert!(!phrase.excluded);
+    }
+
+    #[test]
+    fn test_import_deck_creates_deck_and_phrases() {
+        use crate::models::{DeckImportData, DeckImportPhrase};
+
+        let mut conn = setup_test_db();
+
+        let import_data = DeckImportData {
+            name: "German B1 Vocabulary".to_string(),
+            description: Some("Essential B1 phrases".to_string()),
+            target_language: "de".to_string(),
+            native_language: "en".to_string(),
+            graduation_threshold: 3,
+            level: Some("B1".to_string()),
+            category: Some("vocabulary".to_string()),
+            phrases: vec![
+                DeckImportPhrase {
+                    prompt: "How do you say 'hello'?".to_string(),
+                    answer: "Hallo".to_string(),
+                    accepted: vec!["Guten Tag".to_string()],
+                    notes: Some("Informal greeting".to_string()),
+                },
+                DeckImportPhrase {
+                    prompt: "How do you say 'goodbye'?".to_string(),
+                    answer: "Auf Wiedersehen".to_string(),
+                    accepted: vec!["Tschüss".to_string()],
+                    notes: None,
+                },
+            ],
+        };
+
+        let result = import_deck_with_conn(&mut conn, import_data);
+        assert!(result.is_ok());
+
+        let import_result = result.unwrap();
+        assert!(import_result.success);
+        assert_eq!(import_result.deck_name, "German B1 Vocabulary");
+        assert_eq!(import_result.phrases_imported, 2);
+
+        // Verify deck was created
+        let deck_count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM decks WHERE name = ?1", ["German B1 Vocabulary"], |row| row.get(0))
+            .expect("Query failed");
+        assert_eq!(deck_count, 1);
+
+        // Verify phrases were created
+        let phrase_count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM phrases WHERE deck_id = ?1",
+                [import_result.deck_id],
+                |row| row.get(0),
+            )
+            .expect("Query failed");
+        assert_eq!(phrase_count, 2);
+
+        // Verify progress records were created with deck_learning status
+        let progress_count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM phrase_progress pp
+                 JOIN phrases p ON pp.phrase_id = p.id
+                 WHERE p.deck_id = ?1 AND pp.learning_status = 'deck_learning'",
+                [import_result.deck_id],
+                |row| row.get(0),
+            )
+            .expect("Query failed");
+        assert_eq!(progress_count, 2);
+    }
+
+    #[test]
+    fn test_import_deck_with_minimal_data() {
+        use crate::models::{DeckImportData, DeckImportPhrase};
+
+        let mut conn = setup_test_db();
+
+        let import_data = DeckImportData {
+            name: "Simple Deck".to_string(),
+            description: None,
+            target_language: "de".to_string(),
+            native_language: "en".to_string(),
+            graduation_threshold: 2,
+            level: None,
+            category: None,
+            phrases: vec![DeckImportPhrase {
+                prompt: "Test prompt".to_string(),
+                answer: "Test answer".to_string(),
+                accepted: vec![],
+                notes: None,
+            }],
+        };
+
+        let result = import_deck_with_conn(&mut conn, import_data);
+        assert!(result.is_ok());
+
+        let import_result = result.unwrap();
+        assert!(import_result.success);
+        assert_eq!(import_result.phrases_imported, 1);
     }
 }
