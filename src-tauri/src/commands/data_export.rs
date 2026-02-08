@@ -1,6 +1,6 @@
 use crate::db::get_conn;
 use crate::models::{
-    ExportData, ExportDeck, ExportMaterial, ExportMaterialThread, ExportNote,
+    ExportData, ExportDeck, ExportDeckSource, ExportMaterial, ExportMaterialThread, ExportNote,
     ExportPhrase, ExportPhraseProgress, ExportPhraseThread, ExportPracticeSession,
     ExportQuestionThread, ExportSetting, ImportMode, ImportResult, ImportStats,
 };
@@ -274,8 +274,32 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to collect decks: {}", e))?;
     drop(stmt);
 
+    // Export deck sources
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, deck_id, source_type, source_identifier, generated_at, metadata_json, created_at
+             FROM deck_sources",
+        )
+        .map_err(|e| format!("Failed to prepare deck_sources query: {}", e))?;
+    let deck_sources = stmt
+        .query_map([], |row| {
+            Ok(ExportDeckSource {
+                id: row.get(0)?,
+                deck_id: row.get(1)?,
+                source_type: row.get(2)?,
+                source_identifier: row.get(3)?,
+                generated_at: row.get(4)?,
+                metadata_json: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query deck_sources: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect deck_sources: {}", e))?;
+    drop(stmt);
+
     Ok(ExportData {
-        version: 3,
+        version: 4,
         exported_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         settings,
         phrases,
@@ -287,6 +311,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         materials,
         material_threads,
         decks,
+        deck_sources,
     })
 }
 
@@ -303,7 +328,7 @@ pub fn import_data_with_conn(
     mode: ImportMode,
 ) -> Result<ImportResult, String> {
     // Check version compatibility
-    if data.version > 3 {
+    if data.version > 4 {
         return Err(format!(
             "Export version {} is not supported. Please update the application.",
             data.version
@@ -333,6 +358,8 @@ pub fn import_data_with_conn(
                 .map_err(|e| format!("Failed to delete material_threads: {}", e))?;
             tx.execute("DELETE FROM phrases", [])
                 .map_err(|e| format!("Failed to delete phrases: {}", e))?;
+            tx.execute("DELETE FROM deck_sources", [])
+                .map_err(|e| format!("Failed to delete deck_sources: {}", e))?;
             tx.execute("DELETE FROM decks", [])
                 .map_err(|e| format!("Failed to delete decks: {}", e))?;
             tx.execute("DELETE FROM materials", [])
@@ -354,8 +381,8 @@ pub fn import_data_with_conn(
             for deck in &data.decks {
                 tx.execute(
                     "INSERT INTO decks (id, name, description, target_language, native_language,
-                                       graduation_threshold, created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                                       graduation_threshold, created_at, updated_at, level, category)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                     params![
                         deck.id,
                         deck.name,
@@ -364,11 +391,33 @@ pub fn import_data_with_conn(
                         deck.native_language,
                         deck.graduation_threshold,
                         deck.created_at,
-                        deck.updated_at
+                        deck.updated_at,
+                        deck.level,
+                        deck.category
                     ],
                 )
                 .map_err(|e| format!("Failed to import deck: {}", e))?;
                 stats.decks_imported += 1;
+            }
+
+            // Import deck sources with original IDs
+            for source in &data.deck_sources {
+                tx.execute(
+                    "INSERT INTO deck_sources (id, deck_id, source_type, source_identifier,
+                                              generated_at, metadata_json, created_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        source.id,
+                        source.deck_id,
+                        source.source_type,
+                        source.source_identifier,
+                        source.generated_at,
+                        source.metadata_json,
+                        source.created_at
+                    ],
+                )
+                .map_err(|e| format!("Failed to import deck_source: {}", e))?;
+                stats.deck_sources_imported += 1;
             }
 
             // Import phrases with original IDs
@@ -574,8 +623,8 @@ pub fn import_data_with_conn(
                 } else {
                     tx.execute(
                         "INSERT INTO decks (name, description, target_language, native_language,
-                                           graduation_threshold, created_at, updated_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                                           graduation_threshold, created_at, updated_at, level, category)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                         params![
                             deck.name,
                             deck.description,
@@ -583,13 +632,47 @@ pub fn import_data_with_conn(
                             deck.native_language,
                             deck.graduation_threshold,
                             deck.created_at,
-                            deck.updated_at
+                            deck.updated_at,
+                            deck.level,
+                            deck.category
                         ],
                     )
                     .map_err(|e| format!("Failed to import deck: {}", e))?;
                     let new_id = tx.last_insert_rowid();
                     deck_id_map.insert(deck.id, new_id);
                     stats.decks_imported += 1;
+                }
+            }
+
+            // Import deck sources (linked to decks)
+            for source in &data.deck_sources {
+                if let Some(&new_deck_id) = deck_id_map.get(&source.deck_id) {
+                    // Check if source exists for this deck
+                    let existing: Option<i64> = tx
+                        .query_row(
+                            "SELECT id FROM deck_sources WHERE deck_id = ?1",
+                            params![new_deck_id],
+                            |row| row.get(0),
+                        )
+                        .ok();
+
+                    if existing.is_none() {
+                        tx.execute(
+                            "INSERT INTO deck_sources (deck_id, source_type, source_identifier,
+                                                      generated_at, metadata_json, created_at)
+                             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                            params![
+                                new_deck_id,
+                                source.source_type,
+                                source.source_identifier,
+                                source.generated_at,
+                                source.metadata_json,
+                                source.created_at
+                            ],
+                        )
+                        .map_err(|e| format!("Failed to import deck_source: {}", e))?;
+                        stats.deck_sources_imported += 1;
+                    }
                 }
             }
 
@@ -884,7 +967,7 @@ mod tests {
     /// Create minimal test export data
     fn create_test_export_data() -> ExportData {
         ExportData {
-            version: 3,
+            version: 4,
             exported_at: "2024-01-01T00:00:00Z".to_string(),
             settings: vec![ExportSetting {
                 key: "test_key".to_string(),
@@ -932,6 +1015,7 @@ mod tests {
             materials: vec![],
             material_threads: vec![],
             decks: vec![],
+            deck_sources: vec![],
         }
     }
 
@@ -942,7 +1026,7 @@ mod tests {
         assert!(result.is_ok());
 
         let data = result.unwrap();
-        assert_eq!(data.version, 3);
+        assert_eq!(data.version, 4);
         assert!(data.settings.is_empty());
         assert!(data.phrases.is_empty());
     }

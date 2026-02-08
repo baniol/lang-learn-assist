@@ -72,3 +72,18 @@ pub mod tokens {
     /// Approximate characters per token for German text (conservative)
     pub const CHARS_PER_TOKEN_GERMAN: usize = 3;
 }
+
+/// Deck generation constants
+pub mod deck_generation {
+    /// Maximum phrases that can be generated in a single request
+    pub const MAX_PHRASES_PER_GENERATION: i32 = 50;
+
+    /// Default number of phrases to generate
+    pub const DEFAULT_PHRASE_COUNT: i32 = 20;
+
+    /// Minimum phrases to generate
+    pub const MIN_PHRASE_COUNT: i32 = 5;
+
+    /// Maximum tokens for deck generation LLM response
+    pub const GENERATION_MAX_TOKENS: i64 = 4000;
+}

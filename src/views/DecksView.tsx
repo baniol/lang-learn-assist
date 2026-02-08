@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { getDecks, createDeck, deleteDeck } from "../lib/decks";
+import { generateDeck } from "../lib/deck-generation";
 import { Button, Spinner, ConfirmDialog } from "../components/ui";
 import { EmptyState } from "../components/shared";
-import { PlusIcon, ArchiveIcon } from "../components/icons";
-import { DeckCard, CreateDeckDialog } from "../components/decks";
+import { PlusIcon, ArchiveIcon, UploadIcon } from "../components/icons";
+import { DeckCard, CreateDeckDialog, ImportDeckDialog } from "../components/decks";
 import { useSettings } from "../contexts/SettingsContext";
 import { useToast } from "../contexts/ToastContext";
 import { useQuery, useMutation } from "../hooks";
-import type { ViewType, CreateDeckRequest } from "../types";
+import type { ViewType, CreateDeckRequest, GenerateDeckRequest } from "../types";
 
 interface DecksViewProps {
   onNavigate: (view: ViewType, data?: unknown) => void;
@@ -17,6 +18,7 @@ export function DecksView({ onNavigate }: DecksViewProps) {
   const { settings } = useSettings();
   const toast = useToast();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   // Fetch decks
@@ -32,7 +34,7 @@ export function DecksView({ onNavigate }: DecksViewProps) {
     }
   );
 
-  // Create deck mutation
+  // Create deck mutation (manual)
   const createMutation = useMutation(
     (request: CreateDeckRequest) => createDeck(request),
     {
@@ -43,6 +45,21 @@ export function DecksView({ onNavigate }: DecksViewProps) {
       },
       onError: (err) => {
         toast.error(`Failed to create deck: ${err.message}`);
+      },
+    }
+  );
+
+  // Generate deck mutation (AI)
+  const generateMutation = useMutation(
+    (request: GenerateDeckRequest) => generateDeck(request),
+    {
+      onSuccess: (result) => {
+        setShowCreateDialog(false);
+        refetch();
+        toast.success(`Deck created with ${result.phrasesCreated} phrases`);
+      },
+      onError: (err) => {
+        toast.error(`Failed to generate deck: ${err.message}`);
       },
     }
   );
@@ -71,6 +88,12 @@ export function DecksView({ onNavigate }: DecksViewProps) {
     onNavigate("deck-detail", { deckId });
   };
 
+  const handleImportSuccess = () => {
+    setShowImportDialog(false);
+    refetch();
+    toast.success("Deck pack imported");
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -92,10 +115,19 @@ export function DecksView({ onNavigate }: DecksViewProps) {
               Organize new phrases for learning before they graduate to SRS
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <PlusIcon size="sm" />
-            New Deck
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setShowImportDialog(true)}
+            >
+              <UploadIcon size="sm" />
+              Import
+            </Button>
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <PlusIcon size="sm" />
+              New Deck
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -135,9 +167,17 @@ export function DecksView({ onNavigate }: DecksViewProps) {
         isOpen={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
         onSubmit={createMutation.mutate}
-        isLoading={createMutation.isLoading}
+        onGenerate={generateMutation.mutate}
+        isLoading={createMutation.isLoading || generateMutation.isLoading}
         defaultTargetLanguage={settings?.targetLanguage}
         defaultNativeLanguage={settings?.nativeLanguage}
+      />
+
+      {/* Import Dialog */}
+      <ImportDeckDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onSuccess={handleImportSuccess}
       />
 
       {/* Delete Confirmation */}

@@ -5,7 +5,7 @@ mod models;
 mod state;
 mod utils;
 
-use commands::{audio, data_export, decks, learning, llm, materials, notes, phrases, questions, settings, tts};
+use commands::{audio, data_export, deck_import, decks, learning, llm, materials, notes, phrases, questions, settings, tts};
 use db::{get_db_path, init_db};
 use rusqlite::Connection;
 use state::AppState;
@@ -75,6 +75,9 @@ pub fn run() {
             llm::material::estimate_material_tokens,
             llm::material::ask_about_sentence,
             llm::material::process_audio_segments,
+            // Deck generation
+            llm::deck_generation::generate_deck,
+            llm::deck_generation::extend_deck,
             // Materials
             materials::create_material,
             materials::get_materials,
@@ -129,6 +132,10 @@ pub fn run() {
             decks::assign_phrase_to_deck,
             decks::assign_phrases_to_deck,
             decks::get_deck_phrases,
+            // Deck import
+            deck_import::validate_deck_pack,
+            deck_import::import_deck_pack,
+            deck_import::get_deck_source,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

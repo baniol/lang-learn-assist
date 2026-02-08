@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod data_export;
+pub mod deck_import;
 pub mod decks;
 pub mod learning;
 pub mod llm;

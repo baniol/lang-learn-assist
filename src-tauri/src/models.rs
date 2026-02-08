@@ -37,6 +37,122 @@ impl LearningStatus {
     }
 }
 
+/// CEFR language proficiency levels
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CefrLevel {
+    A1,
+    A2,
+    B1,
+    B2,
+    C1,
+    C2,
+}
+
+impl CefrLevel {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_uppercase().as_str() {
+            "A1" => Some(CefrLevel::A1),
+            "A2" => Some(CefrLevel::A2),
+            "B1" => Some(CefrLevel::B1),
+            "B2" => Some(CefrLevel::B2),
+            "C1" => Some(CefrLevel::C1),
+            "C2" => Some(CefrLevel::C2),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CefrLevel::A1 => "A1",
+            CefrLevel::A2 => "A2",
+            CefrLevel::B1 => "B1",
+            CefrLevel::B2 => "B2",
+            CefrLevel::C1 => "C1",
+            CefrLevel::C2 => "C2",
+        }
+    }
+
+    pub fn description(&self) -> &'static str {
+        match self {
+            CefrLevel::A1 => "Beginner - basic phrases and expressions",
+            CefrLevel::A2 => "Elementary - everyday situations",
+            CefrLevel::B1 => "Intermediate - familiar topics and opinions",
+            CefrLevel::B2 => "Upper Intermediate - complex topics and spontaneous interaction",
+            CefrLevel::C1 => "Advanced - fluent expression and implicit meaning",
+            CefrLevel::C2 => "Proficiency - near-native command",
+        }
+    }
+}
+
+/// Source type for deck content
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeckSourceType {
+    /// AI-generated content
+    AiGenerated,
+    /// Imported from a deck pack file
+    Imported,
+    /// Fetched from an external API
+    Api,
+    /// Created manually by the user
+    UserCreated,
+}
+
+impl DeckSourceType {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "ai_generated" => Some(DeckSourceType::AiGenerated),
+            "imported" => Some(DeckSourceType::Imported),
+            "api" => Some(DeckSourceType::Api),
+            "user_created" => Some(DeckSourceType::UserCreated),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DeckSourceType::AiGenerated => "ai_generated",
+            DeckSourceType::Imported => "imported",
+            DeckSourceType::Api => "api",
+            DeckSourceType::UserCreated => "user_created",
+        }
+    }
+}
+
+/// Deck source record - tracks origin of deck content
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckSource {
+    pub id: i64,
+    pub deck_id: i64,
+    pub source_type: String,
+    pub source_identifier: Option<String>,
+    pub generated_at: Option<String>,
+    pub metadata_json: Option<String>,
+    pub created_at: String,
+}
+
+/// Request for AI deck generation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateDeckRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub level: String,
+    pub category: Option<String>,
+    pub phrase_count: i32,
+    pub target_language: Option<String>,
+    pub native_language: Option<String>,
+}
+
+/// Response from AI deck generation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateDeckResponse {
+    pub deck: Deck,
+    pub phrases_created: i32,
+}
+
 /// Study mode for unified learning commands
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -509,6 +625,8 @@ pub struct ExportData {
     pub material_threads: Vec<ExportMaterialThread>,
     #[serde(default)]
     pub decks: Vec<ExportDeck>,
+    #[serde(default)]
+    pub deck_sources: Vec<ExportDeckSource>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -642,6 +760,7 @@ pub struct ImportStats {
     pub materials_imported: i32,
     pub material_threads_imported: i32,
     pub decks_imported: i32,
+    pub deck_sources_imported: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -687,6 +806,18 @@ pub struct ExportDeck {
     pub category: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportDeckSource {
+    pub id: i64,
+    pub deck_id: i64,
+    pub source_type: String,
+    pub source_identifier: Option<String>,
+    pub generated_at: Option<String>,
+    pub metadata_json: Option<String>,
+    pub created_at: String,
 }
 
 // Materials (YouTube transcripts, articles, etc.)

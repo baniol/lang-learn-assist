@@ -6,8 +6,10 @@
 //! - `prompts`: System prompt builders for various use cases
 //! - `phrase`: Phrase refinement and title generation
 //! - `material`: Material processing and sentence Q&A
+//! - `deck_generation`: AI-powered deck creation with CEFR levels
 
 pub mod client;
+pub mod deck_generation;
 pub mod material;
 pub mod phrase;
 pub mod prompts;

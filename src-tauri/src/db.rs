@@ -474,6 +474,25 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Deck sources table (tracks origin of deck content: AI-generated, imported, API, user-created)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS deck_sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            deck_id INTEGER NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+            source_type TEXT NOT NULL,
+            source_identifier TEXT,
+            generated_at TEXT,
+            metadata_json TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_deck_sources_deck ON deck_sources(deck_id)",
+        [],
+    )?;
+
     // Migration: Drop conversations table (no longer needed)
     // First clear conversation_id from phrases, then drop the table and index
     log_migration_result(

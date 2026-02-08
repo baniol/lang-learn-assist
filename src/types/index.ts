@@ -39,6 +39,119 @@ export interface Phrase {
 // Learning status - determines where phrase is in the learning lifecycle
 export type LearningStatus = "inactive" | "deck_learning" | "srs_active";
 
+// CEFR language proficiency levels
+export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+
+export const CEFR_LEVELS: { level: CefrLevel; description: string }[] = [
+  { level: "A1", description: "Beginner - basic phrases and expressions" },
+  { level: "A2", description: "Elementary - everyday situations" },
+  { level: "B1", description: "Intermediate - familiar topics and opinions" },
+  { level: "B2", description: "Upper Intermediate - complex topics and spontaneous interaction" },
+  { level: "C1", description: "Advanced - fluent expression and implicit meaning" },
+  { level: "C2", description: "Proficiency - near-native command" },
+];
+
+// Source type for deck content
+export type DeckSourceType = "ai_generated" | "imported" | "api" | "user_created";
+
+// Vocabulary categories for deck generation
+export interface VocabularyCategory {
+  id: string;
+  label: string;
+  icon: string;
+}
+
+export const VOCABULARY_CATEGORIES: VocabularyCategory[] = [
+  { id: "greetings", label: "Greetings & Introductions", icon: "👋" },
+  { id: "numbers", label: "Numbers & Counting", icon: "🔢" },
+  { id: "food", label: "Food & Drinks", icon: "🍽️" },
+  { id: "travel", label: "Travel & Transport", icon: "✈️" },
+  { id: "shopping", label: "Shopping & Money", icon: "🛒" },
+  { id: "home", label: "Home & Family", icon: "🏠" },
+  { id: "work", label: "Work & Office", icon: "💼" },
+  { id: "health", label: "Health & Body", icon: "🏥" },
+  { id: "time", label: "Time & Calendar", icon: "📅" },
+  { id: "weather", label: "Weather & Nature", icon: "🌤️" },
+  { id: "emotions", label: "Emotions & Feelings", icon: "😊" },
+  { id: "hobbies", label: "Hobbies & Free Time", icon: "🎨" },
+  { id: "verbs", label: "Common Verbs", icon: "🏃" },
+  { id: "adjectives", label: "Adjectives & Descriptions", icon: "📝" },
+  { id: "phrases", label: "Everyday Phrases", icon: "💬" },
+];
+
+// Deck source record
+export interface DeckSource {
+  id: number;
+  deckId: number;
+  sourceType: DeckSourceType;
+  sourceIdentifier: string | null;
+  generatedAt: string | null;
+  metadataJson: string | null;
+  createdAt: string;
+}
+
+// Request for AI deck generation
+export interface GenerateDeckRequest {
+  name: string;
+  description?: string;
+  level: CefrLevel;
+  category?: string;
+  phraseCount: number;
+  targetLanguage?: string;
+  nativeLanguage?: string;
+}
+
+// Response from AI deck generation
+export interface GenerateDeckResponse {
+  deck: Deck;
+  phrasesCreated: number;
+}
+
+// Deck pack types for import
+
+export interface DeckPackPhrase {
+  prompt: string;
+  answer: string;
+  accepted: string[];
+}
+
+export interface DeckPackDeck {
+  name: string;
+  description?: string;
+  level?: string;
+  category?: string;
+  phrases: DeckPackPhrase[];
+}
+
+export interface DeckPack {
+  version: number;
+  packName: string;
+  description?: string;
+  sourceUrl?: string;
+  decks: DeckPackDeck[];
+}
+
+export type DeckImportMode = "skip_existing" | "merge_into_existing" | "create_new";
+
+export interface DeckPackValidation {
+  valid: boolean;
+  packName: string;
+  deckCount: number;
+  phraseCount: number;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface DeckPackImportResult {
+  success: boolean;
+  message: string;
+  decksCreated: number;
+  decksMerged: number;
+  phrasesCreated: number;
+  phrasesSkipped: number;
+  createdDeckIds: number[];
+}
+
 export interface PhraseProgress {
   id: number;
   phraseId: number;
@@ -485,6 +598,8 @@ export interface ImportStats {
   practiceSessionsImported: number;
   materialsImported: number;
   materialThreadsImported: number;
+  decksImported: number;
+  deckSourcesImported: number;
 }
 
 export interface ExportMaterial {
