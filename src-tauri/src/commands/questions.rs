@@ -164,6 +164,61 @@ Keep explanations clear and concise. Focus on practical usage."#,
     )
 }
 
+fn build_translation_system_prompt(target_lang: &str, native_lang: &str) -> String {
+    let target_name = get_language_name(target_lang);
+    let native_name = get_language_name(native_lang);
+
+    format!(
+        r#"Translator {}<->{}.
+
+RESPOND WITH JSON:
+{{"explanation": "", "examples": [{{"sentence": "translation in {}", "translation": "original text in {}", "notes": ""}}]}}
+
+RULES:
+- Return translation as a single example
+- "sentence" = the translation in target language
+- "translation" = the original input text
+- "explanation" = empty string (or very brief note ONLY for idioms)
+- "notes" = empty string
+- NO grammar explanations
+- NO multiple examples
+
+Example input: "Idę do domu"
+Example output: {{"explanation": "", "examples": [{{"sentence": "Ich gehe nach Hause", "translation": "Idę do domu", "notes": ""}}]}}"#,
+        native_name, target_name, target_name, native_name
+    )
+}
+
+enum QuestionMode {
+    Grammar,
+    Translation(String), // Contains the text to translate (without prefix)
+}
+
+fn detect_question_mode(question: &str) -> QuestionMode {
+    let trimmed = question.trim();
+
+    // Check for translation prefixes (both /t and \t)
+    let translation_prefixes = [
+        "/t ", "/T ", "\\t ", "\\T ",
+        "/t", "/T", "\\t", "\\T",  // without space
+        "/translate ", "/Translate ",
+        "przetłumacz:", "Przetłumacz:",
+        "przetłumacz ", "Przetłumacz ",
+        "translate:", "Translate:",
+    ];
+
+    for prefix in translation_prefixes {
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
+            let text = rest.trim();
+            if !text.is_empty() {
+                return QuestionMode::Translation(text.to_string());
+            }
+        }
+    }
+
+    QuestionMode::Grammar
+}
+
 async fn call_llm_for_grammar(
     settings: &AppSettings,
     messages: &[serde_json::Value],
@@ -310,8 +365,18 @@ pub async fn ask_grammar_question(
     // Get the thread to access language settings and existing messages
     let thread = get_question_thread(threadId)?;
 
-    let system_prompt =
-        build_grammar_system_prompt(&thread.target_language, &thread.native_language);
+    // Detect mode and get appropriate prompt
+    let mode = detect_question_mode(&question);
+    let (system_prompt, actual_question) = match &mode {
+        QuestionMode::Grammar => (
+            build_grammar_system_prompt(&thread.target_language, &thread.native_language),
+            question.clone(),
+        ),
+        QuestionMode::Translation(text) => (
+            build_translation_system_prompt(&thread.target_language, &thread.native_language),
+            text.clone(),
+        ),
+    };
 
     // Build message history for context
     let mut llm_messages: Vec<serde_json::Value> = thread
@@ -329,8 +394,8 @@ pub async fn ask_grammar_question(
         })
         .collect();
 
-    // Add the new question
-    llm_messages.push(serde_json::json!({"role": "user", "content": question.clone()}));
+    // Add the new question (use actual_question for LLM, without prefix)
+    llm_messages.push(serde_json::json!({"role": "user", "content": actual_question}));
 
     // Call the LLM
     let response_content = call_llm_for_grammar(&settings, &llm_messages, &system_prompt).await?;
