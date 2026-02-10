@@ -59,11 +59,9 @@ pub fn init_db(conn: &Connection) -> Result<()> {
     )?;
 
     // Phrases table
-    // Note: conversation_id column kept for backwards compatibility but no longer used
     conn.execute(
         "CREATE TABLE IF NOT EXISTS phrases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            conversation_id INTEGER,
             prompt TEXT NOT NULL,
             answer TEXT NOT NULL,
             accepted_json TEXT NOT NULL DEFAULT '[]',
@@ -474,19 +472,87 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Migration: Drop conversations table (no longer needed)
-    // First clear conversation_id from phrases, then drop the table and index
-    log_migration_result(
-        "clear conversation_id from phrases",
-        conn.execute(
-            "UPDATE phrases SET conversation_id = NULL WHERE conversation_id IS NOT NULL",
-            [],
-        ),
-    );
+    // Migration: Remove conversation_id column and any FK constraint on it
+    // This is needed because:
+    // 1. Some older databases have an FK constraint pointing to the now-deleted conversations table
+    // 2. The conversation_id column is no longer used
+    let has_conversation_id = phrase_columns_updated.contains(&"conversation_id".to_string());
+
+    if has_conversation_id {
+        // Disable FK checks for the migration
+        let _ = conn.execute("PRAGMA foreign_keys = OFF", []);
+
+        // Rebuild phrases table without conversation_id column
+        log_migration_result(
+            "create phrases_new without conversation_id",
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS phrases_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    prompt TEXT NOT NULL,
+                    answer TEXT NOT NULL,
+                    accepted_json TEXT NOT NULL DEFAULT '[]',
+                    target_language TEXT NOT NULL DEFAULT 'de',
+                    native_language TEXT NOT NULL DEFAULT 'pl',
+                    audio_path TEXT,
+                    notes TEXT,
+                    starred INTEGER NOT NULL DEFAULT 0,
+                    excluded INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    material_id INTEGER REFERENCES materials(id) ON DELETE SET NULL,
+                    deck_id INTEGER REFERENCES decks(id) ON DELETE SET NULL,
+                    refined INTEGER NOT NULL DEFAULT 0
+                )",
+                [],
+            ),
+        );
+
+        log_migration_result(
+            "copy phrases to phrases_new (without conversation_id)",
+            conn.execute(
+                "INSERT INTO phrases_new (id, prompt, answer, accepted_json,
+                    target_language, native_language, audio_path, notes, starred, excluded, created_at,
+                    material_id, deck_id, refined)
+                 SELECT id, prompt, answer, accepted_json,
+                    target_language, native_language, audio_path, notes, starred, excluded, created_at,
+                    material_id, deck_id, refined FROM phrases",
+                [],
+            ),
+        );
+
+        log_migration_result("drop old phrases table", conn.execute("DROP TABLE phrases", []));
+
+        log_migration_result(
+            "rename phrases_new to phrases",
+            conn.execute("ALTER TABLE phrases_new RENAME TO phrases", []),
+        );
+
+        // Re-enable FK checks
+        let _ = conn.execute("PRAGMA foreign_keys = ON", []);
+
+        // Recreate indexes
+        log_migration_result(
+            "recreate idx_phrases_starred",
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_phrases_starred ON phrases(starred)", []),
+        );
+        log_migration_result(
+            "recreate idx_phrases_material",
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_phrases_material ON phrases(material_id)", []),
+        );
+        log_migration_result(
+            "recreate idx_phrases_deck",
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_phrases_deck ON phrases(deck_id)", []),
+        );
+    }
+
+    // Migration: Drop conversations table and related indexes (no longer needed)
+    // Disable FK temporarily to allow dropping a table that might have been referenced
+    let _ = conn.execute("PRAGMA foreign_keys = OFF", []);
     log_migration_result(
         "drop conversations table",
         conn.execute("DROP TABLE IF EXISTS conversations", []),
     );
+    let _ = conn.execute("PRAGMA foreign_keys = ON", []);
+
     log_migration_result(
         "drop idx_conversations_status index",
         conn.execute("DROP INDEX IF EXISTS idx_conversations_status", []),

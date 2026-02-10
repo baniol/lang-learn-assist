@@ -62,7 +62,7 @@ pub fn get_next_phrase(
     };
 
     let query = format!(
-        "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
+        "SELECT p.id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count, pp.learning_status
@@ -182,7 +182,7 @@ pub fn get_next_deck_phrase(
 
     // Order by deck_correct_count (less practiced first), then random for variety
     let query = format!(
-        "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
+        "SELECT p.id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                 pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                 pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count, pp.learning_status
@@ -311,7 +311,7 @@ mod tests {
             // Query phrase with priority calculation
             let phrase: Option<PhraseWithProgress> = conn
                 .query_row(
-                    "SELECT p.id, p.conversation_id, p.prompt, p.answer, p.accepted_json,
+                    "SELECT p.id, p.prompt, p.answer, p.accepted_json,
                             p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
                             pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
                             pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count, pp.learning_status

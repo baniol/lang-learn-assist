@@ -36,30 +36,30 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
     // Export phrases
     let mut stmt = conn
         .prepare(
-            "SELECT id, conversation_id, prompt, answer, accepted_json, target_language,
+            "SELECT id, prompt, answer, accepted_json, target_language,
                     native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id
              FROM phrases",
         )
         .map_err(|e| format!("Failed to prepare phrases query: {}", e))?;
     let phrases = stmt
         .query_map([], |row| {
-            let starred_int: i32 = row.get(9)?;
-            let excluded_int: i32 = row.get(10).unwrap_or(0);
+            let starred_int: i32 = row.get(8)?;
+            let excluded_int: i32 = row.get(9).unwrap_or(0);
             Ok(ExportPhrase {
                 id: row.get(0)?,
-                conversation_id: row.get(1)?,
-                material_id: row.get(12).ok(),
-                deck_id: row.get(13).ok(),
-                prompt: row.get(2)?,
-                answer: row.get(3)?,
-                accepted_json: row.get(4)?,
-                target_language: row.get(5)?,
-                native_language: row.get(6)?,
-                audio_path: row.get(7)?,
-                notes: row.get(8)?,
+                conversation_id: None,
+                material_id: row.get(11).ok(),
+                deck_id: row.get(12).ok(),
+                prompt: row.get(1)?,
+                answer: row.get(2)?,
+                accepted_json: row.get(3)?,
+                target_language: row.get(4)?,
+                native_language: row.get(5)?,
+                audio_path: row.get(6)?,
+                notes: row.get(7)?,
                 starred: starred_int != 0,
                 excluded: excluded_int != 0,
-                created_at: row.get(11)?,
+                created_at: row.get(10)?,
             })
         })
         .map_err(|e| format!("Failed to query phrases: {}", e))?
@@ -375,13 +375,12 @@ pub fn import_data_with_conn(
             // Import phrases with original IDs
             for phrase in &data.phrases {
                 tx.execute(
-                    "INSERT INTO phrases (id, conversation_id, prompt, answer, accepted_json,
+                    "INSERT INTO phrases (id, prompt, answer, accepted_json,
                                          target_language, native_language, audio_path, notes,
                                          starred, excluded, created_at, material_id, deck_id)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                     params![
                         phrase.id,
-                        phrase.conversation_id,
                         phrase.prompt,
                         phrase.answer,
                         phrase.accepted_json,

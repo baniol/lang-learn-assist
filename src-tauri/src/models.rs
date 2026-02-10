@@ -70,7 +70,6 @@ pub fn get_language_name(code: &str) -> &str {
 #[serde(rename_all = "camelCase")]
 pub struct Phrase {
     pub id: i64,
-    pub conversation_id: Option<i64>,
     pub material_id: Option<i64>,
     pub deck_id: Option<i64>,
     pub prompt: String,
@@ -522,7 +521,8 @@ pub struct ExportSetting {
 #[serde(rename_all = "camelCase")]
 pub struct ExportPhrase {
     pub id: i64,
-    pub conversation_id: Option<i64>,
+    #[serde(default, skip_serializing)]
+    pub conversation_id: Option<i64>, // Deprecated, kept for import compatibility
     pub material_id: Option<i64>,
     #[serde(default)]
     pub deck_id: Option<i64>,

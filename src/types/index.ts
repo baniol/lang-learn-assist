@@ -20,7 +20,6 @@ export {
 
 export interface Phrase {
   id: number;
-  conversationId: number | null;
   materialId: number | null;
   deckId: number | null;
   prompt: string;
@@ -426,7 +425,7 @@ export interface ExportSetting {
 
 export interface ExportPhrase {
   id: number;
-  conversationId: number | null;
+  conversationId?: number | null; // Deprecated, kept for import compatibility
   materialId: number | null;
   prompt: string;
   answer: string;
