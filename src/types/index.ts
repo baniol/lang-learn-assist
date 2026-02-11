@@ -358,6 +358,7 @@ export const LANGUAGE_OPTIONS = [
   { code: "it", name: "Italian" },
   { code: "pt", name: "Portuguese" },
   { code: "cs", name: "Czech" },
+  { code: "uk", name: "Ukrainian" },
 ];
 
 export const NATIVE_LANGUAGE_OPTIONS = [

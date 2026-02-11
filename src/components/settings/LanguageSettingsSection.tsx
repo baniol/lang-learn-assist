@@ -9,6 +9,7 @@ const LANGUAGE_FLAGS: Record<string, string> = {
   it: "🇮🇹",
   pt: "🇵🇹",
   cs: "🇨🇿",
+  uk: "🇺🇦",
 };
 
 interface LanguageSettingsSectionProps {
