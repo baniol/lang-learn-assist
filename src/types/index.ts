@@ -356,12 +356,15 @@ export const LANGUAGE_OPTIONS = [
   { code: "fr", name: "French" },
   { code: "es", name: "Spanish" },
   { code: "it", name: "Italian" },
+  { code: "pt", name: "Portuguese" },
+  { code: "cs", name: "Czech" },
 ];
 
 export const NATIVE_LANGUAGE_OPTIONS = [
   { code: "pl", name: "Polish" },
   { code: "en", name: "English" },
   { code: "de", name: "German" },
+  { code: "pt", name: "Portuguese" },
 ];
 
 // Question threads for grammar/style Q&A

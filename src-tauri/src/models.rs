@@ -62,6 +62,7 @@ pub fn get_language_name(code: &str) -> &str {
         "zh" => "Chinese",
         "ja" => "Japanese",
         "ko" => "Korean",
+        "cs" => "Czech",
         _ => code,
     }
 }
