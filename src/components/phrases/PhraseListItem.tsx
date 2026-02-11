@@ -11,6 +11,7 @@ interface PhraseListItemProps {
   onToggleExcluded: (id: number) => void;
   onPlay: () => void;
   onRefine: () => void;
+  onTranslate?: () => void;
   onDelete: () => void;
   onAssignToDeck?: () => void;
 }
@@ -23,6 +24,7 @@ export function PhraseListItem({
   onToggleExcluded,
   onPlay,
   onRefine,
+  onTranslate,
   onDelete,
   onAssignToDeck,
 }: PhraseListItemProps) {
@@ -65,6 +67,7 @@ export function PhraseListItem({
         isRefined={phrase.refined}
         onPlay={onPlay}
         onRefine={onRefine}
+        onTranslate={onTranslate}
         onToggleExcluded={() => onToggleExcluded(phrase.id)}
         onDelete={onDelete}
         onAssignToDeck={onAssignToDeck}

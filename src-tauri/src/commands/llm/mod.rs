@@ -6,9 +6,11 @@
 //! - `prompts`: System prompt builders for various use cases
 //! - `phrase`: Phrase refinement and title generation
 //! - `material`: Material processing and sentence Q&A
+//! - `translation`: Phrase translation to different languages
 
 pub mod client;
 pub mod material;
 pub mod phrase;
 pub mod prompts;
+pub mod translation;
 pub mod types;

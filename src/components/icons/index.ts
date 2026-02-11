@@ -60,6 +60,7 @@ export {
   ExternalLinkIcon,
   CopyIcon,
   GlobeIcon,
+  TranslateIcon,
   FilterIcon,
   SortIcon,
   DotsVerticalIcon,

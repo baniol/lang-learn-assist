@@ -1,7 +1,7 @@
 //! System prompt builders for LLM interactions.
 //!
 //! This module contains functions that build system prompts for various
-//! LLM use cases like phrase refinement and sentence Q&A.
+//! LLM use cases like phrase refinement, sentence Q&A, and translation.
 
 use crate::models::{get_language_name, Phrase};
 
@@ -93,5 +93,48 @@ Always respond with JSON in this exact format:
         native_name,
         native_name,
         native_name, target_name
+    )
+}
+
+/// Build system prompt for phrase translation.
+pub fn build_translation_system_prompt(
+    source_language: &str,
+    target_language: &str,
+    native_language: &str,
+) -> String {
+    let source_name = get_language_name(source_language);
+    let target_name = get_language_name(target_language);
+    let native_name = get_language_name(native_language);
+
+    format!(
+        r#"You are a language translation assistant. Your task is to translate a phrase from {} to {}.
+
+The phrase consists of:
+- An answer (main phrase in {})
+- Accepted alternatives (alternative ways to say the same thing in {})
+
+Translate ONLY the {} parts to {}. Keep the meaning as close as possible while sounding natural.
+The prompt (in {}) should remain unchanged - you are just translating the answer and alternatives.
+
+IMPORTANT:
+- Maintain the same formality level as the original
+- If there are multiple accepted alternatives, translate each one
+- Keep alternative variations that make sense in {}
+- Do not add or remove alternatives unless they don't translate meaningfully
+
+Respond with JSON in this exact format:
+{{
+  "answer": "translated {} phrase",
+  "accepted": ["alternative 1", "alternative 2"]
+}}
+
+If there are no accepted alternatives, return an empty array for "accepted"."#,
+        source_name, target_name,
+        source_name,
+        source_name,
+        source_name, target_name,
+        native_name,
+        target_name,
+        target_name
     )
 }

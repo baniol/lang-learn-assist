@@ -4,6 +4,7 @@ import type {
   PhraseThread,
   PhraseThreadMessage,
   RefinePhraseSuggestion,
+  TranslationPreview,
 } from "../types";
 
 export async function getPhraseThread(
@@ -51,5 +52,29 @@ export async function refinePhrase(
     phrase,
     messages,
     userMessage,
+  });
+}
+
+export async function previewPhraseTranslation(
+  phraseId: number,
+  newTargetLanguage: string
+): Promise<TranslationPreview> {
+  return invoke<TranslationPreview>("preview_phrase_translation", {
+    phraseId,
+    newTargetLanguage,
+  });
+}
+
+export async function applyPhraseTranslation(
+  phraseId: number,
+  translatedAnswer: string,
+  translatedAccepted: string[],
+  newTargetLanguage: string
+): Promise<Phrase> {
+  return invoke<Phrase>("apply_phrase_translation", {
+    phraseId,
+    translatedAnswer,
+    translatedAccepted,
+    newTargetLanguage,
   });
 }

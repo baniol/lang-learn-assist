@@ -8,6 +8,7 @@ import {
   ExcludeIcon,
   CloseIcon,
   DecksIcon,
+  TranslateIcon,
 } from "../icons";
 
 interface PhraseActionsProps {
@@ -19,6 +20,7 @@ interface PhraseActionsProps {
   isRefined?: boolean;
   onPlay: () => void;
   onRefine: () => void;
+  onTranslate?: () => void;
   onToggleExcluded: () => void;
   onDelete: () => void;
   onAssignToDeck?: () => void;
@@ -32,6 +34,7 @@ export function PhraseActions({
   isRefined,
   onPlay,
   onRefine,
+  onTranslate,
   onToggleExcluded,
   onDelete,
   onAssignToDeck,
@@ -64,6 +67,15 @@ export function PhraseActions({
       >
         <LightbulbIcon size="xs" />
       </button>
+      {onTranslate && (
+        <button
+          onClick={onTranslate}
+          className="p-2 rounded text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          title="Copy to another language"
+        >
+          <TranslateIcon size="xs" />
+        </button>
+      )}
       {onAssignToDeck && (
         <button
           onClick={onAssignToDeck}

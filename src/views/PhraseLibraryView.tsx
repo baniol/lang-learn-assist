@@ -8,6 +8,7 @@ import {
   PhraseFilters,
   PhraseListItem,
   AddPhraseDialog,
+  TranslateDialog,
   type FilterStatus,
   type ExcludedFilter,
   type LanguageFilter,
@@ -27,12 +28,13 @@ import {
   getLearningStats,
 } from "../api";
 import { assignPhraseToDeck, getDecks } from "../lib/decks";
-import type {
-  PhraseWithProgress,
-  CreatePhraseRequest,
-  LearningStats,
-  Phrase,
-  DeckWithStats,
+import {
+  LANGUAGE_OPTIONS,
+  type PhraseWithProgress,
+  type CreatePhraseRequest,
+  type LearningStats,
+  type Phrase,
+  type DeckWithStats,
 } from "../types";
 
 export function PhraseLibraryView() {
@@ -57,6 +59,7 @@ export function PhraseLibraryView() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [refiningPhrase, setRefiningPhrase] = useState<Phrase | null>(null);
+  const [translatingPhrase, setTranslatingPhrase] = useState<Phrase | null>(null);
   const [deckSelectorPhrase, setDeckSelectorPhrase] = useState<PhraseWithProgress | null>(null);
 
   const handleAudioGenerated = useCallback(
@@ -297,6 +300,14 @@ export function PhraseLibraryView() {
     );
   };
 
+  const handleTranslated = (newPhrase: Phrase) => {
+    setTranslatingPhrase(null);
+    loadStats(); // Update phrase counts
+
+    const langName = LANGUAGE_OPTIONS.find(l => l.code === newPhrase.targetLanguage)?.name || newPhrase.targetLanguage;
+    toast.success(`Phrase copied to ${langName}`);
+  };
+
   const handleAssignToDeck = async (deckId: number | null) => {
     if (!deckSelectorPhrase) return;
 
@@ -389,6 +400,7 @@ export function PhraseLibraryView() {
               onToggleExcluded={handleToggleExcluded}
               onPlay={() => handlePlay(item)}
               onRefine={() => setRefiningPhrase(item.phrase)}
+              onTranslate={() => setTranslatingPhrase(item.phrase)}
               onDelete={() => setDeleteConfirmId(item.phrase.id)}
               onAssignToDeck={() => setDeckSelectorPhrase(item)}
             />
@@ -440,6 +452,14 @@ export function PhraseLibraryView() {
         onSelect={handleAssignToDeck}
         currentDeckId={deckSelectorPhrase?.phrase.deckId ?? null}
         title="Assign to Deck"
+      />
+
+      {/* Translate Dialog */}
+      <TranslateDialog
+        isOpen={translatingPhrase !== null}
+        phrase={translatingPhrase}
+        onClose={() => setTranslatingPhrase(null)}
+        onTranslated={handleTranslated}
       />
     </div>
   );

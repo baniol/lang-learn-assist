@@ -821,3 +821,15 @@ pub struct DeckImportResult {
     pub phrases_imported: i32,
     pub message: String,
 }
+
+/// Translation preview for phrase translation feature
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslationPreview {
+    pub phrase_id: i64,
+    pub original_answer: String,
+    pub translated_answer: String,
+    pub original_accepted: Vec<String>,
+    pub translated_accepted: Vec<String>,
+    pub new_target_language: String,
+}

@@ -75,6 +75,8 @@ pub fn run() {
             llm::material::estimate_material_tokens,
             llm::material::ask_about_sentence,
             llm::material::process_audio_segments,
+            llm::translation::preview_phrase_translation,
+            llm::translation::apply_phrase_translation,
             // Materials
             materials::create_material,
             materials::get_materials,

@@ -60,6 +60,9 @@ pub mod llm {
     /// Maximum tokens for asking about sentences
     pub const ASK_SENTENCE_MAX_TOKENS: i64 = 1500;
 
+    /// Maximum tokens for phrase translation
+    pub const TRANSLATE_PHRASE_MAX_TOKENS: i64 = 500;
+
     /// Maximum input tokens per chunk for material processing
     pub const MAX_CHUNK_INPUT_TOKENS: usize = 1000;
 

@@ -323,6 +323,15 @@ export interface RefinePhraseSuggestion {
   explanation: string;
 }
 
+export interface TranslationPreview {
+  phraseId: number;
+  originalAnswer: string;
+  translatedAnswer: string;
+  originalAccepted: string[];
+  translatedAccepted: string[];
+  newTargetLanguage: string;
+}
+
 export interface TopicCategory {
   id: string;
   label: string;
