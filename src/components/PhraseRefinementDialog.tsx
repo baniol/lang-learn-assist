@@ -268,6 +268,7 @@ export function PhraseRefinementDialog({
         phrase.id,
         undefined,
         phrase.targetLanguage,
+        true, // forceRegenerate - bypass cache
       );
       setAudioPath(newPath);
 

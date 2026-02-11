@@ -121,21 +121,24 @@ fn resolve_voice_id(
 }
 
 #[tauri::command]
+#[allow(non_snake_case)]
 pub async fn generate_tts(
     state: State<'_, AppState>,
     text: String,
     phrase_id: Option<i64>,
     voice_id: Option<String>,
     language: Option<String>,
+    forceRegenerate: Option<bool>,
 ) -> Result<String, String> {
     let settings = state.settings.safe_read()?.clone();
 
     // Resolve voice ID with priority: explicit > per-language > legacy global
     let effective_voice_id = resolve_voice_id(voice_id.as_ref(), language.as_ref(), &settings);
+    let force = forceRegenerate.unwrap_or(false);
 
     match settings.tts_provider.as_str() {
         "elevenlabs" => {
-            generate_elevenlabs_tts(&settings.tts_api_key, &effective_voice_id, &text, phrase_id)
+            generate_elevenlabs_tts(&settings.tts_api_key, &effective_voice_id, &text, phrase_id, force)
                 .await
         }
         "none" | "" => Err("TTS not configured".to_string()),
@@ -182,6 +185,7 @@ async fn generate_elevenlabs_tts(
     voice_id: &str,
     text: &str,
     phrase_id: Option<i64>,
+    force: bool,
 ) -> Result<String, String> {
     let api_key = api_key.trim();
     let voice_id = voice_id.trim();
@@ -211,6 +215,11 @@ async fn generate_elevenlabs_tts(
     };
 
     let audio_path = audio_dir.join(&filename);
+
+    // Delete existing file if force regeneration is requested
+    if force && audio_path.exists() {
+        let _ = std::fs::remove_file(&audio_path);
+    }
 
     // Check if file already exists (cache hit)
     if audio_path.exists() {
