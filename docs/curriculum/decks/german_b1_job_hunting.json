@@ -1,0 +1,131 @@
+{
+  "name": "German B1: Job Hunting & CV",
+  "description": "Szukanie pracy: ogłoszenia, pisanie CV, listy motywacyjne na poziomie B1.",
+  "targetLanguage": "de",
+  "nativeLanguage": "pl",
+  "graduationThreshold": 3,
+  "level": "B1",
+  "category": "Work",
+  "phrases": [
+    {
+      "prompt": "Szukam pracy w branży IT.",
+      "answer": "Ich suche eine Stelle in der IT-Branche.",
+      "accepted": ["Ich bin auf der Suche nach einem Job in der IT-Branche."],
+      "notes": ""
+    },
+    {
+      "prompt": "Po ukończeniu studiów pracowałem trzy lata jako programista.",
+      "answer": "Nachdem ich mein Studium abgeschlossen hatte, habe ich drei Jahre als Programmierer gearbeitet.",
+      "accepted": ["Nach meinem Studium habe ich drei Jahre als Programmierer gearbeitet."],
+      "notes": "nachdem + Plusquamperfekt: sekwencja czasowa"
+    },
+    {
+      "prompt": "Mam doświadczenie zdobyte w międzynarodowej firmie.",
+      "answer": "Ich habe Erfahrung, die ich in einem internationalen Unternehmen gesammelt habe.",
+      "accepted": ["Ich habe Berufserfahrung aus einem internationalen Unternehmen."],
+      "notes": "Relativsatz: 'die ich gesammelt habe'"
+    },
+    {
+      "prompt": "Czy to stanowisko wymaga znajomości języka angielskiego?",
+      "answer": "Erfordert diese Stelle Englischkenntnisse?",
+      "accepted": ["Sind für diese Position Englischkenntnisse erforderlich?"],
+      "notes": ""
+    },
+    {
+      "prompt": "W załączeniu przesyłam moje CV i list motywacyjny.",
+      "answer": "Im Anhang sende ich Ihnen meinen Lebenslauf und mein Anschreiben.",
+      "accepted": ["Anbei finden Sie meinen Lebenslauf und mein Bewerbungsschreiben."],
+      "notes": "Formalne zwroty w korespondencji"
+    },
+    {
+      "prompt": "Jestem zainteresowany ogłoszonym stanowiskiem.",
+      "answer": "Ich interessiere mich für die ausgeschriebene Stelle.",
+      "accepted": ["Die ausgeschriebene Position interessiert mich sehr."],
+      "notes": "Partizip II jako przymiotnik: 'ausgeschriebene'"
+    },
+    {
+      "prompt": "Ukończyłem studia ekonomiczne w 2020 roku.",
+      "answer": "Ich habe 2020 mein Wirtschaftsstudium abgeschlossen.",
+      "accepted": ["Ich habe 2020 meinen Abschluss in Wirtschaft gemacht."],
+      "notes": "Perfekt: opis wykształcenia"
+    },
+    {
+      "prompt": "Po stażu zostałem zatrudniony na stałe.",
+      "answer": "Nachdem ich das Praktikum beendet hatte, wurde ich fest angestellt.",
+      "accepted": ["Nach dem Praktikum bekam ich eine Festanstellung."],
+      "notes": "nachdem + Passiv: 'wurde angestellt'"
+    },
+    {
+      "prompt": "Mam bardzo dobre umiejętności komunikacyjne.",
+      "answer": "Ich verfüge über sehr gute Kommunikationsfähigkeiten.",
+      "accepted": ["Ich habe ausgezeichnete kommunikative Fähigkeiten."],
+      "notes": "verfügen über + Akk."
+    },
+    {
+      "prompt": "W moim poprzednim miejscu pracy byłem odpowiedzialny za obsługę klienta.",
+      "answer": "An meinem früheren Arbeitsplatz war ich für die Kundenbetreuung verantwortlich.",
+      "accepted": ["In meiner vorherigen Stelle war ich für den Kundenservice zuständig."],
+      "notes": "Partizip II jako przymiotnik: 'früheren'"
+    },
+    {
+      "prompt": "Chciałbym dowiedzieć się więcej o warunkach zatrudnienia.",
+      "answer": "Ich würde gerne mehr über die Arbeitsbedingungen erfahren.",
+      "accepted": ["Ich möchte mehr über die Anstellungsbedingungen wissen."],
+      "notes": "Konjunktiv II: würde gerne"
+    },
+    {
+      "prompt": "Czy mogliby Państwo przesłać mi szczegółowy opis stanowiska?",
+      "answer": "Könnten Sie mir eine detaillierte Stellenbeschreibung zusenden?",
+      "accepted": ["Wäre es möglich, mir die genaue Jobbeschreibung zu schicken?"],
+      "notes": "Konjunktiv II: könnten Sie"
+    },
+    {
+      "prompt": "Pracowałem w zespole składającym się z dziesięciu osób.",
+      "answer": "Ich habe in einem Team gearbeitet, das aus zehn Personen bestand.",
+      "accepted": ["Ich war Teil eines zehnköpfigen Teams."],
+      "notes": "Relativsatz: 'das bestand'"
+    },
+    {
+      "prompt": "To jest dobrze płatna praca z elastycznymi godzinami.",
+      "answer": "Das ist eine gut bezahlte Arbeit mit flexiblen Arbeitszeiten.",
+      "accepted": ["Das ist ein gut bezahlter Job mit flexibler Arbeitszeit."],
+      "notes": "Partizip II jako przymiotnik: 'gut bezahlte'"
+    },
+    {
+      "prompt": "Po zdobyciu certyfikatu mogę aplikować na wyższe stanowiska.",
+      "answer": "Nachdem ich das Zertifikat erworben habe, kann ich mich auf höhere Positionen bewerben.",
+      "accepted": ["Mit dem erworbenen Zertifikat kann ich mich für bessere Stellen bewerben."],
+      "notes": "nachdem: sekwencja + Partizip II: 'erworbenen'"
+    },
+    {
+      "prompt": "Ogłoszenie wymienia wymagane kwalifikacje.",
+      "answer": "Die Anzeige listet die geforderten Qualifikationen auf.",
+      "accepted": ["In der Anzeige stehen die erforderlichen Qualifikationen."],
+      "notes": "Partizip II jako przymiotnik: 'geforderten'"
+    },
+    {
+      "prompt": "Jestem gotowy do rozpoczęcia pracy od przyszłego miesiąca.",
+      "answer": "Ich bin bereit, ab nächstem Monat anzufangen.",
+      "accepted": ["Ich könnte ab dem nächsten Monat anfangen."],
+      "notes": ""
+    },
+    {
+      "prompt": "Czy oferujecie możliwość pracy zdalnej?",
+      "answer": "Bieten Sie die Möglichkeit zur Fernarbeit an?",
+      "accepted": ["Gibt es bei Ihnen Homeoffice-Möglichkeiten?", "Kann man bei Ihnen im Homeoffice arbeiten?"],
+      "notes": ""
+    },
+    {
+      "prompt": "Moją mocną stroną jest umiejętność rozwiązywania problemów.",
+      "answer": "Meine Stärke ist die Fähigkeit, Probleme zu lösen.",
+      "accepted": ["Problemlösung gehört zu meinen Stärken."],
+      "notes": ""
+    },
+    {
+      "prompt": "Byłbym wdzięczny za możliwość przedstawienia się osobiście.",
+      "answer": "Ich wäre Ihnen dankbar für die Möglichkeit, mich persönlich vorzustellen.",
+      "accepted": ["Über ein persönliches Gespräch würde ich mich freuen."],
+      "notes": "Konjunktiv II: wäre dankbar, würde mich freuen"
+    }
+  ]
+}
