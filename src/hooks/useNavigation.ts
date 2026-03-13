@@ -13,7 +13,7 @@ interface UseNavigationResult {
   viewState: ViewState;
   /** Current view type */
   currentView: ViewType;
-  /** Active nav item (handles sub-views like deck-detail -> decks) */
+  /** Active nav item (handles sub-views like material-review -> materials) */
   activeNavItem: ViewType;
   /** Navigate to a view without data */
   navigate: {

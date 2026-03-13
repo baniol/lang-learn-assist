@@ -153,13 +153,6 @@ export function DataManagementSection({
                     imported
                   </p>
                 )}
-                {operationResult.details.stats.phraseProgressImported > 0 && (
-                  <p>
-                    Progress:{" "}
-                    {operationResult.details.stats.phraseProgressImported}{" "}
-                    imported
-                  </p>
-                )}
                 {operationResult.details.stats.notesImported > 0 && (
                   <p>
                     Notes: {operationResult.details.stats.notesImported} imported
@@ -169,13 +162,6 @@ export function DataManagementSection({
                   <p>
                     Question threads:{" "}
                     {operationResult.details.stats.questionThreadsImported}{" "}
-                    imported
-                  </p>
-                )}
-                {operationResult.details.stats.practiceSessionsImported > 0 && (
-                  <p>
-                    Practice sessions:{" "}
-                    {operationResult.details.stats.practiceSessionsImported}{" "}
                     imported
                   </p>
                 )}

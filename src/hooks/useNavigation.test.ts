@@ -14,11 +14,11 @@ describe("useNavigation", () => {
 
     it("should accept custom initial view", () => {
       const { result } = renderHook(() =>
-        useNavigation({ type: "learn" })
+        useNavigation({ type: "questions" })
       );
 
-      expect(result.current.viewState).toEqual({ type: "learn" });
-      expect(result.current.currentView).toBe("learn");
+      expect(result.current.viewState).toEqual({ type: "questions" });
+      expect(result.current.currentView).toBe("questions");
     });
 
     it("should accept initial view with data", () => {
@@ -39,7 +39,7 @@ describe("useNavigation", () => {
     describe("views without data", () => {
       it("should navigate to phrase-library", () => {
         const { result } = renderHook(() =>
-          useNavigation({ type: "learn" })
+          useNavigation({ type: "questions" })
         );
 
         act(() => {
@@ -48,16 +48,6 @@ describe("useNavigation", () => {
 
         expect(result.current.viewState).toEqual({ type: "phrase-library" });
         expect(result.current.currentView).toBe("phrase-library");
-      });
-
-      it("should navigate to learn", () => {
-        const { result } = renderHook(() => useNavigation());
-
-        act(() => {
-          result.current.navigate("learn");
-        });
-
-        expect(result.current.viewState).toEqual({ type: "learn" });
       });
 
       it("should navigate to questions", () => {
@@ -109,16 +99,6 @@ describe("useNavigation", () => {
 
         expect(result.current.viewState).toEqual({ type: "material-create" });
       });
-
-      it("should navigate to decks", () => {
-        const { result } = renderHook(() => useNavigation());
-
-        act(() => {
-          result.current.navigate("decks");
-        });
-
-        expect(result.current.viewState).toEqual({ type: "decks" });
-      });
     });
 
     describe("views with data", () => {
@@ -132,32 +112,6 @@ describe("useNavigation", () => {
         expect(result.current.viewState).toEqual({
           type: "material-review",
           materialId: 77,
-        });
-      });
-
-      it("should navigate to deck-detail with deckId", () => {
-        const { result } = renderHook(() => useNavigation());
-
-        act(() => {
-          result.current.navigate("deck-detail", { deckId: 42 });
-        });
-
-        expect(result.current.viewState).toEqual({
-          type: "deck-detail",
-          deckId: 42,
-        });
-      });
-
-      it("should navigate to deck-study with deckId", () => {
-        const { result } = renderHook(() => useNavigation());
-
-        act(() => {
-          result.current.navigate("deck-study", { deckId: 99 });
-        });
-
-        expect(result.current.viewState).toEqual({
-          type: "deck-study",
-          deckId: 99,
         });
       });
     });
@@ -184,37 +138,15 @@ describe("useNavigation", () => {
       expect(result.current.activeNavItem).toBe("materials");
     });
 
-    it("should return decks when on deck-detail", () => {
-      const { result } = renderHook(() => useNavigation());
-
-      act(() => {
-        result.current.navigate("deck-detail", { deckId: 1 });
-      });
-
-      expect(result.current.activeNavItem).toBe("decks");
-    });
-
-    it("should return decks when on deck-study", () => {
-      const { result } = renderHook(() => useNavigation());
-
-      act(() => {
-        result.current.navigate("deck-study", { deckId: 1 });
-      });
-
-      expect(result.current.activeNavItem).toBe("decks");
-    });
-
     it("should return the view itself for top-level views", () => {
       const { result } = renderHook(() => useNavigation());
 
       const topLevelViews = [
         "phrase-library",
-        "learn",
         "questions",
         "settings",
         "notes",
         "materials",
-        "decks",
       ] as const;
 
       for (const view of topLevelViews) {
@@ -231,9 +163,9 @@ describe("useNavigation", () => {
       const { result } = renderHook(() => useNavigation());
 
       act(() => {
-        result.current.navigate("learn");
+        result.current.navigate("questions");
       });
-      expect(result.current.currentView).toBe("learn");
+      expect(result.current.currentView).toBe("questions");
 
       act(() => {
         result.current.navigate("material-review", { materialId: 1 });

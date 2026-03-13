@@ -40,22 +40,6 @@ fn load_settings_from_db(conn: &Connection) -> AppSettings {
             }
             "target_language" => settings.target_language = value,
             "native_language" => settings.native_language = value,
-            "required_streak" => {
-                settings.required_streak = value.parse().unwrap_or(2);
-            }
-            "immediate_retry" => {
-                settings.immediate_retry = value == "true";
-            }
-            "default_exercise_mode" => settings.default_exercise_mode = value,
-            "failure_repetitions" => {
-                settings.failure_repetitions = value.parse().unwrap_or(2);
-            }
-            "session_phrase_limit" => {
-                settings.session_phrase_limit = value.parse().unwrap_or(20);
-            }
-            "new_phrases_per_session" => {
-                settings.new_phrases_per_session = value.parse().unwrap_or(2);
-            }
             "fuzzy_matching" => {
                 settings.fuzzy_matching = value == "true";
             }
@@ -105,24 +89,6 @@ fn save_settings_to_db(conn: &Connection, settings: &AppSettings) -> Result<(), 
         ("tts_voices_per_language", voices_json),
         ("target_language", settings.target_language.clone()),
         ("native_language", settings.native_language.clone()),
-        ("required_streak", settings.required_streak.to_string()),
-        ("immediate_retry", settings.immediate_retry.to_string()),
-        (
-            "default_exercise_mode",
-            settings.default_exercise_mode.clone(),
-        ),
-        (
-            "failure_repetitions",
-            settings.failure_repetitions.to_string(),
-        ),
-        (
-            "session_phrase_limit",
-            settings.session_phrase_limit.to_string(),
-        ),
-        (
-            "new_phrases_per_session",
-            settings.new_phrases_per_session.to_string(),
-        ),
         ("fuzzy_matching", settings.fuzzy_matching.to_string()),
         ("notes_enabled", settings.notes_enabled.to_string()),
     ];

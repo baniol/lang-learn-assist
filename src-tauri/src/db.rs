@@ -75,59 +75,6 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Phrase progress table with SRS fields
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS phrase_progress (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phrase_id INTEGER NOT NULL UNIQUE,
-            correct_streak INTEGER NOT NULL DEFAULT 0,
-            total_attempts INTEGER NOT NULL DEFAULT 0,
-            success_count INTEGER NOT NULL DEFAULT 0,
-            last_seen TEXT,
-            ease_factor REAL NOT NULL DEFAULT 2.5,
-            interval_days INTEGER NOT NULL DEFAULT 1,
-            next_review_at TEXT,
-            FOREIGN KEY (phrase_id) REFERENCES phrases(id) ON DELETE CASCADE
-        )",
-        [],
-    )?;
-
-    // Migration: Add SRS columns if they don't exist (for existing databases)
-    let columns: Vec<String> = conn
-        .prepare("PRAGMA table_info(phrase_progress)")
-        .ok()
-        .and_then(|mut stmt| {
-            stmt.query_map([], |row| row.get::<_, String>(1))
-                .ok()
-                .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        })
-        .unwrap_or_default();
-
-    if !columns.contains(&"ease_factor".to_string()) {
-        log_migration_result(
-            "add ease_factor to phrase_progress",
-            conn.execute(
-                "ALTER TABLE phrase_progress ADD COLUMN ease_factor REAL NOT NULL DEFAULT 2.5",
-                [],
-            ),
-        );
-    }
-    if !columns.contains(&"interval_days".to_string()) {
-        log_migration_result(
-            "add interval_days to phrase_progress",
-            conn.execute(
-                "ALTER TABLE phrase_progress ADD COLUMN interval_days INTEGER NOT NULL DEFAULT 1",
-                [],
-            ),
-        );
-    }
-    if !columns.contains(&"next_review_at".to_string()) {
-        log_migration_result(
-            "add next_review_at to phrase_progress",
-            conn.execute("ALTER TABLE phrase_progress ADD COLUMN next_review_at TEXT", []),
-        );
-    }
-
     // Migration: Add excluded column to phrases if it doesn't exist
     let phrase_columns: Vec<String> = conn
         .prepare("PRAGMA table_info(phrases)")
@@ -160,35 +107,14 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         );
     }
 
-    // Practice sessions table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS practice_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            started_at TEXT NOT NULL DEFAULT (datetime('now')),
-            finished_at TEXT,
-            total_phrases INTEGER NOT NULL DEFAULT 0,
-            correct_answers INTEGER NOT NULL DEFAULT 0,
-            exercise_mode TEXT NOT NULL DEFAULT 'speaking',
-            state_json TEXT
-        )",
-        [],
-    )?;
-
-    // Migration: Add state_json column to practice_sessions if it doesn't exist
-    let session_columns: Vec<String> = conn
-        .prepare("PRAGMA table_info(practice_sessions)")
-        .ok()
-        .and_then(|mut stmt| {
-            stmt.query_map([], |row| row.get::<_, String>(1))
-                .ok()
-                .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        })
-        .unwrap_or_default();
-
-    if !session_columns.contains(&"state_json".to_string()) {
+    // Migration: Add refined column to phrases
+    if !phrase_columns.contains(&"refined".to_string()) {
         log_migration_result(
-            "add state_json to practice_sessions",
-            conn.execute("ALTER TABLE practice_sessions ADD COLUMN state_json TEXT", []),
+            "add refined to phrases",
+            conn.execute(
+                "ALTER TABLE phrases ADD COLUMN refined INTEGER NOT NULL DEFAULT 0",
+                [],
+            ),
         );
     }
 
@@ -257,13 +183,10 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_phrase_progress_phrase ON phrase_progress(phrase_id)",
-        [],
-    )?;
-    conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_phrase_threads_phrase ON phrase_threads(phrase_id)",
         [],
     )?;
+
     // Material threads table (for sentence Q&A)
     conn.execute(
         "CREATE TABLE IF NOT EXISTS material_threads (
@@ -326,48 +249,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         );
     }
 
-    // Decks table (for learning new phrases before SRS graduation)
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS decks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            description TEXT,
-            target_language TEXT NOT NULL DEFAULT 'de',
-            native_language TEXT NOT NULL DEFAULT 'pl',
-            graduation_threshold INTEGER NOT NULL DEFAULT 2,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )",
-        [],
-    )?;
-
-    // Migration: Add deck metadata columns (for future levels/themes feature)
-    let deck_columns: Vec<String> = conn
-        .prepare("PRAGMA table_info(decks)")
-        .ok()
-        .and_then(|mut stmt| {
-            stmt.query_map([], |row| row.get::<_, String>(1))
-                .ok()
-                .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        })
-        .unwrap_or_default();
-
-    if !deck_columns.contains(&"level".to_string()) {
-        log_migration_result(
-            "add level to decks",
-            conn.execute("ALTER TABLE decks ADD COLUMN level TEXT", []),
-        );
-    }
-
-    if !deck_columns.contains(&"category".to_string()) {
-        log_migration_result(
-            "add category to decks",
-            conn.execute("ALTER TABLE decks ADD COLUMN category TEXT", []),
-        );
-    }
-
-    // Migration: Add deck_id column to phrases if it doesn't exist
-    // Re-read phrase_columns as we may have added columns above
+    // Migration: Remove conversation_id column and any FK constraint on it
     let phrase_columns_updated: Vec<String> = conn
         .prepare("PRAGMA table_info(phrases)")
         .ok()
@@ -378,113 +260,17 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         })
         .unwrap_or_default();
 
-    if !phrase_columns_updated.contains(&"deck_id".to_string()) {
-        log_migration_result(
-            "add deck_id to phrases",
-            conn.execute(
-                "ALTER TABLE phrases ADD COLUMN deck_id INTEGER REFERENCES decks(id) ON DELETE SET NULL",
-                [],
-            ),
-        );
-    }
-
-    // Migration: Add deck-related columns to phrase_progress
-    // Re-read progress columns
-    let progress_columns_updated: Vec<String> = conn
-        .prepare("PRAGMA table_info(phrase_progress)")
-        .ok()
-        .and_then(|mut stmt| {
-            stmt.query_map([], |row| row.get::<_, String>(1))
-                .ok()
-                .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        })
-        .unwrap_or_default();
-
-    if !progress_columns_updated.contains(&"in_srs_pool".to_string()) {
-        log_migration_result(
-            "add in_srs_pool to phrase_progress",
-            conn.execute(
-                "ALTER TABLE phrase_progress ADD COLUMN in_srs_pool INTEGER NOT NULL DEFAULT 1",
-                [],
-            ),
-        );
-    }
-
-    if !progress_columns_updated.contains(&"deck_correct_count".to_string()) {
-        log_migration_result(
-            "add deck_correct_count to phrase_progress",
-            conn.execute(
-                "ALTER TABLE phrase_progress ADD COLUMN deck_correct_count INTEGER NOT NULL DEFAULT 0",
-                [],
-            ),
-        );
-    }
-
-    // Migration: Add learning_status column to phrase_progress
-    // Values: 'inactive', 'deck_learning', 'srs_active'
-    // New phrases start as 'inactive' (not learnable until added to a deck)
-    if !progress_columns_updated.contains(&"learning_status".to_string()) {
-        log_migration_result(
-            "add learning_status to phrase_progress",
-            conn.execute(
-                "ALTER TABLE phrase_progress ADD COLUMN learning_status TEXT NOT NULL DEFAULT 'inactive'",
-                [],
-            ),
-        );
-
-        // Migrate existing data from in_srs_pool to learning_status
-        // in_srs_pool = 0 (in deck learning) -> 'deck_learning'
-        // in_srs_pool = 1 (graduated to SRS) -> 'srs_active'
-        log_migration_result(
-            "migrate in_srs_pool=0 to learning_status=deck_learning",
-            conn.execute(
-                "UPDATE phrase_progress SET learning_status = 'deck_learning' WHERE in_srs_pool = 0",
-                [],
-            ),
-        );
-        log_migration_result(
-            "migrate in_srs_pool=1 to learning_status=srs_active",
-            conn.execute(
-                "UPDATE phrase_progress SET learning_status = 'srs_active' WHERE in_srs_pool = 1",
-                [],
-            ),
-        );
-    }
-
-    // Migration: Add refined column to phrases
-    if !phrase_columns_updated.contains(&"refined".to_string()) {
-        log_migration_result(
-            "add refined to phrases",
-            conn.execute(
-                "ALTER TABLE phrases ADD COLUMN refined INTEGER NOT NULL DEFAULT 0",
-                [],
-            ),
-        );
-    }
-
-    // Create indexes for deck-related queries
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_phrases_deck ON phrases(deck_id)",
-        [],
-    )?;
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_phrase_progress_srs_pool ON phrase_progress(in_srs_pool)",
-        [],
-    )?;
-
-    // Migration: Remove conversation_id column and any FK constraint on it
-    // This is needed because:
-    // 1. Some older databases have an FK constraint pointing to the now-deleted conversations table
-    // 2. The conversation_id column is no longer used
     let has_conversation_id = phrase_columns_updated.contains(&"conversation_id".to_string());
+    let has_deck_id = phrase_columns_updated.contains(&"deck_id".to_string());
 
-    if has_conversation_id {
+    // Rebuild phrases table if it has conversation_id or deck_id columns
+    if has_conversation_id || has_deck_id {
         // Disable FK checks for the migration
         let _ = conn.execute("PRAGMA foreign_keys = OFF", []);
 
-        // Rebuild phrases table without conversation_id column
+        // Rebuild phrases table without conversation_id and deck_id columns
         log_migration_result(
-            "create phrases_new without conversation_id",
+            "create phrases_new without conversation_id/deck_id",
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS phrases_new (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -499,7 +285,6 @@ pub fn init_db(conn: &Connection) -> Result<()> {
                     excluded INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL DEFAULT (datetime('now')),
                     material_id INTEGER REFERENCES materials(id) ON DELETE SET NULL,
-                    deck_id INTEGER REFERENCES decks(id) ON DELETE SET NULL,
                     refined INTEGER NOT NULL DEFAULT 0
                 )",
                 [],
@@ -507,14 +292,14 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         );
 
         log_migration_result(
-            "copy phrases to phrases_new (without conversation_id)",
+            "copy phrases to phrases_new",
             conn.execute(
                 "INSERT INTO phrases_new (id, prompt, answer, accepted_json,
                     target_language, native_language, audio_path, notes, starred, excluded, created_at,
-                    material_id, deck_id, refined)
+                    material_id, refined)
                  SELECT id, prompt, answer, accepted_json,
                     target_language, native_language, audio_path, notes, starred, excluded, created_at,
-                    material_id, deck_id, refined FROM phrases",
+                    material_id, refined FROM phrases",
                 [],
             ),
         );
@@ -538,21 +323,29 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             "recreate idx_phrases_material",
             conn.execute("CREATE INDEX IF NOT EXISTS idx_phrases_material ON phrases(material_id)", []),
         );
-        log_migration_result(
-            "recreate idx_phrases_deck",
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_phrases_deck ON phrases(deck_id)", []),
-        );
     }
 
-    // Migration: Drop conversations table and related indexes (no longer needed)
-    // Disable FK temporarily to allow dropping a table that might have been referenced
+    // Migration: Drop tables that are no longer needed
     let _ = conn.execute("PRAGMA foreign_keys = OFF", []);
     log_migration_result(
         "drop conversations table",
         conn.execute("DROP TABLE IF EXISTS conversations", []),
     );
+    log_migration_result(
+        "drop decks table",
+        conn.execute("DROP TABLE IF EXISTS decks", []),
+    );
+    log_migration_result(
+        "drop practice_sessions table",
+        conn.execute("DROP TABLE IF EXISTS practice_sessions", []),
+    );
+    log_migration_result(
+        "drop phrase_progress table",
+        conn.execute("DROP TABLE IF EXISTS phrase_progress", []),
+    );
     let _ = conn.execute("PRAGMA foreign_keys = ON", []);
 
+    // Drop old indexes
     log_migration_result(
         "drop idx_conversations_status index",
         conn.execute("DROP INDEX IF EXISTS idx_conversations_status", []),
@@ -560,6 +353,18 @@ pub fn init_db(conn: &Connection) -> Result<()> {
     log_migration_result(
         "drop idx_phrases_conversation index",
         conn.execute("DROP INDEX IF EXISTS idx_phrases_conversation", []),
+    );
+    log_migration_result(
+        "drop idx_phrases_deck index",
+        conn.execute("DROP INDEX IF EXISTS idx_phrases_deck", []),
+    );
+    log_migration_result(
+        "drop idx_phrase_progress_phrase index",
+        conn.execute("DROP INDEX IF EXISTS idx_phrase_progress_phrase", []),
+    );
+    log_migration_result(
+        "drop idx_phrase_progress_srs_pool index",
+        conn.execute("DROP INDEX IF EXISTS idx_phrase_progress_srs_pool", []),
     );
 
     Ok(())

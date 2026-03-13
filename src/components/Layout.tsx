@@ -4,11 +4,9 @@ import { cn } from "../lib/utils";
 import {
   BookIcon,
   ArchiveIcon,
-  LightbulbIcon,
   QuestionCircleIcon,
   NoteIcon,
   SettingsIcon,
-  DecksIcon,
   PlusIcon,
   ChevronDownIcon,
   CheckIcon,
@@ -41,8 +39,6 @@ interface NavItem {
 const baseNavItems: NavItem[] = [
   { id: "phrase-library", label: "Phrases", icon: <BookIcon /> },
   { id: "materials", label: "Materials", icon: <ArchiveIcon /> },
-  { id: "decks", label: "Decks", icon: <DecksIcon /> },
-  { id: "learn", label: "Review", icon: <LightbulbIcon /> },
   { id: "questions", label: "Questions", icon: <QuestionCircleIcon /> },
 ];
 
@@ -170,10 +166,7 @@ export function Layout({
               currentView === item.id ||
               (item.id === "materials" &&
                 (currentView === "material-create" ||
-                  currentView === "material-review")) ||
-              (item.id === "decks" &&
-                (currentView === "deck-detail" ||
-                  currentView === "deck-study"));
+                  currentView === "material-review"));
 
             return (
               <button

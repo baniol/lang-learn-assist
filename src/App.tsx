@@ -4,23 +4,16 @@ import { ToastProvider } from "./contexts/ToastContext";
 import { ErrorBoundary } from "./components/shared";
 import { Layout } from "./components/Layout";
 import { PhraseLibraryView } from "./views/PhraseLibraryView";
-import { StudyView } from "./views/StudyView";
 import { QuestionsView } from "./views/QuestionsView";
 import { SettingsView } from "./views/SettingsView";
 import { NotesView } from "./views/NotesView";
 import { MaterialsView } from "./views/MaterialsView";
 import { MaterialCreateView } from "./views/MaterialCreateView";
 import { MaterialReviewView } from "./views/MaterialReviewView";
-import { DecksView } from "./views/DecksView";
-import { DeckDetailView } from "./views/DeckDetailView";
 import { QuickNotePopup } from "./components/QuickNotePopup";
 import { PageSpinner } from "./components/ui";
 import { useNavigation } from "./hooks";
-import {
-  isMaterialReviewView,
-  isDeckDetailView,
-  isDeckStudyView,
-} from "./types/navigation";
+import { isMaterialReviewView } from "./types/navigation";
 
 /**
  * Main application content.
@@ -63,29 +56,11 @@ function AppContent() {
         />
       );
     }
-    if (isDeckDetailView(viewState)) {
-      return (
-        <DeckDetailView
-          deckId={viewState.deckId}
-          onNavigate={legacyNavigate}
-        />
-      );
-    }
-    if (isDeckStudyView(viewState)) {
-      return (
-        <StudyView
-          deckId={viewState.deckId}
-          onNavigate={legacyNavigate}
-        />
-      );
-    }
 
     // Views without data
     switch (currentView) {
       case "phrase-library":
         return <PhraseLibraryView />;
-      case "learn":
-        return <StudyView onNavigate={legacyNavigate} />;
       case "questions":
         return <QuestionsView />;
       case "settings":
@@ -96,8 +71,6 @@ function AppContent() {
         return <MaterialsView onNavigate={legacyNavigate} />;
       case "material-create":
         return <MaterialCreateView onNavigate={legacyNavigate} />;
-      case "decks":
-        return <DecksView onNavigate={legacyNavigate} />;
       default:
         return <PhraseLibraryView />;
     }

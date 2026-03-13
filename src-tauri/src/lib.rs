@@ -5,7 +5,7 @@ mod models;
 mod state;
 mod utils;
 
-use commands::{audio, data_export, decks, learning, llm, materials, notes, phrases, questions, settings, tts};
+use commands::{audio, data_export, llm, materials, notes, phrases, questions, settings, tts};
 use db::{get_db_path, init_db};
 use rusqlite::Connection;
 use state::AppState;
@@ -48,25 +48,6 @@ pub fn run() {
             phrases::update_phrase_thread,
             phrases::accept_phrase_thread,
             phrases::delete_phrase_thread,
-            // Learning
-            learning::selection::get_next_phrase,
-            learning::selection::get_next_deck_phrase,
-            learning::selection::get_study_phrase,  // Unified command
-            learning::answer::record_answer,
-            learning::answer::record_deck_answer,
-            learning::answer::record_study_answer,  // Unified command
-            learning::answer::validate_answer,
-            learning::stats::get_learning_stats,
-            learning::stats::reset_practice_sessions,
-            learning::stats::reset_phrase_progress,
-            learning::session::start_practice_session,
-            learning::session::start_deck_session,
-            learning::session::update_practice_session,
-            learning::session::finish_practice_session,
-            learning::session::save_session_state,
-            learning::session::get_active_session,
-            learning::session::reset_learning_phrases,
-            learning::session::reset_progress,
             // LLM
             llm::client::test_llm_connection,
             llm::phrase::refine_phrase,
@@ -121,19 +102,8 @@ pub fn run() {
             // Data Export/Import
             data_export::export_data,
             data_export::import_data,
-            data_export::import_deck,
             data_export::find_duplicate_phrases,
             data_export::remove_duplicate_phrases,
-            // Decks
-            decks::get_decks,
-            decks::get_deck,
-            decks::create_deck,
-            decks::update_deck,
-            decks::delete_deck,
-            decks::reset_deck,
-            decks::assign_phrase_to_deck,
-            decks::assign_phrases_to_deck,
-            decks::get_deck_phrases,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

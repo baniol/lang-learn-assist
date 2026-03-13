@@ -7,7 +7,6 @@ import {
   CheckCircleIcon,
   ExcludeIcon,
   CloseIcon,
-  DecksIcon,
   TranslateIcon,
 } from "../icons";
 
@@ -16,28 +15,24 @@ interface PhraseActionsProps {
   isExcluded: boolean;
   isPlaying: boolean;
   isLoading: boolean;
-  hasDeck?: boolean;
   isRefined?: boolean;
   onPlay: () => void;
   onRefine: () => void;
   onTranslate?: () => void;
   onToggleExcluded: () => void;
   onDelete: () => void;
-  onAssignToDeck?: () => void;
 }
 
 export function PhraseActions({
   isExcluded,
   isPlaying,
   isLoading,
-  hasDeck,
   isRefined,
   onPlay,
   onRefine,
   onTranslate,
   onToggleExcluded,
   onDelete,
-  onAssignToDeck,
 }: PhraseActionsProps) {
   return (
     <div className="flex items-center gap-1 flex-shrink-0">
@@ -76,20 +71,6 @@ export function PhraseActions({
           <TranslateIcon size="xs" />
         </button>
       )}
-      {onAssignToDeck && (
-        <button
-          onClick={onAssignToDeck}
-          className={cn(
-            "p-2 rounded transition-colors",
-            hasDeck
-              ? "text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/30"
-              : "text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
-          )}
-          title={hasDeck ? "Change deck" : "Add to deck"}
-        >
-          <DecksIcon size="xs" />
-        </button>
-      )}
       <button
         onClick={onToggleExcluded}
         className={cn(
@@ -98,7 +79,7 @@ export function PhraseActions({
             ? "text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
             : "text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
         )}
-        title={isExcluded ? "Include in learning" : "Exclude from learning"}
+        title={isExcluded ? "Include" : "Exclude"}
       >
         {isExcluded ? <CheckCircleIcon size="xs" /> : <ExcludeIcon size="xs" />}
       </button>

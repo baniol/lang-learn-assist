@@ -1,29 +1,22 @@
 use crate::db::get_conn;
 use crate::models::{
     CreatePhraseRequest, Phrase, PhraseThread, PhraseThreadMessage,
-    PhraseWithProgress, UpdatePhraseRequest,
+    UpdatePhraseRequest,
 };
 use crate::state::AppState;
-use crate::utils::db::{row_to_phrase, row_to_phrase_with_progress};
+use crate::utils::db::row_to_phrase;
 use crate::utils::lock::SafeRwLock;
 use rusqlite::params;
 use tauri::State;
 
-/// Status filter for phrase queries
-/// - "all": no filtering
-/// - "new": phrases with no progress
-/// - "learning": phrases with progress but streak < 2
-/// - "learned": phrases with streak >= 2
-/// - "excluded": only excluded phrases
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn get_phrases(
     starredOnly: Option<bool>,
     excludedOnly: Option<bool>,
     targetLanguage: Option<String>,
-    status: Option<String>,
     searchQuery: Option<String>,
-) -> Result<Vec<PhraseWithProgress>, String> {
+) -> Result<Vec<Phrase>, String> {
     let conn = get_conn()?;
 
     // Build query with parameter placeholders
@@ -47,22 +40,6 @@ pub fn get_phrases(
         param_values.push(Box::new(lang.clone()));
     }
 
-    // Status filtering based on progress
-    if let Some(ref status_filter) = status {
-        match status_filter.as_str() {
-            "new" => {
-                conditions.push("pp.id IS NULL");
-            }
-            "learning" => {
-                conditions.push("pp.id IS NOT NULL AND pp.total_attempts > 0 AND pp.correct_streak < 2");
-            }
-            "learned" => {
-                conditions.push("pp.id IS NOT NULL AND pp.correct_streak >= 2");
-            }
-            _ => {} // "all" or any other value means no filtering
-        }
-    }
-
     // Search filter
     if let Some(ref query) = searchQuery {
         if !query.is_empty() {
@@ -76,17 +53,13 @@ pub fn get_phrases(
     let where_clause = if conditions.is_empty() {
         String::new()
     } else {
-        format!(" AND {}", conditions.join(" AND "))
+        format!(" WHERE {}", conditions.join(" AND "))
     };
 
     let query = format!(
         "SELECT p.id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
-                pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
-                pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count, pp.learning_status
-         FROM phrases p
-         LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
-         WHERE 1=1{}
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.refined
+         FROM phrases p{}
          ORDER BY p.created_at DESC",
         where_clause
     );
@@ -97,7 +70,7 @@ pub fn get_phrases(
 
     let params: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
     let phrases = stmt
-        .query_map(params.as_slice(), row_to_phrase_with_progress)
+        .query_map(params.as_slice(), row_to_phrase)
         .map_err(|e| format!("Failed to query phrases: {}", e))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect phrases: {}", e))?;
@@ -106,19 +79,16 @@ pub fn get_phrases(
 }
 
 #[tauri::command]
-pub fn get_phrase(id: i64) -> Result<PhraseWithProgress, String> {
+pub fn get_phrase(id: i64) -> Result<Phrase, String> {
     let conn = get_conn()?;
 
     conn.query_row(
         "SELECT p.id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.deck_id, p.refined,
-                pp.id as progress_id, pp.correct_streak, pp.total_attempts, pp.success_count, pp.last_seen,
-                pp.ease_factor, pp.interval_days, pp.next_review_at, pp.in_srs_pool, pp.deck_correct_count, pp.learning_status
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.refined
          FROM phrases p
-         LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
          WHERE p.id = ?1",
         params![id],
-        row_to_phrase_with_progress,
+        row_to_phrase,
     )
     .map_err(|e| format!("Phrase not found: {}", e))
 }
@@ -161,7 +131,7 @@ pub fn create_phrase(
     let id = conn.last_insert_rowid();
 
     conn.query_row(
-        "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id, refined
+        "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, refined
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,
@@ -225,7 +195,7 @@ pub fn create_phrases_batch(
     for id in &created_ids {
         let phrase = tx
             .query_row(
-                "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id, refined
+                "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, refined
                  FROM phrases WHERE id = ?1",
                 params![id],
                 row_to_phrase,
@@ -295,7 +265,7 @@ pub fn update_phrase(id: i64, request: UpdatePhraseRequest) -> Result<Phrase, St
     }
 
     conn.query_row(
-        "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id, refined
+        "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, refined
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,

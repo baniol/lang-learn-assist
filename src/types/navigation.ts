@@ -11,16 +11,12 @@
  */
 export type ViewState =
   | { type: "phrase-library" }
-  | { type: "learn" }
   | { type: "questions" }
   | { type: "settings" }
   | { type: "notes" }
   | { type: "materials" }
   | { type: "material-create" }
-  | { type: "material-review"; materialId: number }
-  | { type: "decks" }
-  | { type: "deck-detail"; deckId: number }
-  | { type: "deck-study"; deckId: number };
+  | { type: "material-review"; materialId: number };
 
 /**
  * Extract the view type string from ViewState.
@@ -45,8 +41,7 @@ export type ViewDataFor<T extends ViewType> = Extract<
  */
 export type ViewWithData = Extract<
   ViewState,
-  | { type: string; materialId: number }
-  | { type: string; deckId: number }
+  { type: string; materialId: number }
 >["type"];
 
 /**
@@ -92,32 +87,10 @@ export function isMaterialReviewView(
 }
 
 /**
- * Check if the current view is the deck detail view.
- */
-export function isDeckDetailView(
-  state: ViewState
-): state is { type: "deck-detail"; deckId: number } {
-  return state.type === "deck-detail";
-}
-
-/**
- * Check if the current view is the deck study view.
- */
-export function isDeckStudyView(
-  state: ViewState
-): state is { type: "deck-study"; deckId: number } {
-  return state.type === "deck-study";
-}
-
-/**
  * Check if a view requires data.
  */
 export function viewRequiresData(view: ViewType): view is ViewWithData {
-  return (
-    view === "material-review" ||
-    view === "deck-detail" ||
-    view === "deck-study"
-  );
+  return view === "material-review";
 }
 
 // ============================================================================
@@ -132,9 +105,6 @@ export function getParentView(view: ViewType): ViewType | null {
     case "material-create":
     case "material-review":
       return "materials";
-    case "deck-detail":
-    case "deck-study":
-      return "decks";
     default:
       return null;
   }
@@ -155,9 +125,6 @@ export function getActiveNavItem(view: ViewType): ViewType {
     case "material-create":
     case "material-review":
       return "materials";
-    case "deck-detail":
-    case "deck-study":
-      return "decks";
     default:
       return view;
   }

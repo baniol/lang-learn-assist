@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   createViewState,
   isMaterialReviewView,
-  isDeckDetailView,
-  isDeckStudyView,
   viewRequiresData,
   getParentView,
   isSubViewOf,
@@ -16,11 +14,6 @@ describe("createViewState", () => {
     it("should create phrase-library view state", () => {
       const state = createViewState("phrase-library");
       expect(state).toEqual({ type: "phrase-library" });
-    });
-
-    it("should create learn view state", () => {
-      const state = createViewState("learn");
-      expect(state).toEqual({ type: "learn" });
     });
 
     it("should create questions view state", () => {
@@ -47,27 +40,12 @@ describe("createViewState", () => {
       const state = createViewState("material-create");
       expect(state).toEqual({ type: "material-create" });
     });
-
-    it("should create decks view state", () => {
-      const state = createViewState("decks");
-      expect(state).toEqual({ type: "decks" });
-    });
   });
 
   describe("views with data", () => {
     it("should create material-review view state with materialId", () => {
       const state = createViewState("material-review", { materialId: 789 });
       expect(state).toEqual({ type: "material-review", materialId: 789 });
-    });
-
-    it("should create deck-detail view state with deckId", () => {
-      const state = createViewState("deck-detail", { deckId: 123 });
-      expect(state).toEqual({ type: "deck-detail", deckId: 123 });
-    });
-
-    it("should create deck-study view state with deckId", () => {
-      const state = createViewState("deck-study", { deckId: 456 });
-      expect(state).toEqual({ type: "deck-study", deckId: 456 });
     });
   });
 });
@@ -92,44 +70,6 @@ describe("type guards", () => {
       }
     });
   });
-
-  describe("isDeckDetailView", () => {
-    it("should return true for deck-detail view", () => {
-      const state: ViewState = { type: "deck-detail", deckId: 1 };
-      expect(isDeckDetailView(state)).toBe(true);
-    });
-
-    it("should return false for other views", () => {
-      expect(isDeckDetailView({ type: "decks" })).toBe(false);
-      expect(isDeckDetailView({ type: "deck-study", deckId: 1 })).toBe(false);
-    });
-
-    it("should narrow type correctly", () => {
-      const state: ViewState = { type: "deck-detail", deckId: 42 };
-      if (isDeckDetailView(state)) {
-        expect(state.deckId).toBe(42);
-      }
-    });
-  });
-
-  describe("isDeckStudyView", () => {
-    it("should return true for deck-study view", () => {
-      const state: ViewState = { type: "deck-study", deckId: 1 };
-      expect(isDeckStudyView(state)).toBe(true);
-    });
-
-    it("should return false for other views", () => {
-      expect(isDeckStudyView({ type: "decks" })).toBe(false);
-      expect(isDeckStudyView({ type: "deck-detail", deckId: 1 })).toBe(false);
-    });
-
-    it("should narrow type correctly", () => {
-      const state: ViewState = { type: "deck-study", deckId: 42 };
-      if (isDeckStudyView(state)) {
-        expect(state.deckId).toBe(42);
-      }
-    });
-  });
 });
 
 describe("viewRequiresData", () => {
@@ -137,23 +77,13 @@ describe("viewRequiresData", () => {
     expect(viewRequiresData("material-review")).toBe(true);
   });
 
-  it("should return true for deck-detail", () => {
-    expect(viewRequiresData("deck-detail")).toBe(true);
-  });
-
-  it("should return true for deck-study", () => {
-    expect(viewRequiresData("deck-study")).toBe(true);
-  });
-
   it("should return false for views without data", () => {
     expect(viewRequiresData("phrase-library")).toBe(false);
-    expect(viewRequiresData("learn")).toBe(false);
     expect(viewRequiresData("questions")).toBe(false);
     expect(viewRequiresData("settings")).toBe(false);
     expect(viewRequiresData("notes")).toBe(false);
     expect(viewRequiresData("materials")).toBe(false);
     expect(viewRequiresData("material-create")).toBe(false);
-    expect(viewRequiresData("decks")).toBe(false);
   });
 });
 
@@ -166,22 +96,12 @@ describe("getParentView", () => {
     expect(getParentView("material-review")).toBe("materials");
   });
 
-  it("should return decks for deck-detail", () => {
-    expect(getParentView("deck-detail")).toBe("decks");
-  });
-
-  it("should return decks for deck-study", () => {
-    expect(getParentView("deck-study")).toBe("decks");
-  });
-
   it("should return null for top-level views", () => {
     expect(getParentView("phrase-library")).toBe(null);
-    expect(getParentView("learn")).toBe(null);
     expect(getParentView("questions")).toBe(null);
     expect(getParentView("settings")).toBe(null);
     expect(getParentView("notes")).toBe(null);
     expect(getParentView("materials")).toBe(null);
-    expect(getParentView("decks")).toBe(null);
   });
 });
 
@@ -194,22 +114,12 @@ describe("isSubViewOf", () => {
     expect(isSubViewOf("material-review", "materials")).toBe(true);
   });
 
-  it("should return true for deck-detail -> decks", () => {
-    expect(isSubViewOf("deck-detail", "decks")).toBe(true);
-  });
-
-  it("should return true for deck-study -> decks", () => {
-    expect(isSubViewOf("deck-study", "decks")).toBe(true);
-  });
-
   it("should return false for incorrect parent", () => {
-    expect(isSubViewOf("material-create", "decks")).toBe(false);
-    expect(isSubViewOf("deck-detail", "materials")).toBe(false);
+    expect(isSubViewOf("material-create", "phrase-library")).toBe(false);
   });
 
   it("should return false for top-level views", () => {
     expect(isSubViewOf("phrase-library", "phrase-library")).toBe(false);
-    expect(isSubViewOf("learn", "phrase-library")).toBe(false);
   });
 });
 
@@ -219,18 +129,11 @@ describe("getActiveNavItem", () => {
     expect(getActiveNavItem("material-review")).toBe("materials");
   });
 
-  it("should return decks for deck views", () => {
-    expect(getActiveNavItem("deck-detail")).toBe("decks");
-    expect(getActiveNavItem("deck-study")).toBe("decks");
-  });
-
   it("should return the view itself for top-level views", () => {
     expect(getActiveNavItem("phrase-library")).toBe("phrase-library");
-    expect(getActiveNavItem("learn")).toBe("learn");
     expect(getActiveNavItem("questions")).toBe("questions");
     expect(getActiveNavItem("settings")).toBe("settings");
     expect(getActiveNavItem("notes")).toBe("notes");
     expect(getActiveNavItem("materials")).toBe("materials");
-    expect(getActiveNavItem("decks")).toBe("decks");
   });
 });

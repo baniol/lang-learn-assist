@@ -1,10 +1,9 @@
 import { StarIcon } from "../icons";
-import { PhraseStatusBadge } from "./PhraseStatusBadge";
 import { PhraseActions } from "./PhraseActions";
-import type { PhraseWithProgress } from "../../types";
+import type { Phrase } from "../../types";
 
 interface PhraseListItemProps {
-  item: PhraseWithProgress;
+  item: Phrase;
   isPlaying: boolean;
   isLoading: boolean;
   onToggleStar: (id: number) => void;
@@ -13,11 +12,10 @@ interface PhraseListItemProps {
   onRefine: () => void;
   onTranslate?: () => void;
   onDelete: () => void;
-  onAssignToDeck?: () => void;
 }
 
 export function PhraseListItem({
-  item,
+  item: phrase,
   isPlaying,
   isLoading,
   onToggleStar,
@@ -26,10 +24,7 @@ export function PhraseListItem({
   onRefine,
   onTranslate,
   onDelete,
-  onAssignToDeck,
 }: PhraseListItemProps) {
-  const { phrase, progress } = item;
-
   return (
     <div className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
       {/* Star */}
@@ -54,23 +49,18 @@ export function PhraseListItem({
         </p>
       </div>
 
-      {/* Status badge */}
-      <PhraseStatusBadge progress={progress} />
-
       {/* Actions */}
       <PhraseActions
         phraseId={phrase.id}
         isExcluded={phrase.excluded}
         isPlaying={isPlaying}
         isLoading={isLoading}
-        hasDeck={phrase.deckId !== null}
         isRefined={phrase.refined}
         onPlay={onPlay}
         onRefine={onRefine}
         onTranslate={onTranslate}
         onToggleExcluded={() => onToggleExcluded(phrase.id)}
         onDelete={onDelete}
-        onAssignToDeck={onAssignToDeck}
       />
     </div>
   );

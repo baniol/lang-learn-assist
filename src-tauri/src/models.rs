@@ -1,53 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Learning status for phrases - determines where they are in the learning lifecycle
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LearningStatus {
-    /// Phrase is not learnable yet - must be added to a deck first
-    Inactive,
-    /// Phrase is being learned in a deck (not yet graduated)
-    DeckLearning,
-    /// Phrase has graduated to SRS for long-term spaced repetition
-    SrsActive,
-}
-
-impl Default for LearningStatus {
-    fn default() -> Self {
-        LearningStatus::Inactive
-    }
-}
-
-impl LearningStatus {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "deck_learning" => LearningStatus::DeckLearning,
-            "srs_active" => LearningStatus::SrsActive,
-            _ => LearningStatus::Inactive,
-        }
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            LearningStatus::Inactive => "inactive",
-            LearningStatus::DeckLearning => "deck_learning",
-            LearningStatus::SrsActive => "srs_active",
-        }
-    }
-}
-
-/// Study mode for unified learning commands
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum StudyMode {
-    /// Studying phrases in a specific deck
-    #[serde(rename_all = "camelCase")]
-    DeckLearning { deck_id: i64 },
-    /// SRS review of graduated phrases
-    SrsReview,
-}
-
 /// Convert language code to human-readable name
 pub fn get_language_name(code: &str) -> &str {
     match code {
@@ -73,7 +26,6 @@ pub fn get_language_name(code: &str) -> &str {
 pub struct Phrase {
     pub id: i64,
     pub material_id: Option<i64>,
-    pub deck_id: Option<i64>,
     pub prompt: String,
     pub answer: String,
     pub accepted: Vec<String>,
@@ -85,165 +37,6 @@ pub struct Phrase {
     pub excluded: bool,
     pub refined: bool,
     pub created_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PhraseProgress {
-    pub id: i64,
-    pub phrase_id: i64,
-    pub correct_streak: i32,
-    pub total_attempts: i32,
-    pub success_count: i32,
-    pub last_seen: Option<String>,
-    // SRS fields
-    pub ease_factor: f64,
-    pub interval_days: i32,
-    pub next_review_at: Option<String>,
-    // Learning status - determines where phrase is in lifecycle
-    pub learning_status: LearningStatus,
-    // Deck graduation fields (deck_correct_count tracks progress toward graduation)
-    pub deck_correct_count: i32,
-    // Legacy field - kept for backwards compatibility during migration
-    #[serde(default = "default_true")]
-    pub in_srs_pool: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PhraseWithProgress {
-    pub phrase: Phrase,
-    pub progress: Option<PhraseProgress>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PracticeSession {
-    pub id: i64,
-    pub started_at: String,
-    pub finished_at: Option<String>,
-    pub total_phrases: i32,
-    pub correct_answers: i32,
-    pub exercise_mode: String,
-    pub state: Option<SessionState>,
-}
-
-/// Session state for persistence across app restarts
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SessionState {
-    pub seen_phrase_ids: Vec<i64>,
-    pub session_streaks: HashMap<i64, i32>,
-    pub session_learned_ids: Vec<i64>,
-    pub new_phrase_count: i32,
-    pub current_phrase_id: Option<i64>,
-    pub in_retry_mode: bool,
-    pub retry_count: i32,
-    pub requires_retry: bool,
-    // Deck study fields (optional, only used for deck study sessions)
-    #[serde(default)]
-    pub deck_id: Option<i64>,
-    #[serde(default)]
-    pub session_type: Option<String>,
-}
-
-// Deck models
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Deck {
-    pub id: i64,
-    pub name: String,
-    pub description: Option<String>,
-    pub target_language: String,
-    pub native_language: String,
-    pub graduation_threshold: i32,
-    // Future metadata fields for levels/themes
-    pub level: Option<String>,
-    pub category: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeckWithStats {
-    pub deck: Deck,
-    pub total_phrases: i32,
-    pub graduated_count: i32,
-    pub learning_count: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateDeckRequest {
-    pub name: String,
-    pub description: Option<String>,
-    pub target_language: Option<String>,
-    pub native_language: Option<String>,
-    pub graduation_threshold: Option<i32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateDeckRequest {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub graduation_threshold: Option<i32>,
-}
-
-/// Result of recording an answer in deck study mode
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeckAnswerResult {
-    pub progress: PhraseProgress,
-    pub deck_correct_count: i32,
-    pub just_graduated: bool,
-    pub graduation_threshold: i32,
-}
-
-/// Unified result of recording an answer in study mode (both deck and SRS)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StudyAnswerResult {
-    pub progress: PhraseProgress,
-    // SRS-specific fields
-    pub session_streak: Option<i32>,
-    pub is_learned_in_session: Option<bool>,
-    // Deck-specific fields
-    pub deck_correct_count: Option<i32>,
-    pub just_graduated: Option<bool>,
-    pub graduation_threshold: Option<i32>,
-}
-
-impl From<AnswerResult> for StudyAnswerResult {
-    fn from(result: AnswerResult) -> Self {
-        StudyAnswerResult {
-            progress: result.progress,
-            session_streak: Some(result.session_streak),
-            is_learned_in_session: Some(result.is_learned_in_session),
-            deck_correct_count: None,
-            just_graduated: None,
-            graduation_threshold: None,
-        }
-    }
-}
-
-impl From<DeckAnswerResult> for StudyAnswerResult {
-    fn from(result: DeckAnswerResult) -> Self {
-        StudyAnswerResult {
-            progress: result.progress,
-            session_streak: None,
-            is_learned_in_session: None,
-            deck_correct_count: Some(result.deck_correct_count),
-            just_graduated: Some(result.just_graduated),
-            graduation_threshold: Some(result.graduation_threshold),
-        }
-    }
 }
 
 /// Voice settings for a specific language (default voice + conversation voices A/B)
@@ -280,14 +73,7 @@ pub struct AppSettings {
     pub target_language: String,
     pub native_language: String,
 
-    // Learning settings
-    pub required_streak: i32,
-    pub immediate_retry: bool,
-    pub default_exercise_mode: String,
-    pub failure_repetitions: i32,
-    pub session_phrase_limit: i32,
-    pub new_phrases_per_session: i32,
-    pub new_phrase_interval: i32,
+    // App settings
     pub fuzzy_matching: bool,
     pub notes_enabled: bool,
 }
@@ -307,13 +93,6 @@ impl AppSettings {
             tts_voices_per_language: HashMap::new(),
             target_language: "de".to_string(),
             native_language: "pl".to_string(),
-            required_streak: 2,
-            immediate_retry: true,
-            default_exercise_mode: "speaking".to_string(),
-            failure_repetitions: 2,
-            session_phrase_limit: 20,
-            new_phrases_per_session: 2,
-            new_phrase_interval: 4,
             fuzzy_matching: true,
             notes_enabled: false,
         }
@@ -341,29 +120,6 @@ pub struct CreateNoteRequest {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateNoteRequest {
     pub content: String,
-}
-
-/// Result of recording an answer - includes session-level streak tracking
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AnswerResult {
-    pub progress: PhraseProgress,
-    pub session_streak: i32,
-    pub is_learned_in_session: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LearningStats {
-    pub total_phrases: i32,
-    pub learned_count: i32,
-    pub learning_count: i32,
-    pub new_count: i32,
-    pub average_success_rate: f64,
-    pub total_sessions: i32,
-    // Deck-specific stats
-    pub in_decks_count: i32,
-    pub graduated_to_srs_count: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -476,17 +232,20 @@ pub struct ExportData {
     pub exported_at: String,
     pub settings: Vec<ExportSetting>,
     pub phrases: Vec<ExportPhrase>,
-    pub phrase_progress: Vec<ExportPhraseProgress>,
     pub phrase_threads: Vec<ExportPhraseThread>,
     pub question_threads: Vec<ExportQuestionThread>,
     pub notes: Vec<ExportNote>,
-    pub practice_sessions: Vec<ExportPracticeSession>,
     #[serde(default)]
     pub materials: Vec<ExportMaterial>,
     #[serde(default)]
     pub material_threads: Vec<ExportMaterialThread>,
+    // Legacy fields - accepted during import but no longer exported
     #[serde(default)]
-    pub decks: Vec<ExportDeck>,
+    pub phrase_progress: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub practice_sessions: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub decks: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -498,13 +257,12 @@ pub struct ExportSetting {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct ExportPhrase {
     pub id: i64,
     #[serde(default, skip_serializing)]
     pub conversation_id: Option<i64>, // Deprecated, kept for import compatibility
     pub material_id: Option<i64>,
-    #[serde(default)]
-    pub deck_id: Option<i64>,
     pub prompt: String,
     pub answer: String,
     pub accepted_json: String,
@@ -515,34 +273,9 @@ pub struct ExportPhrase {
     pub starred: bool,
     pub excluded: bool,
     pub created_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportPhraseProgress {
-    pub id: i64,
-    pub phrase_id: i64,
-    pub correct_streak: i32,
-    pub total_attempts: i32,
-    pub success_count: i32,
-    pub last_seen: Option<String>,
-    pub ease_factor: f64,
-    pub interval_days: i32,
-    pub next_review_at: Option<String>,
-    #[serde(default = "export_default_true")]
-    pub in_srs_pool: bool,
-    #[serde(default)]
-    pub deck_correct_count: i32,
-    #[serde(default = "export_default_learning_status")]
-    pub learning_status: String,
-}
-
-fn export_default_true() -> bool {
-    true
-}
-
-fn export_default_learning_status() -> String {
-    "inactive".to_string()
+    // Legacy fields - accepted during import but ignored
+    #[serde(default, skip_serializing)]
+    pub deck_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -580,18 +313,6 @@ pub struct ExportNote {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportPracticeSession {
-    pub id: i64,
-    pub started_at: String,
-    pub finished_at: Option<String>,
-    pub total_phrases: i32,
-    pub correct_answers: i32,
-    pub exercise_mode: String,
-    pub state_json: Option<String>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ImportMode {
@@ -613,14 +334,11 @@ pub struct ImportStats {
     pub settings_imported: i32,
     pub phrases_imported: i32,
     pub phrases_updated: i32,
-    pub phrase_progress_imported: i32,
     pub phrase_threads_imported: i32,
     pub question_threads_imported: i32,
     pub notes_imported: i32,
-    pub practice_sessions_imported: i32,
     pub materials_imported: i32,
     pub material_threads_imported: i32,
-    pub decks_imported: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -647,23 +365,6 @@ pub struct ExportMaterialThread {
     pub segment_index: i32,
     pub messages_json: String,
     pub suggested_phrases_json: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportDeck {
-    pub id: i64,
-    pub name: String,
-    pub description: Option<String>,
-    pub target_language: String,
-    pub native_language: String,
-    pub graduation_threshold: i32,
-    #[serde(default)]
-    pub level: Option<String>,
-    #[serde(default)]
-    pub category: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -742,63 +443,6 @@ pub struct MaterialThreadMessage {
 pub struct AskAboutSentenceResponse {
     pub explanation: String,
     pub phrases: Vec<SuggestedPhrase>,
-}
-
-// Deck import types - simplified format for importing pre-made decks
-
-/// Simplified phrase format for deck import (no IDs, no progress)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeckImportPhrase {
-    pub prompt: String,
-    pub answer: String,
-    #[serde(default)]
-    pub accepted: Vec<String>,
-    #[serde(default)]
-    pub notes: Option<String>,
-}
-
-/// Simplified deck format for importing pre-made decks
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeckImportData {
-    pub name: String,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default = "default_target_language")]
-    pub target_language: String,
-    #[serde(default = "default_native_language")]
-    pub native_language: String,
-    #[serde(default = "default_graduation_threshold")]
-    pub graduation_threshold: i32,
-    #[serde(default)]
-    pub level: Option<String>,
-    #[serde(default)]
-    pub category: Option<String>,
-    pub phrases: Vec<DeckImportPhrase>,
-}
-
-fn default_target_language() -> String {
-    "de".to_string()
-}
-
-fn default_native_language() -> String {
-    "en".to_string()
-}
-
-fn default_graduation_threshold() -> i32 {
-    2
-}
-
-/// Result of importing a deck
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeckImportResult {
-    pub success: bool,
-    pub deck_id: i64,
-    pub deck_name: String,
-    pub phrases_imported: i32,
-    pub message: String,
 }
 
 /// Translation preview for phrase translation feature

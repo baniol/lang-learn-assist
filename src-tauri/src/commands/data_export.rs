@@ -1,8 +1,8 @@
 use crate::db::get_conn;
 use crate::models::{
-    DeckImportData, DeckImportResult, ExportData, ExportDeck, ExportMaterial,
-    ExportMaterialThread, ExportNote, ExportPhrase, ExportPhraseProgress, ExportPhraseThread,
-    ExportPracticeSession, ExportQuestionThread, ExportSetting, ImportMode, ImportResult,
+    ExportData, ExportMaterial,
+    ExportMaterialThread, ExportNote, ExportPhrase, ExportPhraseThread,
+    ExportQuestionThread, ExportSetting, ImportMode, ImportResult,
     ImportStats,
 };
 use rusqlite::{params, Connection};
@@ -37,7 +37,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, prompt, answer, accepted_json, target_language,
-                    native_language, audio_path, notes, starred, excluded, created_at, material_id, deck_id
+                    native_language, audio_path, notes, starred, excluded, created_at, material_id
              FROM phrases",
         )
         .map_err(|e| format!("Failed to prepare phrases query: {}", e))?;
@@ -49,7 +49,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
                 id: row.get(0)?,
                 conversation_id: None,
                 material_id: row.get(11).ok(),
-                deck_id: row.get(12).ok(),
+                deck_id: None,
                 prompt: row.get(1)?,
                 answer: row.get(2)?,
                 accepted_json: row.get(3)?,
@@ -65,38 +65,6 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to query phrases: {}", e))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect phrases: {}", e))?;
-    drop(stmt);
-
-    // Export phrase progress
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, phrase_id, correct_streak, total_attempts, success_count,
-                    last_seen, ease_factor, interval_days, next_review_at, in_srs_pool, deck_correct_count, learning_status
-             FROM phrase_progress",
-        )
-        .map_err(|e| format!("Failed to prepare phrase_progress query: {}", e))?;
-    let phrase_progress = stmt
-        .query_map([], |row| {
-            let in_srs_pool_int: i32 = row.get(9).unwrap_or(1);
-            let learning_status: String = row.get(11).unwrap_or_else(|_| "inactive".to_string());
-            Ok(ExportPhraseProgress {
-                id: row.get(0)?,
-                phrase_id: row.get(1)?,
-                correct_streak: row.get(2)?,
-                total_attempts: row.get(3)?,
-                success_count: row.get(4)?,
-                last_seen: row.get(5)?,
-                ease_factor: row.get(6).unwrap_or(2.5),
-                interval_days: row.get(7).unwrap_or(1),
-                next_review_at: row.get(8).ok(),
-                in_srs_pool: in_srs_pool_int != 0,
-                deck_correct_count: row.get(10).unwrap_or(0),
-                learning_status,
-            })
-        })
-        .map_err(|e| format!("Failed to query phrase_progress: {}", e))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect phrase_progress: {}", e))?;
     drop(stmt);
 
     // Export phrase threads
@@ -169,31 +137,6 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to collect notes: {}", e))?;
     drop(stmt);
 
-    // Export practice sessions
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, started_at, finished_at, total_phrases, correct_answers,
-                    exercise_mode, state_json
-             FROM practice_sessions",
-        )
-        .map_err(|e| format!("Failed to prepare practice_sessions query: {}", e))?;
-    let practice_sessions = stmt
-        .query_map([], |row| {
-            Ok(ExportPracticeSession {
-                id: row.get(0)?,
-                started_at: row.get(1)?,
-                finished_at: row.get(2)?,
-                total_phrases: row.get(3)?,
-                correct_answers: row.get(4)?,
-                exercise_mode: row.get(5)?,
-                state_json: row.get(6)?,
-            })
-        })
-        .map_err(|e| format!("Failed to query practice_sessions: {}", e))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect practice_sessions: {}", e))?;
-    drop(stmt);
-
     // Export materials
     let mut stmt = conn
         .prepare(
@@ -248,46 +191,19 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to collect material_threads: {}", e))?;
     drop(stmt);
 
-    // Export decks
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, name, description, target_language, native_language, graduation_threshold, created_at, updated_at, level, category
-             FROM decks",
-        )
-        .map_err(|e| format!("Failed to prepare decks query: {}", e))?;
-    let decks = stmt
-        .query_map([], |row| {
-            Ok(ExportDeck {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
-                target_language: row.get(3)?,
-                native_language: row.get(4)?,
-                graduation_threshold: row.get(5)?,
-                level: row.get(8)?,
-                category: row.get(9)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
-            })
-        })
-        .map_err(|e| format!("Failed to query decks: {}", e))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect decks: {}", e))?;
-    drop(stmt);
-
     Ok(ExportData {
-        version: 3,
+        version: 4,
         exported_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         settings,
         phrases,
-        phrase_progress,
         phrase_threads,
         question_threads,
         notes,
-        practice_sessions,
         materials,
         material_threads,
-        decks,
+        phrase_progress: vec![],
+        practice_sessions: vec![],
+        decks: vec![],
     })
 }
 
@@ -304,7 +220,7 @@ pub fn import_data_with_conn(
     mode: ImportMode,
 ) -> Result<ImportResult, String> {
     // Check version compatibility
-    if data.version > 3 {
+    if data.version > 4 {
         return Err(format!(
             "Export version {} is not supported. Please update the application.",
             data.version
@@ -320,22 +236,16 @@ pub fn import_data_with_conn(
     match mode {
         ImportMode::Overwrite => {
             // Delete all existing data in reverse FK order
-            tx.execute("DELETE FROM practice_sessions", [])
-                .map_err(|e| format!("Failed to delete practice_sessions: {}", e))?;
             tx.execute("DELETE FROM notes", [])
                 .map_err(|e| format!("Failed to delete notes: {}", e))?;
             tx.execute("DELETE FROM question_threads", [])
                 .map_err(|e| format!("Failed to delete question_threads: {}", e))?;
             tx.execute("DELETE FROM phrase_threads", [])
                 .map_err(|e| format!("Failed to delete phrase_threads: {}", e))?;
-            tx.execute("DELETE FROM phrase_progress", [])
-                .map_err(|e| format!("Failed to delete phrase_progress: {}", e))?;
             tx.execute("DELETE FROM material_threads", [])
                 .map_err(|e| format!("Failed to delete material_threads: {}", e))?;
             tx.execute("DELETE FROM phrases", [])
                 .map_err(|e| format!("Failed to delete phrases: {}", e))?;
-            tx.execute("DELETE FROM decks", [])
-                .map_err(|e| format!("Failed to delete decks: {}", e))?;
             tx.execute("DELETE FROM materials", [])
                 .map_err(|e| format!("Failed to delete materials: {}", e))?;
             tx.execute("DELETE FROM settings", [])
@@ -376,34 +286,13 @@ pub fn import_data_with_conn(
                 stats.materials_imported += 1;
             }
 
-            // Import decks with original IDs
-            for deck in &data.decks {
-                tx.execute(
-                    "INSERT INTO decks (id, name, description, target_language, native_language,
-                                       graduation_threshold, created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                    params![
-                        deck.id,
-                        deck.name,
-                        deck.description,
-                        deck.target_language,
-                        deck.native_language,
-                        deck.graduation_threshold,
-                        deck.created_at,
-                        deck.updated_at
-                    ],
-                )
-                .map_err(|e| format!("Failed to import deck: {}", e))?;
-                stats.decks_imported += 1;
-            }
-
             // Import phrases with original IDs
             for phrase in &data.phrases {
                 tx.execute(
                     "INSERT INTO phrases (id, prompt, answer, accepted_json,
                                          target_language, native_language, audio_path, notes,
-                                         starred, excluded, created_at, material_id, deck_id)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                                         starred, excluded, created_at, material_id)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                     params![
                         phrase.id,
                         phrase.prompt,
@@ -416,38 +305,11 @@ pub fn import_data_with_conn(
                         phrase.starred as i32,
                         phrase.excluded as i32,
                         phrase.created_at,
-                        phrase.material_id,
-                        phrase.deck_id
+                        phrase.material_id
                     ],
                 )
                 .map_err(|e| format!("Failed to import phrase: {}", e))?;
                 stats.phrases_imported += 1;
-            }
-
-            // Import phrase progress with original IDs
-            for progress in &data.phrase_progress {
-                tx.execute(
-                    "INSERT INTO phrase_progress (id, phrase_id, correct_streak, total_attempts,
-                                                 success_count, last_seen, ease_factor,
-                                                 interval_days, next_review_at, in_srs_pool, deck_correct_count, learning_status)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-                    params![
-                        progress.id,
-                        progress.phrase_id,
-                        progress.correct_streak,
-                        progress.total_attempts,
-                        progress.success_count,
-                        progress.last_seen,
-                        progress.ease_factor,
-                        progress.interval_days,
-                        progress.next_review_at,
-                        progress.in_srs_pool as i32,
-                        progress.deck_correct_count,
-                        progress.learning_status
-                    ],
-                )
-                .map_err(|e| format!("Failed to import phrase_progress: {}", e))?;
-                stats.phrase_progress_imported += 1;
             }
 
             // Import phrase threads with original IDs
@@ -504,26 +366,6 @@ pub fn import_data_with_conn(
                 stats.notes_imported += 1;
             }
 
-            // Import practice sessions with original IDs
-            for session in &data.practice_sessions {
-                tx.execute(
-                    "INSERT INTO practice_sessions (id, started_at, finished_at, total_phrases,
-                                                   correct_answers, exercise_mode, state_json)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                    params![
-                        session.id,
-                        session.started_at,
-                        session.finished_at,
-                        session.total_phrases,
-                        session.correct_answers,
-                        session.exercise_mode,
-                        session.state_json
-                    ],
-                )
-                .map_err(|e| format!("Failed to import practice_session: {}", e))?;
-                stats.practice_sessions_imported += 1;
-            }
-
             // Import material threads with original IDs
             for thread in &data.material_threads {
                 tx.execute(
@@ -557,7 +399,6 @@ pub fn import_data_with_conn(
 
             // Build ID mappings for relationships
             let mut phrase_id_map: HashMap<i64, i64> = HashMap::new();
-            let mut deck_id_map: HashMap<i64, i64> = HashMap::new();
             let mut material_id_map: HashMap<i64, i64> = HashMap::new();
 
             // Import materials first (must be before phrases due to FK on material_id)
@@ -598,45 +439,8 @@ pub fn import_data_with_conn(
                 }
             }
 
-            // Import decks (check by created_at + name for uniqueness)
-            for deck in &data.decks {
-                let existing: Option<i64> = tx
-                    .query_row(
-                        "SELECT id FROM decks WHERE created_at = ?1 AND name = ?2",
-                        params![deck.created_at, deck.name],
-                        |row| row.get(0),
-                    )
-                    .ok();
-
-                if let Some(existing_id) = existing {
-                    deck_id_map.insert(deck.id, existing_id);
-                } else {
-                    tx.execute(
-                        "INSERT INTO decks (name, description, target_language, native_language,
-                                           graduation_threshold, created_at, updated_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                        params![
-                            deck.name,
-                            deck.description,
-                            deck.target_language,
-                            deck.native_language,
-                            deck.graduation_threshold,
-                            deck.created_at,
-                            deck.updated_at
-                        ],
-                    )
-                    .map_err(|e| format!("Failed to import deck: {}", e))?;
-                    let new_id = tx.last_insert_rowid();
-                    deck_id_map.insert(deck.id, new_id);
-                    stats.decks_imported += 1;
-                }
-            }
-
             // Import phrases (check by created_at + prompt + answer for uniqueness)
             for phrase in &data.phrases {
-                let mapped_deck_id = phrase
-                    .deck_id
-                    .and_then(|did| deck_id_map.get(&did).copied());
                 let mapped_material_id = phrase
                     .material_id
                     .and_then(|mid| material_id_map.get(&mid).copied());
@@ -650,15 +454,13 @@ pub fn import_data_with_conn(
                     .ok();
 
                 if let Some(existing_id) = existing {
-                    // Phrase exists, just map the ID
                     phrase_id_map.insert(phrase.id, existing_id);
-                    // Could update here if we track updated_at for phrases
                 } else {
                     tx.execute(
                         "INSERT INTO phrases (prompt, answer, accepted_json,
                                              target_language, native_language, audio_path, notes,
-                                             starred, excluded, created_at, material_id, deck_id)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                                             starred, excluded, created_at, material_id)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                         params![
                             phrase.prompt,
                             phrase.answer,
@@ -670,8 +472,7 @@ pub fn import_data_with_conn(
                             phrase.starred as i32,
                             phrase.excluded as i32,
                             phrase.created_at,
-                            mapped_material_id,
-                            mapped_deck_id
+                            mapped_material_id
                         ],
                     )
                     .map_err(|e| format!("Failed to import phrase: {}", e))?;
@@ -681,48 +482,9 @@ pub fn import_data_with_conn(
                 }
             }
 
-            // Import phrase progress (linked to phrases)
-            for progress in &data.phrase_progress {
-                if let Some(&new_phrase_id) = phrase_id_map.get(&progress.phrase_id) {
-                    // Check if progress exists for this phrase
-                    let existing: Option<i64> = tx
-                        .query_row(
-                            "SELECT id FROM phrase_progress WHERE phrase_id = ?1",
-                            params![new_phrase_id],
-                            |row| row.get(0),
-                        )
-                        .ok();
-
-                    if existing.is_none() {
-                        tx.execute(
-                            "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts,
-                                                         success_count, last_seen, ease_factor,
-                                                         interval_days, next_review_at, in_srs_pool, deck_correct_count, learning_status)
-                             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                            params![
-                                new_phrase_id,
-                                progress.correct_streak,
-                                progress.total_attempts,
-                                progress.success_count,
-                                progress.last_seen,
-                                progress.ease_factor,
-                                progress.interval_days,
-                                progress.next_review_at,
-                                progress.in_srs_pool as i32,
-                                progress.deck_correct_count,
-                                progress.learning_status
-                            ],
-                        )
-                        .map_err(|e| format!("Failed to import phrase_progress: {}", e))?;
-                        stats.phrase_progress_imported += 1;
-                    }
-                }
-            }
-
             // Import phrase threads (linked to phrases)
             for thread in &data.phrase_threads {
                 if let Some(&new_phrase_id) = phrase_id_map.get(&thread.phrase_id) {
-                    // Just insert new threads without checking for duplicates
                     tx.execute(
                         "INSERT INTO phrase_threads (phrase_id, messages_json, suggested_prompt,
                                                     suggested_answer, suggested_accepted, status,
@@ -794,39 +556,9 @@ pub fn import_data_with_conn(
                 }
             }
 
-            // Import practice sessions (check by started_at)
-            for session in &data.practice_sessions {
-                let existing: Option<i64> = tx
-                    .query_row(
-                        "SELECT id FROM practice_sessions WHERE started_at = ?1",
-                        params![session.started_at],
-                        |row| row.get(0),
-                    )
-                    .ok();
-
-                if existing.is_none() {
-                    tx.execute(
-                        "INSERT INTO practice_sessions (started_at, finished_at, total_phrases,
-                                                       correct_answers, exercise_mode, state_json)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                        params![
-                            session.started_at,
-                            session.finished_at,
-                            session.total_phrases,
-                            session.correct_answers,
-                            session.exercise_mode,
-                            session.state_json
-                        ],
-                    )
-                    .map_err(|e| format!("Failed to import practice_session: {}", e))?;
-                    stats.practice_sessions_imported += 1;
-                }
-            }
-
             // Import material threads (linked to materials)
             for thread in &data.material_threads {
                 if let Some(&new_material_id) = material_id_map.get(&thread.material_id) {
-                    // Check if thread exists for this material + segment
                     let existing: Option<i64> = tx
                         .query_row(
                             "SELECT id FROM material_threads WHERE material_id = ?1 AND segment_index = ?2",
@@ -870,142 +602,6 @@ pub fn import_data_with_conn(
     })
 }
 
-/// Import a deck from simplified JSON format
-/// Creates a new deck and all phrases with progress initialized for deck learning
-#[tauri::command]
-pub fn import_deck(data: DeckImportData) -> Result<DeckImportResult, String> {
-    let mut conn = get_conn()?;
-    import_deck_with_conn(&mut conn, data)
-}
-
-/// Core deck import logic that can be tested with any connection
-pub fn import_deck_with_conn(
-    conn: &mut Connection,
-    data: DeckImportData,
-) -> Result<DeckImportResult, String> {
-    // Disable foreign key checks - needed because old databases have orphaned FK constraint
-    // on conversation_id after conversations table was dropped
-    conn.execute("PRAGMA foreign_keys = OFF", [])
-        .map_err(|e| format!("Failed to disable foreign keys: {}", e))?;
-
-    let result = import_deck_inner(conn, data);
-
-    // Re-enable foreign key checks
-    let _ = conn.execute("PRAGMA foreign_keys = ON", []);
-
-    result
-}
-
-fn import_deck_inner(
-    conn: &mut Connection,
-    data: DeckImportData,
-) -> Result<DeckImportResult, String> {
-    let tx = conn
-        .transaction()
-        .map_err(|e| format!("Failed to begin transaction: {}", e))?;
-
-    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-
-    // Create the deck
-    tx.execute(
-        "INSERT INTO decks (name, description, target_language, native_language,
-                           graduation_threshold, level, category, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-        params![
-            data.name,
-            data.description,
-            data.target_language,
-            data.native_language,
-            data.graduation_threshold,
-            data.level,
-            data.category,
-            now,
-            now
-        ],
-    )
-    .map_err(|e| format!("Failed to create deck: {}", e))?;
-
-    let deck_id = tx.last_insert_rowid();
-    let mut phrases_imported = 0;
-    let mut phrases_skipped = 0;
-
-    // Create phrases and their progress records
-    for phrase in &data.phrases {
-        // Check if phrase with same answer and target_language already exists
-        let existing_id: Option<i64> = tx
-            .query_row(
-                "SELECT id FROM phrases WHERE answer = ?1 AND target_language = ?2",
-                params![phrase.answer, data.target_language],
-                |row| row.get(0),
-            )
-            .ok();
-
-        if existing_id.is_some() {
-            // Skip duplicate - phrase already exists
-            phrases_skipped += 1;
-            continue;
-        }
-
-        let accepted_json =
-            serde_json::to_string(&phrase.accepted).unwrap_or_else(|_| "[]".to_string());
-
-        // Insert phrase
-        tx.execute(
-            "INSERT INTO phrases (prompt, answer, accepted_json, target_language, native_language,
-                                 notes, starred, excluded, refined, created_at, deck_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 0, 0, ?7, ?8)",
-            params![
-                phrase.prompt,
-                phrase.answer,
-                accepted_json,
-                data.target_language,
-                data.native_language,
-                phrase.notes,
-                now,
-                deck_id
-            ],
-        )
-        .map_err(|e| format!("Failed to create phrase: {}", e))?;
-
-        let phrase_id = tx.last_insert_rowid();
-
-        // Create progress record with deck_learning status
-        tx.execute(
-            "INSERT INTO phrase_progress (phrase_id, correct_streak, total_attempts, success_count,
-                                         ease_factor, interval_days, in_srs_pool, deck_correct_count,
-                                         learning_status)
-             VALUES (?1, 0, 0, 0, 2.5, 1, 0, 0, 'deck_learning')",
-            params![phrase_id],
-        )
-        .map_err(|e| format!("Failed to create phrase progress: {}", e))?;
-
-        phrases_imported += 1;
-    }
-
-    tx.commit()
-        .map_err(|e| format!("Failed to commit transaction: {}", e))?;
-
-    let message = if phrases_skipped > 0 {
-        format!(
-            "Imported deck '{}': {} phrases added, {} skipped (already exist)",
-            data.name, phrases_imported, phrases_skipped
-        )
-    } else {
-        format!(
-            "Successfully imported deck '{}' with {} phrases",
-            data.name, phrases_imported
-        )
-    };
-
-    Ok(DeckImportResult {
-        success: true,
-        deck_id,
-        deck_name: data.name.clone(),
-        phrases_imported,
-        message,
-    })
-}
-
 /// Result of finding duplicate phrases
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DuplicateInfo {
@@ -1015,7 +611,7 @@ pub struct DuplicateInfo {
     pub target_language: String,
     /// IDs of duplicate phrases (all except the one to keep)
     pub duplicate_ids: Vec<i64>,
-    /// ID of the phrase to keep (the one with most progress or earliest created)
+    /// ID of the phrase to keep (the one with earliest created)
     pub keep_id: i64,
 }
 
@@ -1052,17 +648,13 @@ pub fn find_duplicate_phrases() -> Result<RemoveDuplicatesResult, String> {
     let mut details = Vec::new();
 
     for (answer, target_language) in duplicates {
-        // Get all phrase IDs with this answer, ordered by progress (most learned first), then by created_at
+        // Get all phrase IDs with this answer, ordered by created_at
         let mut stmt = conn
             .prepare(
-                "SELECT p.id, COALESCE(pp.total_attempts, 0) as attempts,
-                        COALESCE(pp.success_count, 0) as success,
-                        COALESCE(pp.in_srs_pool, 0) as in_srs,
-                        p.created_at
+                "SELECT p.id
                  FROM phrases p
-                 LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
                  WHERE p.answer = ?1 AND p.target_language = ?2
-                 ORDER BY in_srs DESC, success DESC, attempts DESC, p.created_at ASC",
+                 ORDER BY p.created_at ASC",
             )
             .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
@@ -1092,7 +684,7 @@ pub fn find_duplicate_phrases() -> Result<RemoveDuplicatesResult, String> {
     })
 }
 
-/// Remove duplicate phrases, keeping the one with most progress
+/// Remove duplicate phrases, keeping the one with earliest creation date
 #[tauri::command]
 pub fn remove_duplicate_phrases() -> Result<RemoveDuplicatesResult, String> {
     let mut conn = get_conn()?;
@@ -1116,14 +708,7 @@ pub fn remove_duplicate_phrases() -> Result<RemoveDuplicatesResult, String> {
 
     for dup in &found.details {
         for id in &dup.duplicate_ids {
-            // Delete phrase progress first
-            tx.execute(
-                "DELETE FROM phrase_progress WHERE phrase_id = ?1",
-                params![id],
-            )
-            .map_err(|e| format!("Failed to delete progress: {}", e))?;
-
-            // Delete phrase
+            // Delete phrase (cascade will handle related records)
             tx.execute("DELETE FROM phrases WHERE id = ?1", params![id])
                 .map_err(|e| format!("Failed to delete phrase: {}", e))?;
 
@@ -1156,7 +741,7 @@ mod tests {
     /// Create minimal test export data
     fn create_test_export_data() -> ExportData {
         ExportData {
-            version: 3,
+            version: 4,
             exported_at: "2024-01-01T00:00:00Z".to_string(),
             settings: vec![ExportSetting {
                 key: "test_key".to_string(),
@@ -1178,20 +763,6 @@ mod tests {
                 excluded: false,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
             }],
-            phrase_progress: vec![ExportPhraseProgress {
-                id: 1,
-                phrase_id: 1,
-                correct_streak: 2,
-                total_attempts: 5,
-                success_count: 4,
-                last_seen: Some("2024-01-01T00:00:00Z".to_string()),
-                ease_factor: 2.5,
-                interval_days: 3,
-                next_review_at: Some("2024-01-04T00:00:00Z".to_string()),
-                in_srs_pool: true,
-                deck_correct_count: 0,
-                learning_status: "srs_active".to_string(),
-            }],
             phrase_threads: vec![],
             question_threads: vec![],
             notes: vec![ExportNote {
@@ -1200,9 +771,10 @@ mod tests {
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-01T00:00:00Z".to_string(),
             }],
-            practice_sessions: vec![],
             materials: vec![],
             material_threads: vec![],
+            phrase_progress: vec![],
+            practice_sessions: vec![],
             decks: vec![],
         }
     }
@@ -1214,7 +786,7 @@ mod tests {
         assert!(result.is_ok());
 
         let data = result.unwrap();
-        assert_eq!(data.version, 3);
+        assert_eq!(data.version, 4);
         assert!(data.settings.is_empty());
         assert!(data.phrases.is_empty());
     }
@@ -1231,7 +803,6 @@ mod tests {
         assert!(import_result.success);
         assert_eq!(import_result.stats.settings_imported, 1);
         assert_eq!(import_result.stats.phrases_imported, 1);
-        assert_eq!(import_result.stats.phrase_progress_imported, 1);
         assert_eq!(import_result.stats.notes_imported, 1);
     }
 
@@ -1252,8 +823,6 @@ mod tests {
         assert_eq!(exported.phrases.len(), 1);
         assert_eq!(exported.phrases[0].prompt, "Hello");
         assert_eq!(exported.phrases[0].answer, "Hallo");
-        assert_eq!(exported.phrase_progress.len(), 1);
-        assert_eq!(exported.phrase_progress[0].correct_streak, 2);
         assert_eq!(exported.notes.len(), 1);
     }
 
@@ -1271,8 +840,6 @@ mod tests {
         data2.phrases[0].prompt = "Goodbye".to_string();
         data2.phrases[0].answer = "Tschüss".to_string();
         data2.phrases[0].created_at = "2024-01-02T00:00:00Z".to_string();
-        data2.phrase_progress[0].id = 2;
-        data2.phrase_progress[0].phrase_id = 2;
         data2.notes[0].id = 2;
         data2.notes[0].content = "Another note".to_string();
         data2.notes[0].created_at = "2024-01-02T00:00:00Z".to_string();
@@ -1323,24 +890,6 @@ mod tests {
     }
 
     #[test]
-    fn test_import_preserves_foreign_key_relationships() {
-        let mut conn = setup_test_db();
-
-        let data = create_test_export_data();
-        import_data_with_conn(&mut conn, data, ImportMode::Overwrite).expect("Import failed");
-
-        // Verify progress is linked to phrase
-        let progress_phrase_id: i64 = conn
-            .query_row(
-                "SELECT phrase_id FROM phrase_progress WHERE id = 1",
-                [],
-                |row| row.get(0),
-            )
-            .expect("Query failed");
-        assert_eq!(progress_phrase_id, 1);
-    }
-
-    #[test]
     fn test_export_includes_all_phrase_fields() {
         let conn = setup_test_db();
 
@@ -1365,102 +914,5 @@ mod tests {
         assert_eq!(phrase.notes, Some("A greeting".to_string()));
         assert!(phrase.starred);
         assert!(!phrase.excluded);
-    }
-
-    #[test]
-    fn test_import_deck_creates_deck_and_phrases() {
-        use crate::models::{DeckImportData, DeckImportPhrase};
-
-        let mut conn = setup_test_db();
-
-        let import_data = DeckImportData {
-            name: "German B1 Vocabulary".to_string(),
-            description: Some("Essential B1 phrases".to_string()),
-            target_language: "de".to_string(),
-            native_language: "en".to_string(),
-            graduation_threshold: 3,
-            level: Some("B1".to_string()),
-            category: Some("vocabulary".to_string()),
-            phrases: vec![
-                DeckImportPhrase {
-                    prompt: "How do you say 'hello'?".to_string(),
-                    answer: "Hallo".to_string(),
-                    accepted: vec!["Guten Tag".to_string()],
-                    notes: Some("Informal greeting".to_string()),
-                },
-                DeckImportPhrase {
-                    prompt: "How do you say 'goodbye'?".to_string(),
-                    answer: "Auf Wiedersehen".to_string(),
-                    accepted: vec!["Tschüss".to_string()],
-                    notes: None,
-                },
-            ],
-        };
-
-        let result = import_deck_with_conn(&mut conn, import_data);
-        assert!(result.is_ok());
-
-        let import_result = result.unwrap();
-        assert!(import_result.success);
-        assert_eq!(import_result.deck_name, "German B1 Vocabulary");
-        assert_eq!(import_result.phrases_imported, 2);
-
-        // Verify deck was created
-        let deck_count: i32 = conn
-            .query_row("SELECT COUNT(*) FROM decks WHERE name = ?1", ["German B1 Vocabulary"], |row| row.get(0))
-            .expect("Query failed");
-        assert_eq!(deck_count, 1);
-
-        // Verify phrases were created
-        let phrase_count: i32 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM phrases WHERE deck_id = ?1",
-                [import_result.deck_id],
-                |row| row.get(0),
-            )
-            .expect("Query failed");
-        assert_eq!(phrase_count, 2);
-
-        // Verify progress records were created with deck_learning status
-        let progress_count: i32 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM phrase_progress pp
-                 JOIN phrases p ON pp.phrase_id = p.id
-                 WHERE p.deck_id = ?1 AND pp.learning_status = 'deck_learning'",
-                [import_result.deck_id],
-                |row| row.get(0),
-            )
-            .expect("Query failed");
-        assert_eq!(progress_count, 2);
-    }
-
-    #[test]
-    fn test_import_deck_with_minimal_data() {
-        use crate::models::{DeckImportData, DeckImportPhrase};
-
-        let mut conn = setup_test_db();
-
-        let import_data = DeckImportData {
-            name: "Simple Deck".to_string(),
-            description: None,
-            target_language: "de".to_string(),
-            native_language: "en".to_string(),
-            graduation_threshold: 2,
-            level: None,
-            category: None,
-            phrases: vec![DeckImportPhrase {
-                prompt: "Test prompt".to_string(),
-                answer: "Test answer".to_string(),
-                accepted: vec![],
-                notes: None,
-            }],
-        };
-
-        let result = import_deck_with_conn(&mut conn, import_data);
-        assert!(result.is_ok());
-
-        let import_result = result.unwrap();
-        assert!(import_result.success);
-        assert_eq!(import_result.phrases_imported, 1);
     }
 }

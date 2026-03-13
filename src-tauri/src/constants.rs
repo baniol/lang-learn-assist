@@ -3,46 +3,6 @@
 //! This module centralizes hardcoded values to improve maintainability and
 //! make it easier to understand and adjust algorithm parameters.
 
-/// SRS (Spaced Repetition System) algorithm constants
-pub mod srs {
-    /// Default ease factor for new phrases (SM-2 algorithm standard)
-    pub const DEFAULT_EASE_FACTOR: f64 = 2.5;
-
-    /// Minimum ease factor to prevent intervals from becoming too short
-    pub const MIN_EASE_FACTOR: f64 = 1.3;
-
-    /// Penalty applied to ease factor on incorrect answer
-    pub const EASE_PENALTY: f64 = 0.2;
-
-    /// Minimum correct streak to graduate from learning phase
-    pub const LEARNING_GRADUATION_STREAK: i32 = 2;
-
-    /// Minutes to wait before reviewing again during learning phase
-    pub const LEARNING_REVIEW_MINUTES: i64 = 10;
-
-    /// Minutes to wait before reviewing after incorrect answer
-    pub const INCORRECT_REVIEW_MINUTES: i64 = 5;
-}
-
-/// Priority values for phrase selection
-pub mod priority {
-    /// Base priority for phrases due for review (adds overdue hours on top)
-    pub const DUE_FOR_REVIEW_BASE: f64 = 2000.0;
-
-    /// Priority for new phrases (never practiced)
-    pub const NEW_PHRASE: f64 = 1000.0;
-
-    /// Priority for phrases in learning phase (interval_days = 0, practiced but not graduated)
-    /// These should always be available within a session for repetition
-    pub const LEARNING_PHASE: f64 = 800.0;
-
-    /// Priority for phrases with parsing errors in next_review_at
-    pub const PARSE_ERROR: f64 = 500.0;
-
-    /// Priority for phrases not yet due (should not be shown)
-    pub const NOT_DUE: f64 = 0.0;
-}
-
 /// LLM (Large Language Model) token limits and settings
 pub mod llm {
     /// Maximum tokens for phrase refinement

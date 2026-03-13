@@ -35,7 +35,7 @@ pub async fn preview_phrase_translation(
     let phrase: Phrase = conn
         .query_row(
             "SELECT id, prompt, answer, accepted_json, target_language, native_language,
-                    audio_path, notes, starred, excluded, created_at, material_id, deck_id, refined
+                    audio_path, notes, starred, excluded, created_at, material_id, refined
              FROM phrases WHERE id = ?1",
             params![phraseId],
             row_to_phrase,
@@ -123,7 +123,7 @@ pub fn apply_phrase_translation(
     let original: Phrase = conn
         .query_row(
             "SELECT id, prompt, answer, accepted_json, target_language, native_language,
-                    audio_path, notes, starred, excluded, created_at, material_id, deck_id, refined
+                    audio_path, notes, starred, excluded, created_at, material_id, refined
              FROM phrases WHERE id = ?1",
             params![phraseId],
             row_to_phrase,
@@ -158,7 +158,7 @@ pub fn apply_phrase_translation(
     // Return the new phrase
     conn.query_row(
         "SELECT id, prompt, answer, accepted_json, target_language, native_language,
-                audio_path, notes, starred, excluded, created_at, material_id, deck_id, refined
+                audio_path, notes, starred, excluded, created_at, material_id, refined
          FROM phrases WHERE id = ?1",
         params![new_id],
         row_to_phrase,

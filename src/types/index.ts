@@ -10,8 +10,6 @@ export type {
 export {
   createViewState,
   isMaterialReviewView,
-  isDeckDetailView,
-  isDeckStudyView,
   viewRequiresData,
   getParentView,
   isSubViewOf,
@@ -21,7 +19,6 @@ export {
 export interface Phrase {
   id: number;
   materialId: number | null;
-  deckId: number | null;
   prompt: string;
   answer: string;
   accepted: string[];
@@ -34,157 +31,6 @@ export interface Phrase {
   refined: boolean;
   createdAt: string;
 }
-
-// Learning status - determines where phrase is in the learning lifecycle
-export type LearningStatus = "inactive" | "deck_learning" | "srs_active";
-
-export interface PhraseProgress {
-  id: number;
-  phraseId: number;
-  correctStreak: number;
-  totalAttempts: number;
-  successCount: number;
-  lastSeen: string | null;
-  // SRS fields
-  easeFactor: number;
-  intervalDays: number;
-  nextReviewAt: string | null;
-  // Learning status - new unified field
-  learningStatus: LearningStatus;
-  // Deck graduation fields
-  deckCorrectCount: number;
-  // Legacy field - kept for backwards compatibility
-  inSrsPool: boolean;
-}
-
-export interface AnswerResult {
-  progress: PhraseProgress;
-  sessionStreak: number;
-  isLearnedInSession: boolean;
-}
-
-// Deck types
-
-export interface Deck {
-  id: number;
-  name: string;
-  description: string | null;
-  targetLanguage: string;
-  nativeLanguage: string;
-  graduationThreshold: number;
-  // Future metadata fields for levels/themes
-  level: string | null;
-  category: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface DeckWithStats {
-  deck: Deck;
-  totalPhrases: number;
-  graduatedCount: number;
-  learningCount: number;
-}
-
-export interface CreateDeckRequest {
-  name: string;
-  description?: string;
-  targetLanguage?: string;
-  nativeLanguage?: string;
-  graduationThreshold?: number;
-}
-
-export interface UpdateDeckRequest {
-  name?: string;
-  description?: string;
-  graduationThreshold?: number;
-}
-
-export interface DeckAnswerResult {
-  progress: PhraseProgress;
-  deckCorrectCount: number;
-  justGraduated: boolean;
-  graduationThreshold: number;
-}
-
-// Deck import types - simplified format for importing pre-made decks
-
-export interface DeckImportPhrase {
-  prompt: string;
-  answer: string;
-  accepted?: string[];
-  notes?: string;
-}
-
-export interface DeckImportData {
-  name: string;
-  description?: string;
-  targetLanguage?: string;
-  nativeLanguage?: string;
-  graduationThreshold?: number;
-  level?: string;
-  category?: string;
-  phrases: DeckImportPhrase[];
-}
-
-export interface DeckImportResult {
-  success: boolean;
-  deckId: number;
-  deckName: string;
-  phrasesImported: number;
-  message: string;
-}
-
-// Unified study mode for the new API
-export type StudyModeType =
-  | { type: "deck_learning"; deckId: number }
-  | { type: "srs_review" };
-
-// Unified result of recording an answer in study mode
-export interface StudyAnswerResult {
-  progress: PhraseProgress;
-  // SRS-specific fields
-  sessionStreak?: number;
-  isLearnedInSession?: boolean;
-  // Deck-specific fields
-  deckCorrectCount?: number;
-  justGraduated?: boolean;
-  graduationThreshold?: number;
-}
-
-export interface PhraseWithProgress {
-  phrase: Phrase;
-  progress: PhraseProgress | null;
-}
-
-export interface PracticeSession {
-  id: number;
-  startedAt: string;
-  finishedAt: string | null;
-  totalPhrases: number;
-  correctAnswers: number;
-  exerciseMode: ExerciseMode;
-  state: SessionState | null;
-}
-
-export interface SessionState {
-  seenPhraseIds: number[];
-  sessionStreaks: Record<number, number>;
-  sessionLearnedIds: number[];
-  newPhraseCount: number;
-  currentPhraseId: number | null;
-  inRetryMode: boolean;
-  retryCount: number;
-  requiresRetry: boolean;
-  // Deck study fields
-  deckId?: number;
-  sessionType?: StudyMode;
-}
-
-// Legacy study mode type (simple string)
-export type StudyMode = "srs_review" | "deck_study";
-
-export type ExerciseMode = "speaking" | "typing" | "manual";
 
 export type LlmProvider = "openai" | "anthropic" | "none";
 export type TtsProvider = "elevenlabs" | "google" | "azure" | "none";
@@ -210,13 +56,6 @@ export interface AppSettings {
   ttsVoicesPerLanguage: Record<string, LanguageVoiceSettings>;
   targetLanguage: string;
   nativeLanguage: string;
-  requiredStreak: number;
-  immediateRetry: boolean;
-  defaultExerciseMode: ExerciseMode;
-  failureRepetitions: number;
-  sessionPhraseLimit: number;
-  newPhrasesPerSession: number;
-  newPhraseInterval: number;
   fuzzyMatching: boolean;
   notesEnabled: boolean;
 }
@@ -234,18 +73,6 @@ export interface TtsVoice {
   name: string;
   language: string;
   provider: string;
-}
-
-export interface LearningStats {
-  totalPhrases: number;
-  learnedCount: number;
-  learningCount: number;
-  newCount: number;
-  averageSuccessRate: number;
-  totalSessions: number;
-  // Deck-specific stats
-  inDecksCount: number;
-  graduatedToSrsCount: number;
 }
 
 export interface SuggestedPhrase {
@@ -403,11 +230,9 @@ export interface ExportData {
   exportedAt: string;
   settings: ExportSetting[];
   phrases: ExportPhrase[];
-  phraseProgress: ExportPhraseProgress[];
   phraseThreads: ExportPhraseThread[];
   questionThreads: ExportQuestionThread[];
   notes: ExportNote[];
-  practiceSessions: ExportPracticeSession[];
   materials: ExportMaterial[];
   materialThreads: ExportMaterialThread[];
 }
@@ -431,21 +256,6 @@ export interface ExportPhrase {
   starred: boolean;
   excluded: boolean;
   createdAt: string;
-}
-
-export interface ExportPhraseProgress {
-  id: number;
-  phraseId: number;
-  correctStreak: number;
-  totalAttempts: number;
-  successCount: number;
-  lastSeen: string | null;
-  easeFactor: number;
-  intervalDays: number;
-  nextReviewAt: string | null;
-  inSrsPool: boolean;
-  deckCorrectCount: number;
-  learningStatus: string;
 }
 
 export interface ExportPhraseThread {
@@ -477,16 +287,6 @@ export interface ExportNote {
   updatedAt: string;
 }
 
-export interface ExportPracticeSession {
-  id: number;
-  startedAt: string;
-  finishedAt: string | null;
-  totalPhrases: number;
-  correctAnswers: number;
-  exerciseMode: string;
-  stateJson: string | null;
-}
-
 export type ImportMode = "merge" | "overwrite";
 
 export interface ImportResult {
@@ -499,11 +299,9 @@ export interface ImportStats {
   settingsImported: number;
   phrasesImported: number;
   phrasesUpdated: number;
-  phraseProgressImported: number;
   phraseThreadsImported: number;
   questionThreadsImported: number;
   notesImported: number;
-  practiceSessionsImported: number;
   materialsImported: number;
   materialThreadsImported: number;
 }

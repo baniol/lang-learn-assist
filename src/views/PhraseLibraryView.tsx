@@ -12,9 +12,7 @@ import {
   type FilterStatus,
   type ExcludedFilter,
   type LanguageFilter,
-  type DeckFilter,
 } from "../components/phrases";
-import { DeckSelector } from "../components/decks";
 import { useSettings } from "../contexts/SettingsContext";
 import { useToast } from "../contexts/ToastContext";
 import {
@@ -25,23 +23,17 @@ import {
   toggleStarred,
   toggleExcluded,
   updatePhraseAudio,
-  getLearningStats,
 } from "../api";
-import { assignPhraseToDeck, getDecks } from "../lib/decks";
 import {
   LANGUAGE_OPTIONS,
-  type PhraseWithProgress,
   type CreatePhraseRequest,
-  type LearningStats,
   type Phrase,
-  type DeckWithStats,
 } from "../types";
 
 export function PhraseLibraryView() {
   const { settings } = useSettings();
   const toast = useToast();
-  const [phrases, setPhrases] = useState<PhraseWithProgress[]>([]);
-  const [stats, setStats] = useState<LearningStats | null>(null);
+  const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [showStarredOnly, setShowStarredOnly] = useState(false);
@@ -49,8 +41,6 @@ export function PhraseLibraryView() {
     useState<ExcludedFilter>("active");
   const [languageFilter, setLanguageFilter] =
     useState<LanguageFilter>("current");
-  const [deckFilter, setDeckFilter] = useState<DeckFilter>("all");
-  const [decks, setDecks] = useState<DeckWithStats[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -60,7 +50,6 @@ export function PhraseLibraryView() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [refiningPhrase, setRefiningPhrase] = useState<Phrase | null>(null);
   const [translatingPhrase, setTranslatingPhrase] = useState<Phrase | null>(null);
-  const [deckSelectorPhrase, setDeckSelectorPhrase] = useState<PhraseWithProgress | null>(null);
 
   const handleAudioGenerated = useCallback(
     async (phraseId: number, audioPath: string) => {
@@ -68,8 +57,8 @@ export function PhraseLibraryView() {
         await updatePhraseAudio(phraseId, audioPath);
         setPhrases((prev) =>
           prev.map((p) =>
-            p.phrase.id === phraseId
-              ? { ...p, phrase: { ...p.phrase, audioPath } }
+            p.id === phraseId
+              ? { ...p, audioPath }
               : p
           )
         );
@@ -101,24 +90,6 @@ export function PhraseLibraryView() {
     };
   }, [searchQuery]);
 
-  // Load stats on mount
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  // Load decks for filter
-  useEffect(() => {
-    const loadDecksData = async () => {
-      try {
-        const data = await getDecks(settings?.targetLanguage);
-        setDecks(data);
-      } catch (err) {
-        console.error("Failed to load decks:", err);
-      }
-    };
-    loadDecksData();
-  }, [settings?.targetLanguage]);
-
   // Load phrases when filters change
   useEffect(() => {
     loadPhrases();
@@ -128,18 +99,8 @@ export function PhraseLibraryView() {
     filterStatus,
     debouncedSearch,
     languageFilter,
-    deckFilter,
     settings?.targetLanguage,
   ]);
-
-  const loadStats = async () => {
-    try {
-      const data = await getLearningStats();
-      setStats(data);
-    } catch (err) {
-      console.error("Failed to load stats:", err);
-    }
-  };
 
   const loadPhrases = async () => {
     setIsLoading(true);
@@ -158,40 +119,19 @@ export function PhraseLibraryView() {
       // Apply client-side filtering for starred, excluded, and search
       let filtered = data;
       if (showStarredOnly) {
-        filtered = filtered.filter((p) => p.phrase.starred);
+        filtered = filtered.filter((p) => p.starred);
       }
       if (excludedFilter === "active") {
-        filtered = filtered.filter((p) => !p.phrase.excluded);
+        filtered = filtered.filter((p) => !p.excluded);
       } else if (excludedFilter === "excluded") {
-        filtered = filtered.filter((p) => p.phrase.excluded);
+        filtered = filtered.filter((p) => p.excluded);
       }
       if (debouncedSearch) {
         const search = debouncedSearch.toLowerCase();
         filtered = filtered.filter(
           (p) =>
-            p.phrase.prompt.toLowerCase().includes(search) ||
-            p.phrase.answer.toLowerCase().includes(search)
-        );
-      }
-      if (deckFilter === "no-deck") {
-        filtered = filtered.filter((p) => p.phrase.deckId === null);
-      } else if (typeof deckFilter === "number") {
-        filtered = filtered.filter((p) => p.phrase.deckId === deckFilter);
-      }
-      if (filterStatus === "new") {
-        filtered = filtered.filter(
-          (p) => !p.progress || p.progress.totalAttempts === 0
-        );
-      } else if (filterStatus === "learning") {
-        filtered = filtered.filter(
-          (p) =>
-            p.progress &&
-            p.progress.totalAttempts > 0 &&
-            p.progress.correctStreak < 2
-        );
-      } else if (filterStatus === "learned") {
-        filtered = filtered.filter(
-          (p) => p.progress && p.progress.correctStreak >= 2
+            p.prompt.toLowerCase().includes(search) ||
+            p.answer.toLowerCase().includes(search)
         );
       }
 
@@ -208,8 +148,8 @@ export function PhraseLibraryView() {
       const newStarred = await toggleStarred(id);
       setPhrases((prev) =>
         prev.map((p) =>
-          p.phrase.id === id
-            ? { ...p, phrase: { ...p.phrase, starred: newStarred } }
+          p.id === id
+            ? { ...p, starred: newStarred }
             : p
         )
       );
@@ -223,8 +163,8 @@ export function PhraseLibraryView() {
       const newExcluded = await toggleExcluded(id);
       setPhrases((prev) =>
         prev.map((p) =>
-          p.phrase.id === id
-            ? { ...p, phrase: { ...p.phrase, excluded: newExcluded } }
+          p.id === id
+            ? { ...p, excluded: newExcluded }
             : p
         )
       );
@@ -234,20 +174,20 @@ export function PhraseLibraryView() {
   };
 
   const handlePlay = useCallback(
-    async (phrase: PhraseWithProgress) => {
-      if (tts.isPlaying && playingId === phrase.phrase.id) {
+    async (phrase: Phrase) => {
+      if (tts.isPlaying && playingId === phrase.id) {
         tts.stop();
         setPlayingId(null);
         return;
       }
 
-      setPlayingId(phrase.phrase.id);
+      setPlayingId(phrase.id);
       try {
         await tts.speak(
-          phrase.phrase.answer,
-          phrase.phrase.id,
-          phrase.phrase.audioPath || undefined,
-          phrase.phrase.targetLanguage
+          phrase.answer,
+          phrase.id,
+          phrase.audioPath || undefined,
+          phrase.targetLanguage
         );
       } catch (err) {
         console.error("[TTS] Error in handlePlay:", err);
@@ -262,8 +202,7 @@ export function PhraseLibraryView() {
 
     try {
       await deletePhrase(deleteConfirmId);
-      setPhrases((prev) => prev.filter((p) => p.phrase.id !== deleteConfirmId));
-      loadStats();
+      setPhrases((prev) => prev.filter((p) => p.id !== deleteConfirmId));
     } catch (err) {
       console.error("Failed to delete phrase:", err);
     } finally {
@@ -275,7 +214,6 @@ export function PhraseLibraryView() {
     try {
       await createPhrase(request);
       setShowAddDialog(false);
-      await loadStats();
       await loadPhrases();
     } catch (err) {
       console.error("Failed to create phrase:", err);
@@ -293,8 +231,8 @@ export function PhraseLibraryView() {
 
     setPhrases((prev) =>
       prev.map((p) =>
-        p.phrase.id === refiningPhrase.id
-          ? { ...p, phrase: { ...p.phrase, prompt, answer, accepted, refined: true } }
+        p.id === refiningPhrase.id
+          ? { ...p, prompt, answer, accepted, refined: true }
           : p
       )
     );
@@ -302,32 +240,12 @@ export function PhraseLibraryView() {
 
   const handleTranslated = (newPhrase: Phrase) => {
     setTranslatingPhrase(null);
-    loadStats(); // Update phrase counts
 
     const langName = LANGUAGE_OPTIONS.find(l => l.code === newPhrase.targetLanguage)?.name || newPhrase.targetLanguage;
     toast.success(`Phrase copied to ${langName}`);
   };
 
-  const handleAssignToDeck = async (deckId: number | null) => {
-    if (!deckSelectorPhrase) return;
-
-    try {
-      await assignPhraseToDeck(deckSelectorPhrase.phrase.id, deckId);
-      setPhrases((prev) =>
-        prev.map((p) =>
-          p.phrase.id === deckSelectorPhrase.phrase.id
-            ? { ...p, phrase: { ...p.phrase, deckId } }
-            : p
-        )
-      );
-      toast.success(deckId ? "Phrase added to deck" : "Phrase removed from deck");
-    } catch (err) {
-      console.error("Failed to assign phrase to deck:", err);
-      toast.error("Failed to update deck assignment");
-    } finally {
-      setDeckSelectorPhrase(null);
-    }
-  };
+  const totalPhrases = phrases.length;
 
   return (
     <div className="p-6">
@@ -338,9 +256,7 @@ export function PhraseLibraryView() {
             Phrase Library
           </h1>
           <p className="text-slate-500 dark:text-slate-400">
-            {stats
-              ? `${stats.totalPhrases} phrases (${stats.learnedCount} learned, ${stats.learningCount} learning, ${stats.newCount} new)`
-              : "Loading..."}
+            {totalPhrases} phrases
           </p>
         </div>
         <Button onClick={() => setShowAddDialog(true)}>
@@ -359,9 +275,6 @@ export function PhraseLibraryView() {
         onExcludedFilterChange={setExcludedFilter}
         languageFilter={languageFilter}
         onLanguageFilterChange={setLanguageFilter}
-        deckFilter={deckFilter}
-        onDeckFilterChange={setDeckFilter}
-        decks={decks}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         currentLanguage={settings?.targetLanguage}
@@ -390,19 +303,18 @@ export function PhraseLibraryView() {
         />
       ) : (
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
-          {phrases.map((item) => (
+          {phrases.map((phrase) => (
             <PhraseListItem
-              key={item.phrase.id}
-              item={item}
-              isPlaying={playingId === item.phrase.id && tts.isPlaying}
-              isLoading={tts.isLoading && playingId === item.phrase.id}
+              key={phrase.id}
+              item={phrase}
+              isPlaying={playingId === phrase.id && tts.isPlaying}
+              isLoading={tts.isLoading && playingId === phrase.id}
               onToggleStar={handleToggleStar}
               onToggleExcluded={handleToggleExcluded}
-              onPlay={() => handlePlay(item)}
-              onRefine={() => setRefiningPhrase(item.phrase)}
-              onTranslate={() => setTranslatingPhrase(item.phrase)}
-              onDelete={() => setDeleteConfirmId(item.phrase.id)}
-              onAssignToDeck={() => setDeckSelectorPhrase(item)}
+              onPlay={() => handlePlay(phrase)}
+              onRefine={() => setRefiningPhrase(phrase)}
+              onTranslate={() => setTranslatingPhrase(phrase)}
+              onDelete={() => setDeleteConfirmId(phrase.id)}
             />
           ))}
         </div>
@@ -421,7 +333,7 @@ export function PhraseLibraryView() {
         onClose={() => setDeleteConfirmId(null)}
         onConfirm={handleDeleteConfirm}
         title="Delete phrase?"
-        message="This will permanently delete this phrase and its progress."
+        message="This will permanently delete this phrase."
         confirmLabel="Delete"
         variant="danger"
       />
@@ -435,8 +347,8 @@ export function PhraseLibraryView() {
           onAudioRegenerated={(audioPath) => {
             setPhrases((prev) =>
               prev.map((p) =>
-                p.phrase.id === refiningPhrase.id
-                  ? { ...p, phrase: { ...p.phrase, audioPath } }
+                p.id === refiningPhrase.id
+                  ? { ...p, audioPath }
                   : p
               )
             );
@@ -444,15 +356,6 @@ export function PhraseLibraryView() {
           }}
         />
       )}
-
-      {/* Deck Selector */}
-      <DeckSelector
-        isOpen={deckSelectorPhrase !== null}
-        onClose={() => setDeckSelectorPhrase(null)}
-        onSelect={handleAssignToDeck}
-        currentDeckId={deckSelectorPhrase?.phrase.deckId ?? null}
-        title="Assign to Deck"
-      />
 
       {/* Translate Dialog */}
       <TranslateDialog

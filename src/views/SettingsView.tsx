@@ -17,12 +17,9 @@ import {
   WhisperSettingsSection,
   TtsSettingsSection,
   LanguageSettingsSection,
-  LearningSettingsSection,
   NotesSettingsSection,
   DataManagementSection,
-  ResetSection,
 } from "../components/settings";
-import { resetPracticeSessions, resetPhraseProgress } from "../api";
 import type {
   AppSettings,
   WhisperModel,
@@ -347,35 +344,6 @@ export function SettingsView() {
           onNativeLanguageChange={(l) => updateSetting("nativeLanguage", l)}
         />
 
-        <LearningSettingsSection
-          requiredStreak={settings.requiredStreak}
-          failureRepetitions={settings.failureRepetitions}
-          sessionPhraseLimit={settings.sessionPhraseLimit}
-          newPhrasesPerSession={settings.newPhrasesPerSession}
-          newPhraseInterval={settings.newPhraseInterval}
-          defaultExerciseMode={settings.defaultExerciseMode}
-          immediateRetry={settings.immediateRetry}
-          fuzzyMatching={settings.fuzzyMatching}
-          onRequiredStreakChange={(v) => updateSetting("requiredStreak", v)}
-          onFailureRepetitionsChange={(v) =>
-            updateSetting("failureRepetitions", v)
-          }
-          onSessionPhraseLimitChange={(v) =>
-            updateSetting("sessionPhraseLimit", v)
-          }
-          onNewPhrasesPerSessionChange={(v) =>
-            updateSetting("newPhrasesPerSession", v)
-          }
-          onNewPhraseIntervalChange={(v) =>
-            updateSetting("newPhraseInterval", v)
-          }
-          onDefaultExerciseModeChange={(m) =>
-            updateSetting("defaultExerciseMode", m)
-          }
-          onImmediateRetryChange={(v) => updateSetting("immediateRetry", v)}
-          onFuzzyMatchingChange={(v) => updateSetting("fuzzyMatching", v)}
-        />
-
         <NotesSettingsSection
           notesEnabled={settings.notesEnabled}
           onNotesEnabledChange={(v) => updateSetting("notesEnabled", v)}
@@ -391,10 +359,6 @@ export function SettingsView() {
           onImport={handleImport}
         />
 
-        <ResetSection
-          onResetSessions={resetPracticeSessions}
-          onResetProgress={resetPhraseProgress}
-        />
       </div>
 
       <ConfirmDialog

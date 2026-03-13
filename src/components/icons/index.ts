@@ -9,7 +9,6 @@ export {
   QuestionCircleIcon,
   NoteIcon,
   SettingsIcon,
-  DecksIcon,
 } from "./Icons";
 
 // Action Icons

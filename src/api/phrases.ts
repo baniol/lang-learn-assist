@@ -1,10 +1,9 @@
 /**
- * Phrases API - CRUD, progress tracking, and refinement
+ * Phrases API - CRUD and refinement
  */
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Phrase,
-  PhraseWithProgress,
   PhraseThread,
   RefinePhraseSuggestion,
   CreatePhraseRequest,
@@ -18,12 +17,9 @@ import type {
 export async function getPhrases(options?: {
   targetLanguage?: string;
   materialId?: number;
-  status?: "all" | "starred" | "excluded";
-}): Promise<PhraseWithProgress[]> {
-  return invoke<PhraseWithProgress[]>("get_phrases", {
+}): Promise<Phrase[]> {
+  return invoke<Phrase[]>("get_phrases", {
     targetLanguage: options?.targetLanguage ?? null,
-    materialId: options?.materialId ?? null,
-    status: options?.status ?? "all",
   });
 }
 

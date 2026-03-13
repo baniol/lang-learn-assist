@@ -13,4 +13,3 @@ export { useVoiceRecording } from "./useVoiceRecording";
 export type { RecordingStatus } from "./useVoiceRecording";
 export { useTTS } from "./useTTS";
 export { useAudioPlayback } from "./useAudioPlayback";
-export { useStudySession } from "./useStudySession";

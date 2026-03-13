@@ -9,7 +9,6 @@
  */
 
 // Core domain APIs
-export * as learningApi from "./learning";
 export * as phrasesApi from "./phrases";
 export * as settingsApi from "./settings";
 
@@ -22,25 +21,6 @@ export * as materialsApi from "../lib/materials";
 export * as dataExportApi from "../lib/dataExport";
 
 // Re-export individual functions for convenience
-export {
-  // Learning
-  startPracticeSession,
-  startDeckSession,
-  getActiveSession,
-  updatePracticeSession,
-  finishPracticeSession,
-  getNextPhrase,
-  getNextDeckPhrase,
-  getStudyPhrase, // Unified API
-  validateAnswer,
-  recordAnswer,
-  recordDeckAnswer,
-  recordStudyAnswer, // Unified API
-  getLearningStats,
-  resetPracticeSessions,
-  resetPhraseProgress,
-} from "./learning";
-
 export {
   // Phrases
   getPhrases,
