@@ -351,6 +351,31 @@ pub fn import_data_with_conn(
                 stats.settings_imported += 1;
             }
 
+            // Import materials with original IDs (must be before phrases due to FK)
+            for material in &data.materials {
+                tx.execute(
+                    "INSERT INTO materials (id, title, material_type, source_url, original_text,
+                                           segments_json, target_language, native_language, status,
+                                           created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                    params![
+                        material.id,
+                        material.title,
+                        material.material_type,
+                        material.source_url,
+                        material.original_text,
+                        material.segments_json,
+                        material.target_language,
+                        material.native_language,
+                        material.status,
+                        material.created_at,
+                        material.updated_at
+                    ],
+                )
+                .map_err(|e| format!("Failed to import material: {}", e))?;
+                stats.materials_imported += 1;
+            }
+
             // Import decks with original IDs
             for deck in &data.decks {
                 tx.execute(
@@ -499,31 +524,6 @@ pub fn import_data_with_conn(
                 stats.practice_sessions_imported += 1;
             }
 
-            // Import materials with original IDs
-            for material in &data.materials {
-                tx.execute(
-                    "INSERT INTO materials (id, title, material_type, source_url, original_text,
-                                           segments_json, target_language, native_language, status,
-                                           created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                    params![
-                        material.id,
-                        material.title,
-                        material.material_type,
-                        material.source_url,
-                        material.original_text,
-                        material.segments_json,
-                        material.target_language,
-                        material.native_language,
-                        material.status,
-                        material.created_at,
-                        material.updated_at
-                    ],
-                )
-                .map_err(|e| format!("Failed to import material: {}", e))?;
-                stats.materials_imported += 1;
-            }
-
             // Import material threads with original IDs
             for thread in &data.material_threads {
                 tx.execute(
@@ -558,6 +558,45 @@ pub fn import_data_with_conn(
             // Build ID mappings for relationships
             let mut phrase_id_map: HashMap<i64, i64> = HashMap::new();
             let mut deck_id_map: HashMap<i64, i64> = HashMap::new();
+            let mut material_id_map: HashMap<i64, i64> = HashMap::new();
+
+            // Import materials first (must be before phrases due to FK on material_id)
+            for material in &data.materials {
+                let existing: Option<i64> = tx
+                    .query_row(
+                        "SELECT id FROM materials WHERE created_at = ?1 AND title = ?2",
+                        params![material.created_at, material.title],
+                        |row| row.get(0),
+                    )
+                    .ok();
+
+                if let Some(existing_id) = existing {
+                    material_id_map.insert(material.id, existing_id);
+                } else {
+                    tx.execute(
+                        "INSERT INTO materials (title, material_type, source_url, original_text,
+                                               segments_json, target_language, native_language, status,
+                                               created_at, updated_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                        params![
+                            material.title,
+                            material.material_type,
+                            material.source_url,
+                            material.original_text,
+                            material.segments_json,
+                            material.target_language,
+                            material.native_language,
+                            material.status,
+                            material.created_at,
+                            material.updated_at
+                        ],
+                    )
+                    .map_err(|e| format!("Failed to import material: {}", e))?;
+                    let new_id = tx.last_insert_rowid();
+                    material_id_map.insert(material.id, new_id);
+                    stats.materials_imported += 1;
+                }
+            }
 
             // Import decks (check by created_at + name for uniqueness)
             for deck in &data.decks {
@@ -598,6 +637,9 @@ pub fn import_data_with_conn(
                 let mapped_deck_id = phrase
                     .deck_id
                     .and_then(|did| deck_id_map.get(&did).copied());
+                let mapped_material_id = phrase
+                    .material_id
+                    .and_then(|mid| material_id_map.get(&mid).copied());
 
                 let existing: Option<i64> = tx
                     .query_row(
@@ -628,7 +670,7 @@ pub fn import_data_with_conn(
                             phrase.starred as i32,
                             phrase.excluded as i32,
                             phrase.created_at,
-                            phrase.material_id,
+                            mapped_material_id,
                             mapped_deck_id
                         ],
                     )
@@ -778,47 +820,6 @@ pub fn import_data_with_conn(
                     )
                     .map_err(|e| format!("Failed to import practice_session: {}", e))?;
                     stats.practice_sessions_imported += 1;
-                }
-            }
-
-            // Build material ID mapping for relationships
-            let mut material_id_map: HashMap<i64, i64> = HashMap::new();
-
-            // Import materials (check by created_at + title)
-            for material in &data.materials {
-                let existing: Option<i64> = tx
-                    .query_row(
-                        "SELECT id FROM materials WHERE created_at = ?1 AND title = ?2",
-                        params![material.created_at, material.title],
-                        |row| row.get(0),
-                    )
-                    .ok();
-
-                if let Some(existing_id) = existing {
-                    material_id_map.insert(material.id, existing_id);
-                } else {
-                    tx.execute(
-                        "INSERT INTO materials (title, material_type, source_url, original_text,
-                                               segments_json, target_language, native_language, status,
-                                               created_at, updated_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                        params![
-                            material.title,
-                            material.material_type,
-                            material.source_url,
-                            material.original_text,
-                            material.segments_json,
-                            material.target_language,
-                            material.native_language,
-                            material.status,
-                            material.created_at,
-                            material.updated_at
-                        ],
-                    )
-                    .map_err(|e| format!("Failed to import material: {}", e))?;
-                    let new_id = tx.last_insert_rowid();
-                    material_id_map.insert(material.id, new_id);
-                    stats.materials_imported += 1;
                 }
             }
 
