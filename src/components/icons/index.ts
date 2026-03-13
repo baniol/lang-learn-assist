@@ -6,7 +6,6 @@ export {
   BookIcon,
   ArchiveIcon,
   LightbulbIcon,
-  ChartIcon,
   QuestionCircleIcon,
   NoteIcon,
   SettingsIcon,

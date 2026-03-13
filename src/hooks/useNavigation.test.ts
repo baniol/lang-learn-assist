@@ -60,16 +60,6 @@ describe("useNavigation", () => {
         expect(result.current.viewState).toEqual({ type: "learn" });
       });
 
-      it("should navigate to stats", () => {
-        const { result } = renderHook(() => useNavigation());
-
-        act(() => {
-          result.current.navigate("stats");
-        });
-
-        expect(result.current.viewState).toEqual({ type: "stats" });
-      });
-
       it("should navigate to questions", () => {
         const { result } = renderHook(() => useNavigation());
 
@@ -220,7 +210,6 @@ describe("useNavigation", () => {
       const topLevelViews = [
         "phrase-library",
         "learn",
-        "stats",
         "questions",
         "settings",
         "notes",
@@ -245,11 +234,6 @@ describe("useNavigation", () => {
         result.current.navigate("learn");
       });
       expect(result.current.currentView).toBe("learn");
-
-      act(() => {
-        result.current.navigate("stats");
-      });
-      expect(result.current.currentView).toBe("stats");
 
       act(() => {
         result.current.navigate("material-review", { materialId: 1 });

@@ -23,11 +23,6 @@ describe("createViewState", () => {
       expect(state).toEqual({ type: "learn" });
     });
 
-    it("should create stats view state", () => {
-      const state = createViewState("stats");
-      expect(state).toEqual({ type: "stats" });
-    });
-
     it("should create questions view state", () => {
       const state = createViewState("questions");
       expect(state).toEqual({ type: "questions" });
@@ -153,7 +148,6 @@ describe("viewRequiresData", () => {
   it("should return false for views without data", () => {
     expect(viewRequiresData("phrase-library")).toBe(false);
     expect(viewRequiresData("learn")).toBe(false);
-    expect(viewRequiresData("stats")).toBe(false);
     expect(viewRequiresData("questions")).toBe(false);
     expect(viewRequiresData("settings")).toBe(false);
     expect(viewRequiresData("notes")).toBe(false);
@@ -183,7 +177,6 @@ describe("getParentView", () => {
   it("should return null for top-level views", () => {
     expect(getParentView("phrase-library")).toBe(null);
     expect(getParentView("learn")).toBe(null);
-    expect(getParentView("stats")).toBe(null);
     expect(getParentView("questions")).toBe(null);
     expect(getParentView("settings")).toBe(null);
     expect(getParentView("notes")).toBe(null);
@@ -234,7 +227,6 @@ describe("getActiveNavItem", () => {
   it("should return the view itself for top-level views", () => {
     expect(getActiveNavItem("phrase-library")).toBe("phrase-library");
     expect(getActiveNavItem("learn")).toBe("learn");
-    expect(getActiveNavItem("stats")).toBe("stats");
     expect(getActiveNavItem("questions")).toBe("questions");
     expect(getActiveNavItem("settings")).toBe("settings");
     expect(getActiveNavItem("notes")).toBe("notes");

@@ -8,7 +8,6 @@ import type {
   LearningStats,
   PhraseWithProgress,
   PracticeSession,
-  SrsStats,
   ExerciseMode,
   StudyModeType,
   StudyAnswerResult,
@@ -55,12 +54,6 @@ export async function finishPracticeSession(
   sessionId: number
 ): Promise<PracticeSession> {
   return invoke<PracticeSession>("finish_practice_session", { sessionId });
-}
-
-export async function getPracticeSessions(
-  limit: number = 20
-): Promise<PracticeSession[]> {
-  return invoke<PracticeSession[]>("get_practice_sessions", { limit });
 }
 
 // ============================================================================
@@ -140,12 +133,6 @@ export async function getLearningStats(
   targetLanguage?: string
 ): Promise<LearningStats> {
   return invoke<LearningStats>("get_learning_stats", {
-    targetLanguage: targetLanguage ?? null,
-  });
-}
-
-export async function getSrsStats(targetLanguage?: string): Promise<SrsStats> {
-  return invoke<SrsStats>("get_srs_stats", {
     targetLanguage: targetLanguage ?? null,
   });
 }

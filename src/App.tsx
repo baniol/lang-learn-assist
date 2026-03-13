@@ -5,7 +5,6 @@ import { ErrorBoundary } from "./components/shared";
 import { Layout } from "./components/Layout";
 import { PhraseLibraryView } from "./views/PhraseLibraryView";
 import { StudyView } from "./views/StudyView";
-import { StatsView } from "./views/StatsView";
 import { QuestionsView } from "./views/QuestionsView";
 import { SettingsView } from "./views/SettingsView";
 import { NotesView } from "./views/NotesView";
@@ -87,8 +86,6 @@ function AppContent() {
         return <PhraseLibraryView />;
       case "learn":
         return <StudyView onNavigate={legacyNavigate} />;
-      case "stats":
-        return <StatsView />;
       case "questions":
         return <QuestionsView />;
       case "settings":

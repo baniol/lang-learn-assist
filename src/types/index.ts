@@ -248,25 +248,6 @@ export interface LearningStats {
   graduatedToSrsCount: number;
 }
 
-export interface SrsStats {
-  dueNow: number;
-  overdue: number;
-  dueToday: number;
-  dueTomorrow: number;
-  dueThisWeek: number;
-  totalReviews: number;
-  averageEaseFactor: number;
-  intervalDistribution: IntervalDistribution;
-}
-
-export interface IntervalDistribution {
-  oneDay: number;
-  twoToThreeDays: number;
-  fourToSevenDays: number;
-  oneToTwoWeeks: number;
-  twoWeeksPlus: number;
-}
-
 export interface SuggestedPhrase {
   prompt: string;
   answer: string;

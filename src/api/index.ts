@@ -29,7 +29,6 @@ export {
   getActiveSession,
   updatePracticeSession,
   finishPracticeSession,
-  getPracticeSessions,
   getNextPhrase,
   getNextDeckPhrase,
   getStudyPhrase, // Unified API
@@ -38,7 +37,6 @@ export {
   recordDeckAnswer,
   recordStudyAnswer, // Unified API
   getLearningStats,
-  getSrsStats,
   resetPracticeSessions,
   resetPhraseProgress,
 } from "./learning";

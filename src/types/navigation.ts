@@ -12,7 +12,6 @@
 export type ViewState =
   | { type: "phrase-library" }
   | { type: "learn" }
-  | { type: "stats" }
   | { type: "questions" }
   | { type: "settings" }
   | { type: "notes" }

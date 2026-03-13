@@ -368,29 +368,6 @@ pub struct LearningStats {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SrsStats {
-    pub due_now: i32,
-    pub overdue: i32,
-    pub due_today: i32,
-    pub due_tomorrow: i32,
-    pub due_this_week: i32,
-    pub total_reviews: i32,
-    pub average_ease_factor: f64,
-    pub interval_distribution: IntervalDistribution,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IntervalDistribution {
-    pub one_day: i32,
-    pub two_to_three_days: i32,
-    pub four_to_seven_days: i32,
-    pub one_to_two_weeks: i32,
-    pub two_weeks_plus: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SuggestedPhrase {
     pub prompt: String,
     pub answer: String,

@@ -5,7 +5,6 @@ import {
   BookIcon,
   ArchiveIcon,
   LightbulbIcon,
-  ChartIcon,
   QuestionCircleIcon,
   NoteIcon,
   SettingsIcon,
@@ -44,7 +43,6 @@ const baseNavItems: NavItem[] = [
   { id: "materials", label: "Materials", icon: <ArchiveIcon /> },
   { id: "decks", label: "Decks", icon: <DecksIcon /> },
   { id: "learn", label: "Review", icon: <LightbulbIcon /> },
-  { id: "stats", label: "Stats", icon: <ChartIcon /> },
   { id: "questions", label: "Questions", icon: <QuestionCircleIcon /> },
 ];
 
