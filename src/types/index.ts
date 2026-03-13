@@ -27,7 +27,6 @@ export interface Phrase {
   audioPath: string | null;
   notes: string | null;
   starred: boolean;
-  excluded: boolean;
   refined: boolean;
   createdAt: string;
 }
@@ -254,7 +253,6 @@ export interface ExportPhrase {
   audioPath: string | null;
   notes: string | null;
   starred: boolean;
-  excluded: boolean;
   createdAt: string;
 }
 

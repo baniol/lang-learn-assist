@@ -37,18 +37,17 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, prompt, answer, accepted_json, target_language,
-                    native_language, audio_path, notes, starred, excluded, created_at, material_id
+                    native_language, audio_path, notes, starred, created_at, material_id
              FROM phrases",
         )
         .map_err(|e| format!("Failed to prepare phrases query: {}", e))?;
     let phrases = stmt
         .query_map([], |row| {
             let starred_int: i32 = row.get(8)?;
-            let excluded_int: i32 = row.get(9).unwrap_or(0);
             Ok(ExportPhrase {
                 id: row.get(0)?,
                 conversation_id: None,
-                material_id: row.get(11).ok(),
+                material_id: row.get(10).ok(),
                 deck_id: None,
                 prompt: row.get(1)?,
                 answer: row.get(2)?,
@@ -58,8 +57,8 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
                 audio_path: row.get(6)?,
                 notes: row.get(7)?,
                 starred: starred_int != 0,
-                excluded: excluded_int != 0,
-                created_at: row.get(10)?,
+                excluded: None,
+                created_at: row.get(9)?,
             })
         })
         .map_err(|e| format!("Failed to query phrases: {}", e))?
@@ -291,8 +290,8 @@ pub fn import_data_with_conn(
                 tx.execute(
                     "INSERT INTO phrases (id, prompt, answer, accepted_json,
                                          target_language, native_language, audio_path, notes,
-                                         starred, excluded, created_at, material_id)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                                         starred, created_at, material_id)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                     params![
                         phrase.id,
                         phrase.prompt,
@@ -303,7 +302,6 @@ pub fn import_data_with_conn(
                         phrase.audio_path,
                         phrase.notes,
                         phrase.starred as i32,
-                        phrase.excluded as i32,
                         phrase.created_at,
                         phrase.material_id
                     ],
@@ -459,8 +457,8 @@ pub fn import_data_with_conn(
                     tx.execute(
                         "INSERT INTO phrases (prompt, answer, accepted_json,
                                              target_language, native_language, audio_path, notes,
-                                             starred, excluded, created_at, material_id)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                                             starred, created_at, material_id)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                         params![
                             phrase.prompt,
                             phrase.answer,
@@ -470,7 +468,6 @@ pub fn import_data_with_conn(
                             phrase.audio_path,
                             phrase.notes,
                             phrase.starred as i32,
-                            phrase.excluded as i32,
                             phrase.created_at,
                             mapped_material_id
                         ],
@@ -760,7 +757,7 @@ mod tests {
                 audio_path: None,
                 notes: None,
                 starred: false,
-                excluded: false,
+                excluded: None,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
             }],
             phrase_threads: vec![],
@@ -897,9 +894,9 @@ mod tests {
         conn.execute(
             "INSERT INTO phrases (id, prompt, answer, accepted_json,
                                   target_language, native_language, audio_path, notes,
-                                  starred, excluded, created_at)
+                                  starred, created_at)
              VALUES (1, 'Hello', 'Hallo', '[\"Hi\"]', 'de', 'en', '/path/to/audio.mp3',
-                     'A greeting', 1, 0, '2024-01-01')",
+                     'A greeting', 1, '2024-01-01')",
             [],
         )
         .unwrap();
@@ -913,6 +910,5 @@ mod tests {
         assert_eq!(phrase.audio_path, Some("/path/to/audio.mp3".to_string()));
         assert_eq!(phrase.notes, Some("A greeting".to_string()));
         assert!(phrase.starred);
-        assert!(!phrase.excluded);
     }
 }

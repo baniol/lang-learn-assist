@@ -35,7 +35,7 @@ pub async fn preview_phrase_translation(
     let phrase: Phrase = conn
         .query_row(
             "SELECT id, prompt, answer, accepted_json, target_language, native_language,
-                    audio_path, notes, starred, excluded, created_at, material_id, refined
+                    audio_path, notes, starred, created_at, material_id, refined
              FROM phrases WHERE id = ?1",
             params![phraseId],
             row_to_phrase,
@@ -123,7 +123,7 @@ pub fn apply_phrase_translation(
     let original: Phrase = conn
         .query_row(
             "SELECT id, prompt, answer, accepted_json, target_language, native_language,
-                    audio_path, notes, starred, excluded, created_at, material_id, refined
+                    audio_path, notes, starred, created_at, material_id, refined
              FROM phrases WHERE id = ?1",
             params![phraseId],
             row_to_phrase,
@@ -136,8 +136,8 @@ pub fn apply_phrase_translation(
     // Create a new phrase with the translated content
     conn.execute(
         "INSERT INTO phrases (prompt, answer, accepted_json, target_language, native_language,
-                              notes, material_id, starred, excluded, refined)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                              notes, material_id, starred, refined)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             original.prompt,
             translatedAnswer,
@@ -147,7 +147,6 @@ pub fn apply_phrase_translation(
             original.notes,
             original.material_id,
             false, // not starred by default
-            false, // not excluded
             false, // not refined
         ],
     )

@@ -34,7 +34,6 @@ pub struct Phrase {
     pub audio_path: Option<String>,
     pub notes: Option<String>,
     pub starred: bool,
-    pub excluded: bool,
     pub refined: bool,
     pub created_at: String,
 }
@@ -271,7 +270,8 @@ pub struct ExportPhrase {
     pub audio_path: Option<String>,
     pub notes: Option<String>,
     pub starred: bool,
-    pub excluded: bool,
+    #[serde(default, skip_serializing)]
+    pub excluded: Option<bool>, // Deprecated, kept for import compatibility
     pub created_at: String,
     // Legacy fields - accepted during import but ignored
     #[serde(default, skip_serializing)]

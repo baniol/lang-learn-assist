@@ -10,7 +10,6 @@ import {
   AddPhraseDialog,
   TranslateDialog,
   type FilterStatus,
-  type ExcludedFilter,
   type LanguageFilter,
 } from "../components/phrases";
 import { useSettings } from "../contexts/SettingsContext";
@@ -21,7 +20,6 @@ import {
   updatePhrase,
   deletePhrase,
   toggleStarred,
-  toggleExcluded,
   updatePhraseAudio,
 } from "../api";
 import {
@@ -36,9 +34,6 @@ export function PhraseLibraryView() {
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
-  const [showStarredOnly, setShowStarredOnly] = useState(false);
-  const [excludedFilter, setExcludedFilter] =
-    useState<ExcludedFilter>("active");
   const [languageFilter, setLanguageFilter] =
     useState<LanguageFilter>("current");
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,8 +89,6 @@ export function PhraseLibraryView() {
   useEffect(() => {
     loadPhrases();
   }, [
-    showStarredOnly,
-    excludedFilter,
     filterStatus,
     debouncedSearch,
     languageFilter,
@@ -116,16 +109,8 @@ export function PhraseLibraryView() {
         targetLanguage: targetLang,
       });
 
-      // Apply client-side filtering for starred, excluded, and search
+      // Apply client-side filtering for search
       let filtered = data;
-      if (showStarredOnly) {
-        filtered = filtered.filter((p) => p.starred);
-      }
-      if (excludedFilter === "active") {
-        filtered = filtered.filter((p) => !p.excluded);
-      } else if (excludedFilter === "excluded") {
-        filtered = filtered.filter((p) => p.excluded);
-      }
       if (debouncedSearch) {
         const search = debouncedSearch.toLowerCase();
         filtered = filtered.filter(
@@ -155,21 +140,6 @@ export function PhraseLibraryView() {
       );
     } catch (err) {
       console.error("Failed to toggle starred:", err);
-    }
-  };
-
-  const handleToggleExcluded = async (id: number) => {
-    try {
-      const newExcluded = await toggleExcluded(id);
-      setPhrases((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? { ...p, excluded: newExcluded }
-            : p
-        )
-      );
-    } catch (err) {
-      console.error("Failed to toggle excluded:", err);
     }
   };
 
@@ -269,10 +239,6 @@ export function PhraseLibraryView() {
       <PhraseFilters
         filterStatus={filterStatus}
         onFilterStatusChange={setFilterStatus}
-        showStarredOnly={showStarredOnly}
-        onShowStarredOnlyChange={setShowStarredOnly}
-        excludedFilter={excludedFilter}
-        onExcludedFilterChange={setExcludedFilter}
         languageFilter={languageFilter}
         onLanguageFilterChange={setLanguageFilter}
         searchQuery={searchQuery}
@@ -310,7 +276,6 @@ export function PhraseLibraryView() {
               isPlaying={playingId === phrase.id && tts.isPlaying}
               isLoading={tts.isLoading && playingId === phrase.id}
               onToggleStar={handleToggleStar}
-              onToggleExcluded={handleToggleExcluded}
               onPlay={() => handlePlay(phrase)}
               onRefine={() => setRefiningPhrase(phrase)}
               onTranslate={() => setTranslatingPhrase(phrase)}

@@ -1,18 +1,11 @@
-import { cn } from "../../lib/utils";
-import { StarIcon } from "../icons";
 import { LANGUAGE_OPTIONS } from "../../types";
 
 export type FilterStatus = "all" | "new" | "learning" | "learned";
-export type ExcludedFilter = "active" | "excluded" | "all";
 export type LanguageFilter = "all" | "current" | string;
 
 interface PhraseFiltersProps {
   filterStatus: FilterStatus;
   onFilterStatusChange: (status: FilterStatus) => void;
-  showStarredOnly: boolean;
-  onShowStarredOnlyChange: (value: boolean) => void;
-  excludedFilter: ExcludedFilter;
-  onExcludedFilterChange: (filter: ExcludedFilter) => void;
   languageFilter: LanguageFilter;
   onLanguageFilterChange: (filter: LanguageFilter) => void;
   searchQuery: string;
@@ -20,13 +13,7 @@ interface PhraseFiltersProps {
   currentLanguage?: string;
 }
 
-const EXCLUDED_OPTIONS: ExcludedFilter[] = ["active", "excluded", "all"];
-
 export function PhraseFilters({
-  showStarredOnly,
-  onShowStarredOnlyChange,
-  excludedFilter,
-  onExcludedFilterChange,
   languageFilter,
   onLanguageFilterChange,
   searchQuery,
@@ -35,46 +22,8 @@ export function PhraseFilters({
 }: PhraseFiltersProps) {
   return (
     <div className="flex flex-wrap items-center gap-4 mb-6">
-      {/* Starred filter */}
-      <button
-        onClick={() => onShowStarredOnlyChange(!showStarredOnly)}
-        className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-          showStarredOnly
-            ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
-            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
-        )}
-      >
-        <StarIcon size="xs" filled={showStarredOnly} />
-        Starred
-      </button>
-
-      {/* Excluded filter */}
-      <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-4">
-        {EXCLUDED_OPTIONS.map((filter) => (
-          <button
-            key={filter}
-            onClick={() => onExcludedFilterChange(filter)}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-              excludedFilter === filter
-                ? filter === "excluded"
-                  ? "bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200"
-                  : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
-            )}
-          >
-            {filter === "active"
-              ? "Active"
-              : filter === "excluded"
-                ? "Excluded"
-                : "All"}
-          </button>
-        ))}
-      </div>
-
       {/* Language filter */}
-      <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-4">
+      <div className="flex items-center gap-1">
         <select
           value={languageFilter}
           onChange={(e) => onLanguageFilterChange(e.target.value)}

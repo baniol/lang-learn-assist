@@ -39,7 +39,6 @@ pub fn run() {
             phrases::create_phrases_batch,
             phrases::update_phrase,
             phrases::toggle_starred,
-            phrases::toggle_excluded,
             phrases::update_phrase_audio,
             phrases::delete_phrase,
             // Phrase threads

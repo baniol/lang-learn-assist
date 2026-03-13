@@ -1,7 +1,6 @@
 export {
   PhraseFilters,
   type FilterStatus,
-  type ExcludedFilter,
   type LanguageFilter,
 } from "./PhraseFilters";
 export { PhraseActions } from "./PhraseActions";

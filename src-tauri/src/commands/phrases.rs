@@ -13,7 +13,6 @@ use tauri::State;
 #[allow(non_snake_case)]
 pub fn get_phrases(
     starredOnly: Option<bool>,
-    excludedOnly: Option<bool>,
     targetLanguage: Option<String>,
     searchQuery: Option<String>,
 ) -> Result<Vec<Phrase>, String> {
@@ -25,14 +24,6 @@ pub fn get_phrases(
 
     if starredOnly.unwrap_or(false) {
         conditions.push("p.starred = 1");
-    }
-
-    if let Some(excluded) = excludedOnly {
-        if excluded {
-            conditions.push("p.excluded = 1");
-        } else {
-            conditions.push("p.excluded = 0");
-        }
     }
 
     if let Some(ref lang) = targetLanguage {
@@ -58,7 +49,7 @@ pub fn get_phrases(
 
     let query = format!(
         "SELECT p.id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.refined
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at, p.material_id, p.refined
          FROM phrases p{}
          ORDER BY p.created_at DESC",
         where_clause
@@ -84,7 +75,7 @@ pub fn get_phrase(id: i64) -> Result<Phrase, String> {
 
     conn.query_row(
         "SELECT p.id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.excluded, p.created_at, p.material_id, p.refined
+                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at, p.material_id, p.refined
          FROM phrases p
          WHERE p.id = ?1",
         params![id],
@@ -131,7 +122,7 @@ pub fn create_phrase(
     let id = conn.last_insert_rowid();
 
     conn.query_row(
-        "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, refined
+        "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, created_at, material_id, refined
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,
@@ -195,7 +186,7 @@ pub fn create_phrases_batch(
     for id in &created_ids {
         let phrase = tx
             .query_row(
-                "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, refined
+                "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, created_at, material_id, refined
                  FROM phrases WHERE id = ?1",
                 params![id],
                 row_to_phrase,
@@ -265,31 +256,12 @@ pub fn update_phrase(id: i64, request: UpdatePhraseRequest) -> Result<Phrase, St
     }
 
     conn.query_row(
-        "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, excluded, created_at, material_id, refined
+        "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, created_at, material_id, refined
          FROM phrases WHERE id = ?1",
         params![id],
         row_to_phrase,
     )
     .map_err(|e| format!("Phrase not found: {}", e))
-}
-
-#[tauri::command]
-pub fn toggle_excluded(id: i64) -> Result<bool, String> {
-    let conn = get_conn()?;
-
-    conn.execute(
-        "UPDATE phrases SET excluded = NOT excluded WHERE id = ?1",
-        params![id],
-    )
-    .map_err(|e| format!("Failed to toggle excluded: {}", e))?;
-
-    let excluded: i32 = conn
-        .query_row("SELECT excluded FROM phrases WHERE id = ?1", params![id], |row| {
-            row.get(0)
-        })
-        .map_err(|e| format!("Failed to get excluded status: {}", e))?;
-
-    Ok(excluded != 0)
 }
 
 #[tauri::command]

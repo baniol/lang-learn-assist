@@ -29,7 +29,6 @@ export {
   updatePhrase,
   deletePhrase,
   toggleStarred,
-  toggleExcluded,
   updatePhraseAudio,
   getPhraseThread,
   createPhraseThread,

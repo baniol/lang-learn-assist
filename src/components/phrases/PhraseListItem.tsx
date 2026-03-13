@@ -7,7 +7,6 @@ interface PhraseListItemProps {
   isPlaying: boolean;
   isLoading: boolean;
   onToggleStar: (id: number) => void;
-  onToggleExcluded: (id: number) => void;
   onPlay: () => void;
   onRefine: () => void;
   onTranslate?: () => void;
@@ -19,7 +18,6 @@ export function PhraseListItem({
   isPlaying,
   isLoading,
   onToggleStar,
-  onToggleExcluded,
   onPlay,
   onRefine,
   onTranslate,
@@ -52,14 +50,12 @@ export function PhraseListItem({
       {/* Actions */}
       <PhraseActions
         phraseId={phrase.id}
-        isExcluded={phrase.excluded}
         isPlaying={isPlaying}
         isLoading={isLoading}
         isRefined={phrase.refined}
         onPlay={onPlay}
         onRefine={onRefine}
         onTranslate={onTranslate}
-        onToggleExcluded={() => onToggleExcluded(phrase.id)}
         onDelete={onDelete}
       />
     </div>

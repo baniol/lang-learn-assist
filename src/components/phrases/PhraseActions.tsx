@@ -4,34 +4,28 @@ import {
   PlayIcon,
   PauseIcon,
   LightbulbIcon,
-  CheckCircleIcon,
-  ExcludeIcon,
   CloseIcon,
   TranslateIcon,
 } from "../icons";
 
 interface PhraseActionsProps {
   phraseId: number;
-  isExcluded: boolean;
   isPlaying: boolean;
   isLoading: boolean;
   isRefined?: boolean;
   onPlay: () => void;
   onRefine: () => void;
   onTranslate?: () => void;
-  onToggleExcluded: () => void;
   onDelete: () => void;
 }
 
 export function PhraseActions({
-  isExcluded,
   isPlaying,
   isLoading,
   isRefined,
   onPlay,
   onRefine,
   onTranslate,
-  onToggleExcluded,
   onDelete,
 }: PhraseActionsProps) {
   return (
@@ -71,18 +65,6 @@ export function PhraseActions({
           <TranslateIcon size="xs" />
         </button>
       )}
-      <button
-        onClick={onToggleExcluded}
-        className={cn(
-          "p-2 rounded transition-colors",
-          isExcluded
-            ? "text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
-            : "text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
-        )}
-        title={isExcluded ? "Include" : "Exclude"}
-      >
-        {isExcluded ? <CheckCircleIcon size="xs" /> : <ExcludeIcon size="xs" />}
-      </button>
       <button
         onClick={(e) => {
           e.stopPropagation();

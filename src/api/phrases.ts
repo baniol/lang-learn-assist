@@ -52,10 +52,6 @@ export async function toggleStarred(id: number): Promise<boolean> {
   return invoke<boolean>("toggle_starred", { id });
 }
 
-export async function toggleExcluded(id: number): Promise<boolean> {
-  return invoke<boolean>("toggle_excluded", { id });
-}
-
 // ============================================================================
 // Audio
 // ============================================================================
