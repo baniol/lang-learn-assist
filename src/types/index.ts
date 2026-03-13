@@ -527,6 +527,19 @@ export interface ImportStats {
   materialThreadsImported: number;
 }
 
+export interface DuplicateInfo {
+  answer: string;
+  targetLanguage: string;
+  duplicateIds: number[];
+  keepId: number;
+}
+
+export interface RemoveDuplicatesResult {
+  duplicatesFound: number;
+  phrasesRemoved: number;
+  details: DuplicateInfo[];
+}
+
 export interface ExportMaterial {
   id: number;
   title: string;

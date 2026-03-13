@@ -6,6 +6,9 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "mic-recorder:default"
+    "mic-recorder:default",
+    "dialog:default",
+    "fs:default",
+    "fs:write-all"
   ]
 }

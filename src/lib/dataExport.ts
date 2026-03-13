@@ -1,5 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ExportData, ImportMode, ImportResult } from "../types";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
+import type {
+  ExportData,
+  ImportMode,
+  ImportResult,
+  RemoveDuplicatesResult,
+} from "../types";
 
 export async function exportData(): Promise<ExportData> {
   return invoke<ExportData>("export_data");
@@ -16,16 +23,20 @@ export async function exportToFile(): Promise<{ success: boolean; error?: string
   try {
     const data = await exportData();
     const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `lang-learn-export-${new Date().toISOString().split("T")[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const defaultName = `lang-learn-export-${new Date().toISOString().split("T")[0]}.json`;
+
+    const filePath = await save({
+      defaultPath: defaultName,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+      title: "Export data",
+    });
+
+    if (!filePath) {
+      return { success: false, error: "Export cancelled" };
+    }
+
+    await writeTextFile(filePath, json);
 
     return { success: true };
   } catch (error) {
@@ -52,4 +63,12 @@ export function readFileAsJson(file: File): Promise<ExportData> {
     reader.onerror = () => reject(new Error("Failed to read file"));
     reader.readAsText(file);
   });
+}
+
+export async function findDuplicatePhrases(): Promise<RemoveDuplicatesResult> {
+  return invoke<RemoveDuplicatesResult>("find_duplicate_phrases");
+}
+
+export async function removeDuplicatePhrases(): Promise<RemoveDuplicatesResult> {
+  return invoke<RemoveDuplicatesResult>("remove_duplicate_phrases");
 }

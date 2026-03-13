@@ -926,9 +926,25 @@ fn import_deck_inner(
 
     let deck_id = tx.last_insert_rowid();
     let mut phrases_imported = 0;
+    let mut phrases_skipped = 0;
 
     // Create phrases and their progress records
     for phrase in &data.phrases {
+        // Check if phrase with same answer and target_language already exists
+        let existing_id: Option<i64> = tx
+            .query_row(
+                "SELECT id FROM phrases WHERE answer = ?1 AND target_language = ?2",
+                params![phrase.answer, data.target_language],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if existing_id.is_some() {
+            // Skip duplicate - phrase already exists
+            phrases_skipped += 1;
+            continue;
+        }
+
         let accepted_json =
             serde_json::to_string(&phrase.accepted).unwrap_or_else(|_| "[]".to_string());
 
@@ -968,15 +984,159 @@ fn import_deck_inner(
     tx.commit()
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
+    let message = if phrases_skipped > 0 {
+        format!(
+            "Imported deck '{}': {} phrases added, {} skipped (already exist)",
+            data.name, phrases_imported, phrases_skipped
+        )
+    } else {
+        format!(
+            "Successfully imported deck '{}' with {} phrases",
+            data.name, phrases_imported
+        )
+    };
+
     Ok(DeckImportResult {
         success: true,
         deck_id,
         deck_name: data.name.clone(),
         phrases_imported,
-        message: format!(
-            "Successfully imported deck '{}' with {} phrases",
-            data.name, phrases_imported
-        ),
+        message,
+    })
+}
+
+/// Result of finding duplicate phrases
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DuplicateInfo {
+    /// The answer text (target language phrase)
+    pub answer: String,
+    /// Target language
+    pub target_language: String,
+    /// IDs of duplicate phrases (all except the one to keep)
+    pub duplicate_ids: Vec<i64>,
+    /// ID of the phrase to keep (the one with most progress or earliest created)
+    pub keep_id: i64,
+}
+
+/// Result of duplicate removal
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct RemoveDuplicatesResult {
+    pub duplicates_found: i32,
+    pub phrases_removed: i32,
+    pub details: Vec<DuplicateInfo>,
+}
+
+/// Find duplicate phrases based on answer + target_language
+/// Returns info about duplicates without removing them
+#[tauri::command]
+pub fn find_duplicate_phrases() -> Result<RemoveDuplicatesResult, String> {
+    let conn = get_conn()?;
+
+    // Find phrases that have duplicates (same answer + target_language)
+    let mut stmt = conn
+        .prepare(
+            "SELECT answer, target_language, COUNT(*) as cnt
+             FROM phrases
+             GROUP BY answer, target_language
+             HAVING cnt > 1",
+        )
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let duplicates: Vec<(String, String)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| format!("Failed to query duplicates: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect: {}", e))?;
+
+    let mut details = Vec::new();
+
+    for (answer, target_language) in duplicates {
+        // Get all phrase IDs with this answer, ordered by progress (most learned first), then by created_at
+        let mut stmt = conn
+            .prepare(
+                "SELECT p.id, COALESCE(pp.total_attempts, 0) as attempts,
+                        COALESCE(pp.success_count, 0) as success,
+                        COALESCE(pp.in_srs_pool, 0) as in_srs,
+                        p.created_at
+                 FROM phrases p
+                 LEFT JOIN phrase_progress pp ON p.id = pp.phrase_id
+                 WHERE p.answer = ?1 AND p.target_language = ?2
+                 ORDER BY in_srs DESC, success DESC, attempts DESC, p.created_at ASC",
+            )
+            .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+        let ids: Vec<i64> = stmt
+            .query_map(params![answer, target_language], |row| row.get(0))
+            .map_err(|e| format!("Failed to query phrase ids: {}", e))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect ids: {}", e))?;
+
+        if ids.len() > 1 {
+            let keep_id = ids[0];
+            let duplicate_ids: Vec<i64> = ids[1..].to_vec();
+
+            details.push(DuplicateInfo {
+                answer: answer.clone(),
+                target_language: target_language.clone(),
+                duplicate_ids,
+                keep_id,
+            });
+        }
+    }
+
+    Ok(RemoveDuplicatesResult {
+        duplicates_found: details.len() as i32,
+        phrases_removed: 0, // Not removed yet, just found
+        details,
+    })
+}
+
+/// Remove duplicate phrases, keeping the one with most progress
+#[tauri::command]
+pub fn remove_duplicate_phrases() -> Result<RemoveDuplicatesResult, String> {
+    let mut conn = get_conn()?;
+
+    // First find all duplicates
+    let found = find_duplicate_phrases()?;
+
+    if found.details.is_empty() {
+        return Ok(RemoveDuplicatesResult {
+            duplicates_found: 0,
+            phrases_removed: 0,
+            details: vec![],
+        });
+    }
+
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Failed to begin transaction: {}", e))?;
+
+    let mut total_removed = 0;
+
+    for dup in &found.details {
+        for id in &dup.duplicate_ids {
+            // Delete phrase progress first
+            tx.execute(
+                "DELETE FROM phrase_progress WHERE phrase_id = ?1",
+                params![id],
+            )
+            .map_err(|e| format!("Failed to delete progress: {}", e))?;
+
+            // Delete phrase
+            tx.execute("DELETE FROM phrases WHERE id = ?1", params![id])
+                .map_err(|e| format!("Failed to delete phrase: {}", e))?;
+
+            total_removed += 1;
+        }
+    }
+
+    tx.commit()
+        .map_err(|e| format!("Failed to commit: {}", e))?;
+
+    Ok(RemoveDuplicatesResult {
+        duplicates_found: found.details.len() as i32,
+        phrases_removed: total_removed,
+        details: found.details,
     })
 }
 

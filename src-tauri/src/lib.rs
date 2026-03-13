@@ -25,6 +25,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_mic_recorder::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // Settings
@@ -122,6 +124,8 @@ pub fn run() {
             data_export::export_data,
             data_export::import_data,
             data_export::import_deck,
+            data_export::find_duplicate_phrases,
+            data_export::remove_duplicate_phrases,
             // Decks
             decks::get_decks,
             decks::get_deck,
