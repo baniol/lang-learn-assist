@@ -1,6 +1,6 @@
 # Language Learning Assistant - User Guide
 
-A desktop application for practicing foreign language conversations with AI assistance, extracting phrases for spaced repetition learning, and practicing with voice input and text-to-speech.
+A desktop application for practicing foreign language conversations with AI assistance, building a personal phrase library, and processing learning materials with voice input and text-to-speech.
 
 ---
 
@@ -9,10 +9,9 @@ A desktop application for practicing foreign language conversations with AI assi
 1. [Overview](#overview)
 2. [Conversations](#conversations)
 3. [Phrase Library](#phrase-library)
-4. [Learning & Practice](#learning--practice)
-5. [Spaced Repetition System (SRS)](#spaced-repetition-system-srs)
-6. [Voice Features](#voice-features)
-7. [Settings](#settings)
+4. [Materials](#materials)
+5. [Voice Features](#voice-features)
+6. [Settings](#settings)
 
 ---
 
@@ -22,7 +21,7 @@ The app helps you learn a foreign language through three main activities:
 
 1. **Conversations** - Have AI-powered translation conversations to discover how to say things in your target language
 2. **Phrase Library** - Build a personal collection of phrases to learn
-3. **Practice** - Review and memorize phrases using spaced repetition
+3. **Materials** - Import and process learning materials to extract phrases
 
 ### Supported Languages
 
@@ -68,7 +67,7 @@ Your personal collection of phrases to learn. Each phrase has:
 ### Managing Phrases
 
 - **Star** phrases to mark favorites
-- **Filter** by status: All, New, Learning, Learned
+- **Filter** by status
 - **Search** to find specific phrases
 - **Delete** phrases you no longer need
 
@@ -89,126 +88,16 @@ Click the edit button on any phrase to open the editor with two modes:
 
 ---
 
-## Learning & Practice
+## Materials
 
-### Exercise Modes
+Import and process learning materials (articles, texts, etc.) to extract useful phrases.
 
-**Manual Mode**
-1. See the prompt (native language)
-2. Think of the answer
-3. Reveal the correct answer
-4. Self-grade: Correct or Incorrect
+### Adding Materials
 
-**Typing Mode**
-1. See the prompt
-2. Type your answer in the target language
-3. System checks if your answer matches (with some flexibility for minor differences)
-
-**Speaking Mode**
-1. See the prompt
-2. Press and hold the microphone button
-3. Speak your answer in the target language
-4. Voice is transcribed and checked automatically
-5. Requires a Whisper model (download in Settings)
-
-### During Practice
-
-- See your session progress (phrases practiced, correct answers)
-- Wrong answers show the correct answer with a "Try Again" button
-- The answer stays visible until you're ready to continue
-- End session anytime to return to dashboard
-
----
-
-## Spaced Repetition System (SRS)
-
-The app uses a proven spaced repetition algorithm (based on SM-2/Anki) to optimize your learning.
-
-### Algorithm Flowchart
-
-```mermaid
-flowchart TD
-    Start([Practice Phrase]) --> CheckAnswer{Answer<br/>Correct?}
-
-    CheckAnswer -->|Yes| CheckPhaseCorrect{In Learning<br/>Phase?<br/><i>streak < 2</i>}
-    CheckAnswer -->|No| ReduceEase[Reduce Ease Factor<br/><i>ease -= 0.2, min 1.3</i>]
-
-    ReduceEase --> CheckPhaseWrong{In Learning<br/>Phase?<br/><i>interval = 0</i>}
-
-    CheckPhaseWrong -->|Yes| ReviewSoon[Review in 5 min]
-    CheckPhaseWrong -->|No| SoftReset[Soft Reset<br/><i>interval = interval / 2</i><br/><i>min: 1 day</i>]
-    SoftReset --> ScheduleSoft[Schedule Next Review<br/><i>in N days</i>]
-
-    CheckPhaseCorrect -->|Yes| CheckGraduation{Ready to<br/>Graduate?<br/><i>streak+1 ≥ 2</i>}
-    CheckPhaseCorrect -->|No| IncreaseInterval[Increase Interval<br/><i>new = old × ease</i><br/><i>min: old + 1 day</i>]
-
-    CheckGraduation -->|Yes| Graduate[Graduate to Review<br/><i>interval = 1 day</i>]
-    CheckGraduation -->|No| StayLearning[Stay in Learning<br/><i>interval = 0</i>]
-
-    StayLearning --> ReviewMinutes[Review in 10 min]
-    Graduate --> ReviewDays[Review in 1 day]
-    IncreaseInterval --> ScheduleNext[Schedule Next Review<br/><i>in N days</i>]
-
-    ReviewSoon --> End([Done])
-    ReviewMinutes --> End
-    ReviewDays --> End
-    ScheduleNext --> End
-    ScheduleSoft --> End
-```
-
-### How It Works
-
-Each phrase has:
-- **Interval** - Days until next review
-- **Ease factor** - How easy this phrase is for you (affects interval growth)
-- **Next review date** - When you should see this phrase again
-
-### The Algorithm
-
-**Learning Phase** (new phrases, streak < 2):
-- Correct answer: review in 10 minutes, until you get 2 in a row
-- After 2 correct: "graduate" to review phase with 1-day interval
-
-**Review Phase** (learned phrases, streak ≥ 2):
-- Correct answer: `new interval = current interval × ease factor` (minimum +1 day)
-- Phrases you know well appear less frequently
-
-**Incorrect Answer**:
-- Ease factor decreases by 0.2 (minimum 1.3)
-- **Learning phase** (interval 0): review in 5 minutes
-- **Review phase** (interval ≥ 1): soft reset - halve interval (minimum 1 day)
-  - Example: 8 days → 4 days, 3 days → 1 day
-
-### Scheduling Priority
-
-During practice, phrases are shown in this order:
-1. **Interleaved new phrases** - Every Nth phrase is a new one (configurable interval, default 4)
-2. **Overdue phrases** - Past their review date (most urgent first)
-3. **New phrases** - Never practiced before
-4. **Not yet due** - Skipped until their review date
-
-The interleaving ensures new phrases are introduced steadily, even when you have many overdue reviews.
-
-### Example Progression
-
-With all correct answers at default ease (2.5):
-
-| # | Phase | Interval | Next Review |
-|---|-------|----------|-------------|
-| 1 | Learning | 0 | 10 minutes |
-| 2 | Graduate | 1 | 1 day |
-| 3 | Review | 3 | 3 days |
-| 4 | Review | 8 | 1 week |
-| 5 | Review | 20 | 3 weeks |
-| 6 | Review | 50 | ~2 months |
-
-This means well-known phrases eventually only appear once a month or less, while difficult phrases stay in frequent rotation.
-
-### Phrase Status
-
-- **New** - Never practiced
-- **Learning** - Has been practiced but not yet mastered
-- **Learned** - Achieved 2+ correct answers in a row
+1. Go to the Materials view
+2. Create a new material with your text content
+3. The AI processes the text and extracts useful phrases
+4. Review extracted phrases and add them to your library
 
 ---
 
@@ -225,13 +114,12 @@ Configure in Settings with your API key and preferred voice.
 
 ### Speech-to-Text (Whisper)
 
-Speak your answers and have them transcribed automatically.
+Transcribe spoken input automatically.
 
 **Setup:**
 1. Go to Settings
 2. Download a Whisper model (Base recommended for balance of speed/accuracy)
 3. Wait for download to complete
-4. Speaking mode becomes available in Practice
 
 **Available Models:**
 - Tiny - Fastest, least accurate
@@ -263,34 +151,20 @@ For phrase pronunciation playback.
 
 ### Whisper Model
 
-For voice input during practice. Download once, works offline.
+For voice input. Download once, works offline.
 
 ### Language Defaults
 
 Set your default target and native languages for new conversations.
 
-### Learning Settings
-
-- **Required streak** - Correct answers needed to mark phrase as "learned"
-- **Immediate retry** - Whether to retry wrong answers immediately
-- **Default exercise mode** - Preferred practice mode (Manual/Typing/Speaking)
-- **New phrases per session** - Maximum new phrases to introduce (0 = unlimited)
-- **New phrase interval** - Introduce a new phrase every N phrases (e.g., 4 = every 4th phrase is new)
-
 ---
 
 ## Tips for Effective Learning
 
-1. **Practice daily** - Even 5-10 minutes helps. SRS works best with consistent review.
+1. **Use conversations** - Don't just add phrases manually. Conversations help you discover natural expressions.
 
-2. **Trust the algorithm** - Don't skip ahead or review phrases before they're due. The spacing is designed to maximize retention.
+2. **Review context** - When a phrase is hard to remember, use AI Assistant to understand it better or add notes.
 
-3. **Be honest** - In manual mode, grade yourself accurately. Marking wrong answers as correct hurts your learning.
+3. **Start small** - Begin with 10-20 phrases. Add more as you master the initial set.
 
-4. **Use conversations** - Don't just add phrases manually. Conversations help you discover natural expressions.
-
-5. **Review context** - When a phrase is hard to remember, use AI Assistant to understand it better or add notes.
-
-6. **Start small** - Begin with 10-20 phrases. Add more as you master the initial set.
-
-7. **Use voice** - Speaking practice improves pronunciation and builds confidence for real conversations.
+4. **Use materials** - Import articles or texts in your target language to discover new phrases in context.

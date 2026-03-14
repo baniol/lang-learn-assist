@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Tauri desktop app: React/TypeScript frontend + Rust backend. Language learning with AI conversations, phrase extraction, and SRS practice.
+Tauri desktop app: React/TypeScript frontend + Rust backend. Language learning with AI conversations, phrase management, and learning materials.
 
 ## Commands
 ```bash
@@ -30,7 +30,7 @@ npm run coverage  # Run tests with coverage report
 
 **Database changes:**
 1. Update schema in `src-tauri/src/db.rs`
-2. Add migration for existing DBs (see `phrase_progress` SRS fields example)
+2. Add migration for existing DBs
 3. Update models in `src-tauri/src/models.rs`
 
 ## Frontend Conventions
@@ -352,13 +352,13 @@ const { settings } = useSettings();
 
 **File size limits:** Split files exceeding ~300 lines into submodules
 ```
-src/commands/learning.rs (1000 lines) → src/commands/learning/
+src/commands/llm.rs (1000 lines) → src/commands/llm/
 ├── mod.rs          # Re-exports public items
-├── srs.rs          # Algorithm functions
-├── selection.rs    # Phrase selection
-├── answer.rs       # Answer validation
-├── stats.rs        # Statistics queries
-└── session.rs      # Session management
+├── client.rs       # HTTP client
+├── prompts.rs      # Prompt templates
+├── phrase.rs       # Phrase refinement
+├── translation.rs  # Translation logic
+└── material.rs     # Material processing
 ```
 
 **When to create submodules:**
@@ -495,20 +495,19 @@ let mut model = state.whisper_model.safe_lock()?;
 
 **Centralize magic numbers in `src/constants.rs`:**
 ```rust
-pub mod srs {
-    pub const DEFAULT_EASE_FACTOR: f64 = 2.5;
-    pub const MIN_EASE_FACTOR: f64 = 1.3;
+pub mod llm {
+    pub const REFINE_PHRASE_MAX_TOKENS: i64 = 1000;
+    pub const REQUEST_TIMEOUT_SECS: u64 = 60;
 }
 
-pub mod llm {
-    pub const CONVERSATION_MAX_TOKENS: i64 = 500;
-    pub const REQUEST_TIMEOUT_SECS: u64 = 60;
+pub mod tokens {
+    pub const CHARS_PER_TOKEN_GERMAN: usize = 3;
 }
 ```
 
 **Usage:**
 ```rust
-use crate::constants::srs::DEFAULT_EASE_FACTOR;
+use crate::constants::llm::REQUEST_TIMEOUT_SECS;
 ```
 
 ### Testing
@@ -547,7 +546,7 @@ fn test_with_db() {
 **What to test:**
 - Pure functions (algorithms, calculations)
 - Data transformations (row mappers, serialization)
-- Business logic (SRS scheduling, answer matching)
+- Business logic (data transformations, answer matching)
 - Import/export (data integrity)
 
 **What NOT to test:**
@@ -578,11 +577,11 @@ log_migration_result("migration_name", conn.execute("...", []));
 **DON'T: Hardcoded magic numbers**
 ```rust
 // BAD
-if ease_factor < 1.3 { ... }
+if timeout > 60 { ... }
 
 // GOOD
-use crate::constants::srs::MIN_EASE_FACTOR;
-if ease_factor < MIN_EASE_FACTOR { ... }
+use crate::constants::llm::REQUEST_TIMEOUT_SECS;
+if timeout > REQUEST_TIMEOUT_SECS { ... }
 ```
 
 **DON'T: Monolithic files**
@@ -590,9 +589,9 @@ if ease_factor < MIN_EASE_FACTOR { ... }
 // BAD - 1000+ line file with mixed concerns
 
 // GOOD - split into focused modules
-mod srs;      // Algorithm
-mod answer;   // Validation
-mod stats;    // Queries
+mod client;       // HTTP client
+mod prompts;      // Prompt templates
+mod translation;  // Translation logic
 ```
 
 ## General Development Rules
@@ -647,7 +646,6 @@ src/                    # Frontend (React/TypeScript)
 
 src-tauri/src/          # Backend (Rust)
 ├── commands/           # Tauri command handlers
-│   ├── learning/       # Split module example
 │   └── llm/            # Split module example
 ├── utils/              # Shared utilities
 ├── constants.rs        # Magic numbers
@@ -677,7 +675,6 @@ src-tauri/src/          # Backend (Rust)
 - `src-tauri/src/models.rs` - All Rust data structures
 - `src-tauri/src/constants.rs` - Centralized constants
 - `src-tauri/src/utils/` - Shared utilities (lock, db, error, regex)
-- `src-tauri/src/commands/learning/srs.rs` - SRS algorithm (SM-2 variant)
 - `src-tauri/src/commands/data_export.rs` - Import/export with tests
 
 **Frontend:**
