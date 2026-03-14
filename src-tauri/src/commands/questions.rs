@@ -4,7 +4,7 @@ use crate::models::{
 };
 use crate::state::AppState;
 use crate::utils::lock::SafeRwLock;
-use rusqlite::params;
+use rusqlite::{self, params};
 use serde::Deserialize;
 use std::time::Duration;
 use tauri::State;
@@ -110,6 +110,20 @@ pub fn delete_question_thread(id: i64) -> Result<(), String> {
         .map_err(|e| format!("Failed to delete thread: {}", e))?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn delete_all_question_threads() -> Result<i64, String> {
+    let conn = get_conn()?;
+
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM question_threads", [], |row| row.get(0))
+        .map_err(|e| format!("Failed to count question threads: {}", e))?;
+
+    conn.execute("DELETE FROM question_threads", [])
+        .map_err(|e| format!("Failed to delete question threads: {}", e))?;
+
+    Ok(count)
 }
 
 #[tauri::command]

@@ -1,6 +1,12 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { SettingsSection } from "./SettingsSection";
-import { UploadIcon, DownloadIcon } from "../icons";
+import { UploadIcon, DownloadIcon, TrashIcon } from "../icons";
+import { ConfirmDialog } from "../ui";
+import {
+  deleteAllPhrases,
+  deleteAllQuestionThreads,
+  deleteAllMaterials,
+} from "../../lib/dataExport";
 import type { ImportMode, ImportResult } from "../../types";
 
 interface DataManagementSectionProps {
@@ -27,6 +33,52 @@ export function DataManagementSection({
   onImport,
 }: DataManagementSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    "phrases" | "questions" | "materials" | null
+  >(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteResult, setDeleteResult] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const deleteLabels = {
+    phrases: "all phrases",
+    questions: "all questions",
+    materials: "all materials",
+  };
+
+  const handleDeleteAll = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteResult(null);
+    try {
+      let count: number;
+      switch (deleteTarget) {
+        case "phrases":
+          count = await deleteAllPhrases();
+          break;
+        case "questions":
+          count = await deleteAllQuestionThreads();
+          break;
+        case "materials":
+          count = await deleteAllMaterials();
+          break;
+      }
+      setDeleteResult({
+        type: "success",
+        message: `Deleted ${count} ${deleteTarget}.`,
+      });
+    } catch (err) {
+      setDeleteResult({
+        type: "error",
+        message: err instanceof Error ? err.message : "Delete failed",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -169,7 +221,64 @@ export function DataManagementSection({
           Note: API keys are included in exports. Keep your export files secure.
           Audio files are not exported (only file paths).
         </p>
+
+        {/* Delete Data */}
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+          <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Delete Data
+          </h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+            Permanently delete all items of a specific type. This cannot be
+            undone.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setDeleteTarget("phrases")}
+              className="px-3 py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1.5"
+            >
+              <TrashIcon size="sm" />
+              Delete all phrases
+            </button>
+            <button
+              onClick={() => setDeleteTarget("questions")}
+              className="px-3 py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1.5"
+            >
+              <TrashIcon size="sm" />
+              Delete all questions
+            </button>
+            <button
+              onClick={() => setDeleteTarget("materials")}
+              className="px-3 py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1.5"
+            >
+              <TrashIcon size="sm" />
+              Delete all materials
+            </button>
+          </div>
+
+          {deleteResult && (
+            <div
+              className={`mt-3 p-3 rounded-lg text-sm ${
+                deleteResult.type === "success"
+                  ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                  : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+              }`}
+            >
+              {deleteResult.message}
+            </div>
+          )}
+        </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteAll}
+        title={`Delete ${deleteTarget ? deleteLabels[deleteTarget] : ""}?`}
+        message={`This will permanently delete ${deleteTarget ? deleteLabels[deleteTarget] : ""}. This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </SettingsSection>
   );
 }

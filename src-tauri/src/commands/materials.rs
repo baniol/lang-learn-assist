@@ -244,6 +244,25 @@ pub fn delete_material(id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn delete_all_materials() -> Result<i64, String> {
+    let conn = get_conn()?;
+
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM materials", [], |row| row.get(0))
+        .map_err(|e| format!("Failed to count materials: {}", e))?;
+
+    conn.execute("DELETE FROM material_threads", [])
+        .map_err(|e| format!("Failed to delete material threads: {}", e))?;
+    // SET NULL on phrases that reference materials
+    conn.execute("UPDATE phrases SET material_id = NULL WHERE material_id IS NOT NULL", [])
+        .map_err(|e| format!("Failed to clear phrase material references: {}", e))?;
+    conn.execute("DELETE FROM materials", [])
+        .map_err(|e| format!("Failed to delete materials: {}", e))?;
+
+    Ok(count)
+}
+
+#[tauri::command]
 #[allow(non_snake_case)]
 pub fn update_material_bookmark(id: i64, bookmarkIndex: Option<i32>) -> Result<(), String> {
     let conn = get_conn()?;

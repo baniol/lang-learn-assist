@@ -306,6 +306,22 @@ pub fn delete_phrase(id: i64) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn delete_all_phrases() -> Result<i64, String> {
+    let conn = get_conn()?;
+
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM phrases", [], |row| row.get(0))
+        .map_err(|e| format!("Failed to count phrases: {}", e))?;
+
+    conn.execute("DELETE FROM phrase_threads", [])
+        .map_err(|e| format!("Failed to delete phrase threads: {}", e))?;
+    conn.execute("DELETE FROM phrases", [])
+        .map_err(|e| format!("Failed to delete phrases: {}", e))?;
+
+    Ok(count)
+}
+
 fn row_to_phrase_thread(row: &rusqlite::Row) -> Result<PhraseThread, rusqlite::Error> {
     let messages_json: String = row.get(2)?;
     let messages: Vec<PhraseThreadMessage> = serde_json::from_str(&messages_json).unwrap_or_default();

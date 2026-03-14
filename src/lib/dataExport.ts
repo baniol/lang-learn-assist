@@ -72,3 +72,15 @@ export async function findDuplicatePhrases(): Promise<RemoveDuplicatesResult> {
 export async function removeDuplicatePhrases(): Promise<RemoveDuplicatesResult> {
   return invoke<RemoveDuplicatesResult>("remove_duplicate_phrases");
 }
+
+export async function deleteAllPhrases(): Promise<number> {
+  return invoke<number>("delete_all_phrases");
+}
+
+export async function deleteAllQuestionThreads(): Promise<number> {
+  return invoke<number>("delete_all_question_threads");
+}
+
+export async function deleteAllMaterials(): Promise<number> {
+  return invoke<number>("delete_all_materials");
+}

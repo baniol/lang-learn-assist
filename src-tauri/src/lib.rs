@@ -41,6 +41,7 @@ pub fn run() {
             phrases::toggle_starred,
             phrases::update_phrase_audio,
             phrases::delete_phrase,
+            phrases::delete_all_phrases,
             // Phrase threads
             phrases::get_phrase_thread,
             phrases::create_phrase_thread,
@@ -63,6 +64,7 @@ pub fn run() {
             materials::get_material,
             materials::update_material,
             materials::delete_material,
+            materials::delete_all_materials,
             materials::update_material_bookmark,
             materials::get_material_thread,
             materials::create_material_thread,
@@ -90,6 +92,7 @@ pub fn run() {
             questions::get_question_thread,
             questions::create_question_thread,
             questions::delete_question_thread,
+            questions::delete_all_question_threads,
             questions::update_question_thread_title,
             questions::ask_grammar_question,
             // Data Export/Import
