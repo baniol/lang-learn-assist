@@ -74,7 +74,6 @@ pub struct AppSettings {
 
     // App settings
     pub fuzzy_matching: bool,
-    pub notes_enabled: bool,
 }
 
 impl AppSettings {
@@ -93,32 +92,8 @@ impl AppSettings {
             target_language: "de".to_string(),
             native_language: "pl".to_string(),
             fuzzy_matching: true,
-            notes_enabled: false,
         }
     }
-}
-
-// Notes
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Note {
-    pub id: i64,
-    pub content: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateNoteRequest {
-    pub content: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateNoteRequest {
-    pub content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -233,7 +208,8 @@ pub struct ExportData {
     pub phrases: Vec<ExportPhrase>,
     pub phrase_threads: Vec<ExportPhraseThread>,
     pub question_threads: Vec<ExportQuestionThread>,
-    pub notes: Vec<ExportNote>,
+    #[serde(default)]
+    pub notes: Vec<serde_json::Value>,
     #[serde(default)]
     pub materials: Vec<ExportMaterial>,
     #[serde(default)]
@@ -304,15 +280,6 @@ pub struct ExportQuestionThread {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportNote {
-    pub id: i64,
-    pub content: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ImportMode {
@@ -336,7 +303,6 @@ pub struct ImportStats {
     pub phrases_updated: i32,
     pub phrase_threads_imported: i32,
     pub question_threads_imported: i32,
-    pub notes_imported: i32,
     pub materials_imported: i32,
     pub material_threads_imported: i32,
 }

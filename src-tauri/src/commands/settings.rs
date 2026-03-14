@@ -43,9 +43,6 @@ fn load_settings_from_db(conn: &Connection) -> AppSettings {
             "fuzzy_matching" => {
                 settings.fuzzy_matching = value == "true";
             }
-            "notes_enabled" => {
-                settings.notes_enabled = value == "true";
-            }
             _ => {}
         }
     }
@@ -90,7 +87,6 @@ fn save_settings_to_db(conn: &Connection, settings: &AppSettings) -> Result<(), 
         ("target_language", settings.target_language.clone()),
         ("native_language", settings.native_language.clone()),
         ("fuzzy_matching", settings.fuzzy_matching.to_string()),
-        ("notes_enabled", settings.notes_enabled.to_string()),
     ];
 
     for (key, value) in pairs {

@@ -1,7 +1,7 @@
 use crate::db::get_conn;
 use crate::models::{
     ExportData, ExportMaterial,
-    ExportMaterialThread, ExportNote, ExportPhrase, ExportPhraseThread,
+    ExportMaterialThread, ExportPhrase, ExportPhraseThread,
     ExportQuestionThread, ExportSetting, ImportMode, ImportResult,
     ImportStats,
 };
@@ -118,24 +118,6 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to collect question_threads: {}", e))?;
     drop(stmt);
 
-    // Export notes
-    let mut stmt = conn
-        .prepare("SELECT id, content, created_at, updated_at FROM notes")
-        .map_err(|e| format!("Failed to prepare notes query: {}", e))?;
-    let notes = stmt
-        .query_map([], |row| {
-            Ok(ExportNote {
-                id: row.get(0)?,
-                content: row.get(1)?,
-                created_at: row.get(2)?,
-                updated_at: row.get(3)?,
-            })
-        })
-        .map_err(|e| format!("Failed to query notes: {}", e))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect notes: {}", e))?;
-    drop(stmt);
-
     // Export materials
     let mut stmt = conn
         .prepare(
@@ -197,7 +179,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         phrases,
         phrase_threads,
         question_threads,
-        notes,
+        notes: vec![],
         materials,
         material_threads,
         phrase_progress: vec![],
@@ -235,8 +217,6 @@ pub fn import_data_with_conn(
     match mode {
         ImportMode::Overwrite => {
             // Delete all existing data in reverse FK order
-            tx.execute("DELETE FROM notes", [])
-                .map_err(|e| format!("Failed to delete notes: {}", e))?;
             tx.execute("DELETE FROM question_threads", [])
                 .map_err(|e| format!("Failed to delete question_threads: {}", e))?;
             tx.execute("DELETE FROM phrase_threads", [])
@@ -351,17 +331,6 @@ pub fn import_data_with_conn(
                 )
                 .map_err(|e| format!("Failed to import question_thread: {}", e))?;
                 stats.question_threads_imported += 1;
-            }
-
-            // Import notes with original IDs
-            for note in &data.notes {
-                tx.execute(
-                    "INSERT INTO notes (id, content, created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4)",
-                    params![note.id, note.content, note.created_at, note.updated_at],
-                )
-                .map_err(|e| format!("Failed to import note: {}", e))?;
-                stats.notes_imported += 1;
             }
 
             // Import material threads with original IDs
@@ -529,27 +498,6 @@ pub fn import_data_with_conn(
                     )
                     .map_err(|e| format!("Failed to import question_thread: {}", e))?;
                     stats.question_threads_imported += 1;
-                }
-            }
-
-            // Import notes (check by created_at + content)
-            for note in &data.notes {
-                let existing: Option<i64> = tx
-                    .query_row(
-                        "SELECT id FROM notes WHERE created_at = ?1 AND content = ?2",
-                        params![note.created_at, note.content],
-                        |row| row.get(0),
-                    )
-                    .ok();
-
-                if existing.is_none() {
-                    tx.execute(
-                        "INSERT INTO notes (content, created_at, updated_at)
-                         VALUES (?1, ?2, ?3)",
-                        params![note.content, note.created_at, note.updated_at],
-                    )
-                    .map_err(|e| format!("Failed to import note: {}", e))?;
-                    stats.notes_imported += 1;
                 }
             }
 
@@ -762,12 +710,7 @@ mod tests {
             }],
             phrase_threads: vec![],
             question_threads: vec![],
-            notes: vec![ExportNote {
-                id: 1,
-                content: "Test note".to_string(),
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
-            }],
+            notes: vec![],
             materials: vec![],
             material_threads: vec![],
             phrase_progress: vec![],
@@ -800,7 +743,6 @@ mod tests {
         assert!(import_result.success);
         assert_eq!(import_result.stats.settings_imported, 1);
         assert_eq!(import_result.stats.phrases_imported, 1);
-        assert_eq!(import_result.stats.notes_imported, 1);
     }
 
     #[test]
@@ -820,7 +762,6 @@ mod tests {
         assert_eq!(exported.phrases.len(), 1);
         assert_eq!(exported.phrases[0].prompt, "Hello");
         assert_eq!(exported.phrases[0].answer, "Hallo");
-        assert_eq!(exported.notes.len(), 1);
     }
 
     #[test]
@@ -837,17 +778,12 @@ mod tests {
         data2.phrases[0].prompt = "Goodbye".to_string();
         data2.phrases[0].answer = "Tschüss".to_string();
         data2.phrases[0].created_at = "2024-01-02T00:00:00Z".to_string();
-        data2.notes[0].id = 2;
-        data2.notes[0].content = "Another note".to_string();
-        data2.notes[0].created_at = "2024-01-02T00:00:00Z".to_string();
-
         let result = import_data_with_conn(&mut conn, data2, ImportMode::Merge);
         assert!(result.is_ok());
 
         // Verify both sets of data exist
         let exported = export_data_with_conn(&conn).expect("Export failed");
         assert_eq!(exported.phrases.len(), 2);
-        assert_eq!(exported.notes.len(), 2);
     }
 
     #[test]
@@ -866,12 +802,9 @@ mod tests {
 
         // Should not create duplicates
         assert_eq!(import_result.stats.phrases_imported, 0);
-        assert_eq!(import_result.stats.notes_imported, 0);
-
         // Verify no duplicates
         let exported = export_data_with_conn(&conn).expect("Export failed");
         assert_eq!(exported.phrases.len(), 1);
-        assert_eq!(exported.notes.len(), 1);
     }
 
     #[test]

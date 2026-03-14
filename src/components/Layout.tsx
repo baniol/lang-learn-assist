@@ -5,9 +5,7 @@ import {
   BookIcon,
   ArchiveIcon,
   QuestionCircleIcon,
-  NoteIcon,
   SettingsIcon,
-  PlusIcon,
   ChevronDownIcon,
   CheckIcon,
 } from "./icons";
@@ -27,7 +25,6 @@ interface LayoutProps {
   currentView: ViewType;
   onNavigate: (view: ViewType) => void;
   children: React.ReactNode;
-  onQuickNoteOpen?: () => void;
 }
 
 interface NavItem {
@@ -42,12 +39,6 @@ const baseNavItems: NavItem[] = [
   { id: "questions", label: "Questions", icon: <QuestionCircleIcon /> },
 ];
 
-const notesNavItem: NavItem = {
-  id: "notes",
-  label: "Notes",
-  icon: <NoteIcon />,
-};
-
 const settingsNavItem: NavItem = {
   id: "settings",
   label: "Settings",
@@ -58,7 +49,6 @@ export function Layout({
   currentView,
   onNavigate,
   children,
-  onQuickNoteOpen,
 }: LayoutProps) {
   const { settings, updateSetting } = useSettings();
   const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
@@ -67,7 +57,6 @@ export function Layout({
   // Build nav items based on settings
   const navItems = [
     ...baseNavItems,
-    ...(settings?.notesEnabled ? [notesNavItem] : []),
     settingsNavItem,
   ];
 
@@ -189,15 +178,6 @@ export function Layout({
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
-          {settings?.notesEnabled && onQuickNoteOpen && (
-            <button
-              onClick={onQuickNoteOpen}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
-            >
-              <PlusIcon size="sm" />
-              <span className="text-sm font-medium">Add a note</span>
-            </button>
-          )}
           <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
             Press Space to record
           </p>

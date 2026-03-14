@@ -153,11 +153,6 @@ export function DataManagementSection({
                     imported
                   </p>
                 )}
-                {operationResult.details.stats.notesImported > 0 && (
-                  <p>
-                    Notes: {operationResult.details.stats.notesImported} imported
-                  </p>
-                )}
                 {operationResult.details.stats.questionThreadsImported > 0 && (
                   <p>
                     Question threads:{" "}

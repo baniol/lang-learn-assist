@@ -13,7 +13,6 @@ export type ViewState =
   | { type: "phrase-library" }
   | { type: "questions" }
   | { type: "settings" }
-  | { type: "notes" }
   | { type: "materials" }
   | { type: "material-create" }
   | { type: "material-review"; materialId: number };

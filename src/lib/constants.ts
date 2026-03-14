@@ -4,57 +4,6 @@
  */
 
 // ============================================================================
-// SRS (Spaced Repetition System) Constants
-// ============================================================================
-
-export const SRS = {
-  /** Default ease factor for new cards (SM-2 algorithm) */
-  DEFAULT_EASE_FACTOR: 2.5,
-
-  /** Minimum ease factor to prevent intervals from becoming too short */
-  MIN_EASE_FACTOR: 1.3,
-
-  /** Maximum ease factor to prevent intervals from becoming too long */
-  MAX_EASE_FACTOR: 3.0,
-
-  /** Correct streak required to consider a phrase "learned" */
-  LEARNED_STREAK_THRESHOLD: 2,
-
-  /** Initial interval in days for new cards after first correct answer */
-  INITIAL_INTERVAL_DAYS: 1,
-} as const;
-
-// ============================================================================
-// Learning Session Constants
-// ============================================================================
-
-export const LEARNING = {
-  /** Default required streak to master a phrase within a session */
-  DEFAULT_REQUIRED_STREAK: 2,
-
-  /** Default failure repetitions required in speaking mode */
-  DEFAULT_FAILURE_REPETITIONS: 2,
-
-  /** Default number of new phrases to introduce per session */
-  DEFAULT_NEW_PHRASES_PER_SESSION: 5,
-
-  /** Default session phrase limit (0 = unlimited) */
-  DEFAULT_SESSION_PHRASE_LIMIT: 20,
-
-  /** Minimum streak value */
-  MIN_REQUIRED_STREAK: 1,
-
-  /** Maximum streak value */
-  MAX_REQUIRED_STREAK: 10,
-
-  /** Minimum failure repetitions */
-  MIN_FAILURE_REPETITIONS: 1,
-
-  /** Maximum failure repetitions */
-  MAX_FAILURE_REPETITIONS: 5,
-} as const;
-
-// ============================================================================
 // UI Constants
 // ============================================================================
 
@@ -147,9 +96,6 @@ export const VALIDATION = {
 
   /** Maximum length for conversation title */
   MAX_CONVERSATION_TITLE_LENGTH: 200,
-
-  /** Maximum length for note content */
-  MAX_NOTE_LENGTH: 10000,
 
   /** Minimum length for search query */
   MIN_SEARCH_LENGTH: 1,

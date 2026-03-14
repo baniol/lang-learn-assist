@@ -70,16 +70,6 @@ describe("useNavigation", () => {
         expect(result.current.viewState).toEqual({ type: "settings" });
       });
 
-      it("should navigate to notes", () => {
-        const { result } = renderHook(() => useNavigation());
-
-        act(() => {
-          result.current.navigate("notes");
-        });
-
-        expect(result.current.viewState).toEqual({ type: "notes" });
-      });
-
       it("should navigate to materials", () => {
         const { result } = renderHook(() => useNavigation());
 
@@ -145,7 +135,6 @@ describe("useNavigation", () => {
         "phrase-library",
         "questions",
         "settings",
-        "notes",
         "materials",
       ] as const;
 

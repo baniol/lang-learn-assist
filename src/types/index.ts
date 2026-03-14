@@ -56,7 +56,6 @@ export interface AppSettings {
   targetLanguage: string;
   nativeLanguage: string;
   fuzzyMatching: boolean;
-  notesEnabled: boolean;
 }
 
 export interface WhisperModel {
@@ -205,23 +204,6 @@ export interface GrammarQuestionResponse {
   examples: QuestionExample[];
 }
 
-// Notes
-
-export interface Note {
-  id: number;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateNoteRequest {
-  content: string;
-}
-
-export interface UpdateNoteRequest {
-  content: string;
-}
-
 // Export/Import types
 
 export interface ExportData {
@@ -231,7 +213,6 @@ export interface ExportData {
   phrases: ExportPhrase[];
   phraseThreads: ExportPhraseThread[];
   questionThreads: ExportQuestionThread[];
-  notes: ExportNote[];
   materials: ExportMaterial[];
   materialThreads: ExportMaterialThread[];
 }
@@ -278,13 +259,6 @@ export interface ExportQuestionThread {
   updatedAt: string;
 }
 
-export interface ExportNote {
-  id: number;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export type ImportMode = "merge" | "overwrite";
 
 export interface ImportResult {
@@ -299,7 +273,6 @@ export interface ImportStats {
   phrasesUpdated: number;
   phraseThreadsImported: number;
   questionThreadsImported: number;
-  notesImported: number;
   materialsImported: number;
   materialThreadsImported: number;
 }

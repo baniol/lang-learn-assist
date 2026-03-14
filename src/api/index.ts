@@ -15,7 +15,6 @@ export * as settingsApi from "./settings";
 // Re-export from lib (these already exist as wrappers)
 export * as audioApi from "../lib/audio";
 export * as ttsApi from "../lib/tts";
-export * as notesApi from "../lib/notes";
 export * as questionsApi from "../lib/questions";
 export * as materialsApi from "../lib/materials";
 export * as dataExportApi from "../lib/dataExport";

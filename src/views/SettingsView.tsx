@@ -17,7 +17,6 @@ import {
   WhisperSettingsSection,
   TtsSettingsSection,
   LanguageSettingsSection,
-  NotesSettingsSection,
   DataManagementSection,
 } from "../components/settings";
 import type {
@@ -342,11 +341,6 @@ export function SettingsView() {
           nativeLanguage={settings.nativeLanguage}
           onTargetLanguageChange={(l) => updateSetting("targetLanguage", l)}
           onNativeLanguageChange={(l) => updateSetting("nativeLanguage", l)}
-        />
-
-        <NotesSettingsSection
-          notesEnabled={settings.notesEnabled}
-          onNotesEnabledChange={(v) => updateSetting("notesEnabled", v)}
         />
 
         <DataManagementSection

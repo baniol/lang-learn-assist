@@ -148,17 +148,6 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Notes table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS notes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            content TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )",
-        [],
-    )?;
-
     // Materials table (for YouTube transcripts, articles, etc.)
     conn.execute(
         "CREATE TABLE IF NOT EXISTS materials (
@@ -342,6 +331,10 @@ pub fn init_db(conn: &Connection) -> Result<()> {
     log_migration_result(
         "drop phrase_progress table",
         conn.execute("DROP TABLE IF EXISTS phrase_progress", []),
+    );
+    log_migration_result(
+        "drop notes table",
+        conn.execute("DROP TABLE IF EXISTS notes", []),
     );
     let _ = conn.execute("PRAGMA foreign_keys = ON", []);
 
