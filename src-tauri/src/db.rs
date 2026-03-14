@@ -134,20 +134,6 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Question threads table for grammar/style Q&A
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS question_threads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            target_language TEXT NOT NULL DEFAULT 'de',
-            native_language TEXT NOT NULL DEFAULT 'pl',
-            messages_json TEXT NOT NULL DEFAULT '[]',
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )",
-        [],
-    )?;
-
     // Materials table (for YouTube transcripts, articles, etc.)
     conn.execute(
         "CREATE TABLE IF NOT EXISTS materials (
@@ -335,6 +321,10 @@ pub fn init_db(conn: &Connection) -> Result<()> {
     log_migration_result(
         "drop notes table",
         conn.execute("DROP TABLE IF EXISTS notes", []),
+    );
+    log_migration_result(
+        "drop question_threads table",
+        conn.execute("DROP TABLE IF EXISTS question_threads", []),
     );
     let _ = conn.execute("PRAGMA foreign_keys = ON", []);
 

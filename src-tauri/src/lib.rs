@@ -5,7 +5,7 @@ mod models;
 mod state;
 mod utils;
 
-use commands::{audio, data_export, llm, materials, phrases, questions, settings, tts};
+use commands::{audio, data_export, llm, materials, phrases, settings, tts};
 use db::{get_db_path, init_db};
 use rusqlite::Connection;
 use state::AppState;
@@ -87,14 +87,6 @@ pub fn run() {
             tts::get_audio_base64,
             tts::test_tts_connection,
             tts::get_voice_for_language,
-            // Questions
-            questions::get_question_threads,
-            questions::get_question_thread,
-            questions::create_question_thread,
-            questions::delete_question_thread,
-            questions::delete_all_question_threads,
-            questions::update_question_thread_title,
-            questions::ask_grammar_question,
             // Data Export/Import
             data_export::export_data,
             data_export::import_data,

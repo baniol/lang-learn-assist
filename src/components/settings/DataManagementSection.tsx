@@ -4,7 +4,6 @@ import { UploadIcon, DownloadIcon, TrashIcon } from "../icons";
 import { ConfirmDialog } from "../ui";
 import {
   deleteAllPhrases,
-  deleteAllQuestionThreads,
   deleteAllMaterials,
 } from "../../lib/dataExport";
 import type { ImportMode, ImportResult } from "../../types";
@@ -34,7 +33,7 @@ export function DataManagementSection({
 }: DataManagementSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<
-    "phrases" | "questions" | "materials" | null
+    "phrases" | "materials" | null
   >(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteResult, setDeleteResult] = useState<{
@@ -44,7 +43,6 @@ export function DataManagementSection({
 
   const deleteLabels = {
     phrases: "all phrases",
-    questions: "all questions",
     materials: "all materials",
   };
 
@@ -57,9 +55,6 @@ export function DataManagementSection({
       switch (deleteTarget) {
         case "phrases":
           count = await deleteAllPhrases();
-          break;
-        case "questions":
-          count = await deleteAllQuestionThreads();
           break;
         case "materials":
           count = await deleteAllMaterials();
@@ -205,13 +200,6 @@ export function DataManagementSection({
                     imported
                   </p>
                 )}
-                {operationResult.details.stats.questionThreadsImported > 0 && (
-                  <p>
-                    Question threads:{" "}
-                    {operationResult.details.stats.questionThreadsImported}{" "}
-                    imported
-                  </p>
-                )}
               </div>
             )}
           </div>
@@ -238,13 +226,6 @@ export function DataManagementSection({
             >
               <TrashIcon size="sm" />
               Delete all phrases
-            </button>
-            <button
-              onClick={() => setDeleteTarget("questions")}
-              className="px-3 py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1.5"
-            >
-              <TrashIcon size="sm" />
-              Delete all questions
             </button>
             <button
               onClick={() => setDeleteTarget("materials")}

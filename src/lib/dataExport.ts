@@ -77,10 +77,6 @@ export async function deleteAllPhrases(): Promise<number> {
   return invoke<number>("delete_all_phrases");
 }
 
-export async function deleteAllQuestionThreads(): Promise<number> {
-  return invoke<number>("delete_all_question_threads");
-}
-
 export async function deleteAllMaterials(): Promise<number> {
   return invoke<number>("delete_all_materials");
 }

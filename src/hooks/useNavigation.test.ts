@@ -14,11 +14,11 @@ describe("useNavigation", () => {
 
     it("should accept custom initial view", () => {
       const { result } = renderHook(() =>
-        useNavigation({ type: "questions" })
+        useNavigation({ type: "settings" })
       );
 
-      expect(result.current.viewState).toEqual({ type: "questions" });
-      expect(result.current.currentView).toBe("questions");
+      expect(result.current.viewState).toEqual({ type: "settings" });
+      expect(result.current.currentView).toBe("settings");
     });
 
     it("should accept initial view with data", () => {
@@ -39,7 +39,7 @@ describe("useNavigation", () => {
     describe("views without data", () => {
       it("should navigate to phrase-library", () => {
         const { result } = renderHook(() =>
-          useNavigation({ type: "questions" })
+          useNavigation({ type: "settings" })
         );
 
         act(() => {
@@ -48,16 +48,6 @@ describe("useNavigation", () => {
 
         expect(result.current.viewState).toEqual({ type: "phrase-library" });
         expect(result.current.currentView).toBe("phrase-library");
-      });
-
-      it("should navigate to questions", () => {
-        const { result } = renderHook(() => useNavigation());
-
-        act(() => {
-          result.current.navigate("questions");
-        });
-
-        expect(result.current.viewState).toEqual({ type: "questions" });
       });
 
       it("should navigate to settings", () => {
@@ -133,7 +123,6 @@ describe("useNavigation", () => {
 
       const topLevelViews = [
         "phrase-library",
-        "questions",
         "settings",
         "materials",
       ] as const;
@@ -150,11 +139,6 @@ describe("useNavigation", () => {
   describe("navigation history", () => {
     it("should update state on each navigation", () => {
       const { result } = renderHook(() => useNavigation());
-
-      act(() => {
-        result.current.navigate("questions");
-      });
-      expect(result.current.currentView).toBe("questions");
 
       act(() => {
         result.current.navigate("material-review", { materialId: 1 });

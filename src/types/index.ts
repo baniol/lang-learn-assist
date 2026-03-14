@@ -174,36 +174,6 @@ export const NATIVE_LANGUAGE_OPTIONS = [
   { code: "pt", name: "Portuguese" },
 ];
 
-// Question threads for grammar/style Q&A
-
-export interface QuestionThread {
-  id: number;
-  title: string;
-  targetLanguage: string;
-  nativeLanguage: string;
-  messages: QuestionMessage[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface QuestionMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  examples?: QuestionExample[];
-}
-
-export interface QuestionExample {
-  sentence: string;
-  translation: string;
-  notes?: string;
-}
-
-export interface GrammarQuestionResponse {
-  explanation: string;
-  examples: QuestionExample[];
-}
-
 // Export/Import types
 
 export interface ExportData {
@@ -212,7 +182,6 @@ export interface ExportData {
   settings: ExportSetting[];
   phrases: ExportPhrase[];
   phraseThreads: ExportPhraseThread[];
-  questionThreads: ExportQuestionThread[];
   materials: ExportMaterial[];
   materialThreads: ExportMaterialThread[];
 }
@@ -249,16 +218,6 @@ export interface ExportPhraseThread {
   updatedAt: string;
 }
 
-export interface ExportQuestionThread {
-  id: number;
-  title: string;
-  targetLanguage: string;
-  nativeLanguage: string;
-  messagesJson: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export type ImportMode = "merge" | "overwrite";
 
 export interface ImportResult {
@@ -272,7 +231,6 @@ export interface ImportStats {
   phrasesImported: number;
   phrasesUpdated: number;
   phraseThreadsImported: number;
-  questionThreadsImported: number;
   materialsImported: number;
   materialThreadsImported: number;
 }

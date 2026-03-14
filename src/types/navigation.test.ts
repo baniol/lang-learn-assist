@@ -16,11 +16,6 @@ describe("createViewState", () => {
       expect(state).toEqual({ type: "phrase-library" });
     });
 
-    it("should create questions view state", () => {
-      const state = createViewState("questions");
-      expect(state).toEqual({ type: "questions" });
-    });
-
     it("should create settings view state", () => {
       const state = createViewState("settings");
       expect(state).toEqual({ type: "settings" });
@@ -74,7 +69,6 @@ describe("viewRequiresData", () => {
 
   it("should return false for views without data", () => {
     expect(viewRequiresData("phrase-library")).toBe(false);
-    expect(viewRequiresData("questions")).toBe(false);
     expect(viewRequiresData("settings")).toBe(false);
     expect(viewRequiresData("materials")).toBe(false);
     expect(viewRequiresData("material-create")).toBe(false);
@@ -92,7 +86,6 @@ describe("getParentView", () => {
 
   it("should return null for top-level views", () => {
     expect(getParentView("phrase-library")).toBe(null);
-    expect(getParentView("questions")).toBe(null);
     expect(getParentView("settings")).toBe(null);
     expect(getParentView("materials")).toBe(null);
   });
@@ -124,7 +117,6 @@ describe("getActiveNavItem", () => {
 
   it("should return the view itself for top-level views", () => {
     expect(getActiveNavItem("phrase-library")).toBe("phrase-library");
-    expect(getActiveNavItem("questions")).toBe("questions");
     expect(getActiveNavItem("settings")).toBe("settings");
     expect(getActiveNavItem("materials")).toBe("materials");
   });

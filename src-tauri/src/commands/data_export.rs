@@ -2,7 +2,7 @@ use crate::db::get_conn;
 use crate::models::{
     ExportData, ExportMaterial,
     ExportMaterialThread, ExportPhrase, ExportPhraseThread,
-    ExportQuestionThread, ExportSetting, ImportMode, ImportResult,
+    ExportSetting, ImportMode, ImportResult,
     ImportStats,
 };
 use rusqlite::{params, Connection};
@@ -93,31 +93,6 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to collect phrase_threads: {}", e))?;
     drop(stmt);
 
-    // Export question threads
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, title, target_language, native_language, messages_json,
-                    created_at, updated_at
-             FROM question_threads",
-        )
-        .map_err(|e| format!("Failed to prepare question_threads query: {}", e))?;
-    let question_threads = stmt
-        .query_map([], |row| {
-            Ok(ExportQuestionThread {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                target_language: row.get(2)?,
-                native_language: row.get(3)?,
-                messages_json: row.get(4)?,
-                created_at: row.get(5)?,
-                updated_at: row.get(6)?,
-            })
-        })
-        .map_err(|e| format!("Failed to query question_threads: {}", e))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Failed to collect question_threads: {}", e))?;
-    drop(stmt);
-
     // Export materials
     let mut stmt = conn
         .prepare(
@@ -178,7 +153,7 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         settings,
         phrases,
         phrase_threads,
-        question_threads,
+        question_threads: vec![],
         notes: vec![],
         materials,
         material_threads,
@@ -217,8 +192,6 @@ pub fn import_data_with_conn(
     match mode {
         ImportMode::Overwrite => {
             // Delete all existing data in reverse FK order
-            tx.execute("DELETE FROM question_threads", [])
-                .map_err(|e| format!("Failed to delete question_threads: {}", e))?;
             tx.execute("DELETE FROM phrase_threads", [])
                 .map_err(|e| format!("Failed to delete phrase_threads: {}", e))?;
             tx.execute("DELETE FROM material_threads", [])
@@ -311,26 +284,6 @@ pub fn import_data_with_conn(
                 )
                 .map_err(|e| format!("Failed to import phrase_thread: {}", e))?;
                 stats.phrase_threads_imported += 1;
-            }
-
-            // Import question threads with original IDs
-            for thread in &data.question_threads {
-                tx.execute(
-                    "INSERT INTO question_threads (id, title, target_language, native_language,
-                                                  messages_json, created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                    params![
-                        thread.id,
-                        thread.title,
-                        thread.target_language,
-                        thread.native_language,
-                        thread.messages_json,
-                        thread.created_at,
-                        thread.updated_at
-                    ],
-                )
-                .map_err(|e| format!("Failed to import question_thread: {}", e))?;
-                stats.question_threads_imported += 1;
             }
 
             // Import material threads with original IDs
@@ -469,35 +422,6 @@ pub fn import_data_with_conn(
                     )
                     .map_err(|e| format!("Failed to import phrase_thread: {}", e))?;
                     stats.phrase_threads_imported += 1;
-                }
-            }
-
-            // Import question threads (check by created_at + title)
-            for thread in &data.question_threads {
-                let existing: Option<i64> = tx
-                    .query_row(
-                        "SELECT id FROM question_threads WHERE created_at = ?1 AND title = ?2",
-                        params![thread.created_at, thread.title],
-                        |row| row.get(0),
-                    )
-                    .ok();
-
-                if existing.is_none() {
-                    tx.execute(
-                        "INSERT INTO question_threads (title, target_language, native_language,
-                                                      messages_json, created_at, updated_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                        params![
-                            thread.title,
-                            thread.target_language,
-                            thread.native_language,
-                            thread.messages_json,
-                            thread.created_at,
-                            thread.updated_at
-                        ],
-                    )
-                    .map_err(|e| format!("Failed to import question_thread: {}", e))?;
-                    stats.question_threads_imported += 1;
                 }
             }
 

@@ -3,7 +3,6 @@ import { ToastProvider } from "./contexts/ToastContext";
 import { ErrorBoundary } from "./components/shared";
 import { Layout } from "./components/Layout";
 import { PhraseLibraryView } from "./views/PhraseLibraryView";
-import { QuestionsView } from "./views/QuestionsView";
 import { SettingsView } from "./views/SettingsView";
 import { MaterialsView } from "./views/MaterialsView";
 import { MaterialCreateView } from "./views/MaterialCreateView";
@@ -57,8 +56,6 @@ function AppContent() {
     switch (currentView) {
       case "phrase-library":
         return <PhraseLibraryView />;
-      case "questions":
-        return <QuestionsView />;
       case "settings":
         return <SettingsView />;
       case "materials":

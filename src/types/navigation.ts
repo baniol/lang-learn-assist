@@ -11,7 +11,6 @@
  */
 export type ViewState =
   | { type: "phrase-library" }
-  | { type: "questions" }
   | { type: "settings" }
   | { type: "materials" }
   | { type: "material-create" }

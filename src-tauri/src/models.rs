@@ -159,44 +159,6 @@ pub struct RefinePhraseSuggestion {
     pub explanation: String,
 }
 
-// Question threads for grammar/style Q&A
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QuestionThread {
-    pub id: i64,
-    pub title: String,
-    pub target_language: String,
-    pub native_language: String,
-    pub messages: Vec<QuestionMessage>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QuestionMessage {
-    pub id: String,
-    pub role: String,
-    pub content: String,
-    pub examples: Option<Vec<QuestionExample>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QuestionExample {
-    pub sentence: String,
-    pub translation: String,
-    pub notes: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GrammarQuestionResponse {
-    pub explanation: String,
-    pub examples: Vec<QuestionExample>,
-}
-
 // Export/Import types
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,7 +169,8 @@ pub struct ExportData {
     pub settings: Vec<ExportSetting>,
     pub phrases: Vec<ExportPhrase>,
     pub phrase_threads: Vec<ExportPhraseThread>,
-    pub question_threads: Vec<ExportQuestionThread>,
+    #[serde(default)]
+    pub question_threads: Vec<serde_json::Value>,
     #[serde(default)]
     pub notes: Vec<serde_json::Value>,
     #[serde(default)]
@@ -268,18 +231,6 @@ pub struct ExportPhraseThread {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportQuestionThread {
-    pub id: i64,
-    pub title: String,
-    pub target_language: String,
-    pub native_language: String,
-    pub messages_json: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ImportMode {
@@ -302,7 +253,6 @@ pub struct ImportStats {
     pub phrases_imported: i32,
     pub phrases_updated: i32,
     pub phrase_threads_imported: i32,
-    pub question_threads_imported: i32,
     pub materials_imported: i32,
     pub material_threads_imported: i32,
 }

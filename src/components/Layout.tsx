@@ -4,7 +4,6 @@ import { cn } from "../lib/utils";
 import {
   BookIcon,
   ArchiveIcon,
-  QuestionCircleIcon,
   SettingsIcon,
   ChevronDownIcon,
   CheckIcon,
@@ -36,7 +35,6 @@ interface NavItem {
 const baseNavItems: NavItem[] = [
   { id: "phrase-library", label: "Phrases", icon: <BookIcon /> },
   { id: "materials", label: "Materials", icon: <ArchiveIcon /> },
-  { id: "questions", label: "Questions", icon: <QuestionCircleIcon /> },
 ];
 
 const settingsNavItem: NavItem = {

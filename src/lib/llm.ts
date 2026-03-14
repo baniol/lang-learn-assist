@@ -6,7 +6,7 @@ export async function testLlmConnection(): Promise<string> {
 
 export async function generateTitle(
   content: string,
-  contentType: "conversation" | "question",
+  contentType: "conversation",
   nativeLanguage?: string
 ): Promise<string> {
   return invoke<string>("generate_title", {
