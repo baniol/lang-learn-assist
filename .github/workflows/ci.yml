@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: NPM Security Audit
+        run: npm audit --audit-level=high
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Cargo Security Audit
+        run: cargo audit
+        working-directory: src-tauri
+
+  lint-frontend:
+    name: Lint Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check Prettier formatting
+        run: npm run format:check
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+  lint-backend:
+    name: Lint Backend
+    # whisper-rs uses Metal (macOS GPU framework) — must run on macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Check formatting
+        run: cargo fmt --check
+        working-directory: src-tauri
+
+      - name: Run Clippy
+        run: cargo clippy -- -D warnings
+        working-directory: src-tauri
+
+  test-backend:
+    name: Test Backend
+    # whisper-rs uses Metal (macOS GPU framework) — must run on macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Run tests
+        run: cargo test
+        working-directory: src-tauri
+
+  build:
+    name: Build Check
+    runs-on: macos-latest
+    needs: [security-audit, lint-frontend, test-frontend, lint-backend, test-backend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Check Rust build
+        run: cargo check
+        working-directory: src-tauri
