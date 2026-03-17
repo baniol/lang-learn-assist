@@ -30,6 +30,15 @@ pub mod llm {
     pub const REQUEST_TIMEOUT_SECS: u64 = 60;
 }
 
+/// Practice session settings
+pub mod practice {
+    /// Maximum tokens of material context to include in practice prompts
+    pub const MATERIAL_CONTEXT_MAX_TOKENS: usize = 3000;
+
+    /// Maximum tokens for practice LLM responses
+    pub const PRACTICE_RESPONSE_MAX_TOKENS: i64 = 1500;
+}
+
 /// Token estimation constants
 pub mod tokens {
     /// Approximate characters per token for German text (conservative)

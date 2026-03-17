@@ -7,9 +7,10 @@ import { SettingsView } from "./views/SettingsView";
 import { MaterialsView } from "./views/MaterialsView";
 import { MaterialCreateView } from "./views/MaterialCreateView";
 import { MaterialReviewView } from "./views/MaterialReviewView";
+import { MaterialPracticeView } from "./views/MaterialPracticeView";
 import { PageSpinner } from "./components/ui";
 import { useNavigation } from "./hooks";
-import { isMaterialReviewView } from "./types/navigation";
+import { isMaterialReviewView, isMaterialPracticeView } from "./types/navigation";
 
 /**
  * Main application content.
@@ -43,6 +44,15 @@ function AppContent() {
 
   const renderView = () => {
     // Type-safe view rendering using discriminated unions
+    if (isMaterialPracticeView(viewState)) {
+      return (
+        <MaterialPracticeView
+          materialId={viewState.materialId}
+          onNavigate={legacyNavigate}
+        />
+      );
+    }
+
     if (isMaterialReviewView(viewState)) {
       return (
         <MaterialReviewView

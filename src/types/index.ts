@@ -10,6 +10,7 @@ export type {
 export {
   createViewState,
   isMaterialReviewView,
+  isMaterialPracticeView,
   viewRequiresData,
   getParentView,
   isSubViewOf,
@@ -333,6 +334,32 @@ export interface MaterialThreadMessage {
 export interface AskAboutSentenceResponse {
   explanation: string;
   phrases: SuggestedPhrase[];
+}
+
+// Practice sessions
+
+export type PracticeMode = "free" | "exercise";
+
+export interface PracticeSession {
+  id: number;
+  materialId: number;
+  mode: PracticeMode;
+  messages: PracticeMessage[];
+  suggestedPhrases: SuggestedPhrase[] | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PracticeMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface PracticeResponse {
+  reply: string;
+  phrases: SuggestedPhrase[];
+  feedback: "correct" | "incorrect" | "partial" | null;
 }
 
 export interface TokenEstimate {

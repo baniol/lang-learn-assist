@@ -310,10 +310,26 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         "drop decks table",
         conn.execute("DROP TABLE IF EXISTS decks", []),
     );
-    log_migration_result(
-        "drop practice_sessions table",
-        conn.execute("DROP TABLE IF EXISTS practice_sessions", []),
-    );
+    // Note: old practice_sessions table was from a different schema — drop it, then recreate with new schema below
+
+    // Practice sessions table (for conversational practice with materials)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS practice_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            material_id INTEGER NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+            mode TEXT NOT NULL DEFAULT 'free',
+            messages_json TEXT NOT NULL DEFAULT '[]',
+            suggested_phrases_json TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_practice_sessions_material ON practice_sessions(material_id)",
+        [],
+    )?;
     log_migration_result(
         "drop phrase_progress table",
         conn.execute("DROP TABLE IF EXISTS phrase_progress", []),

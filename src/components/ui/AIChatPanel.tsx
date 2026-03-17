@@ -21,6 +21,8 @@ export interface AIChatPanelProps {
   variant?: "blue" | "purple" | "amber";
   /** Custom content to render after each assistant message */
   renderMessageExtra?: (message: ChatMessage, index: number) => React.ReactNode;
+  /** Extra content rendered before the text input (e.g., voice button) */
+  renderInputExtra?: () => React.ReactNode;
   /** Use textarea instead of input */
   multiline?: boolean;
   className?: string;
@@ -49,6 +51,7 @@ export function AIChatPanel({
   placeholder = "Type a message...",
   variant = "blue",
   renderMessageExtra,
+  renderInputExtra,
   multiline = false,
   className,
   messagesClassName,
@@ -122,7 +125,8 @@ export function AIChatPanel({
 
       {/* Input area */}
       <div className="p-4 border-t border-slate-200 dark:border-slate-700">
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-end">
+          {renderInputExtra?.()}
           {multiline ? (
             <textarea
               value={inputValue}

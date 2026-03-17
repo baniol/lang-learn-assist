@@ -14,7 +14,8 @@ export type ViewState =
   | { type: "settings" }
   | { type: "materials" }
   | { type: "material-create" }
-  | { type: "material-review"; materialId: number };
+  | { type: "material-review"; materialId: number }
+  | { type: "material-practice"; materialId: number };
 
 /**
  * Extract the view type string from ViewState.
@@ -85,10 +86,19 @@ export function isMaterialReviewView(
 }
 
 /**
+ * Check if the current view is the material practice view.
+ */
+export function isMaterialPracticeView(
+  state: ViewState
+): state is { type: "material-practice"; materialId: number } {
+  return state.type === "material-practice";
+}
+
+/**
  * Check if a view requires data.
  */
 export function viewRequiresData(view: ViewType): view is ViewWithData {
-  return view === "material-review";
+  return view === "material-review" || view === "material-practice";
 }
 
 // ============================================================================
@@ -102,6 +112,7 @@ export function getParentView(view: ViewType): ViewType | null {
   switch (view) {
     case "material-create":
     case "material-review":
+    case "material-practice":
       return "materials";
     default:
       return null;
@@ -122,6 +133,7 @@ export function getActiveNavItem(view: ViewType): ViewType {
   switch (view) {
     case "material-create":
     case "material-review":
+    case "material-practice":
       return "materials";
     default:
       return view;

@@ -5,7 +5,7 @@ mod models;
 mod state;
 mod utils;
 
-use commands::{audio, data_export, llm, materials, phrases, settings, tts};
+use commands::{audio, data_export, llm, materials, phrases, practice, settings, tts};
 use db::{get_db_path, init_db};
 use rusqlite::Connection;
 use state::AppState;
@@ -71,6 +71,12 @@ pub fn run() {
             materials::update_material_thread,
             materials::delete_material_thread,
             materials::get_material_thread_indices,
+            // Practice
+            practice::get_practice_sessions,
+            practice::create_practice_session,
+            practice::update_practice_session,
+            practice::delete_practice_session,
+            practice::practice_send_message,
             // Audio
             audio::get_available_models,
             audio::get_model_status,

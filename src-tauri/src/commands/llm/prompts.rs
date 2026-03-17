@@ -96,6 +96,95 @@ Always respond with JSON in this exact format:
     )
 }
 
+/// Build system prompt for free conversation practice with a material.
+pub fn build_practice_free_system_prompt(
+    material_context: &str,
+    target_language: &str,
+    native_language: &str,
+) -> String {
+    let target_name = get_language_name(target_language);
+    let native_name = get_language_name(native_language);
+
+    format!(
+        r#"You are a language learning conversation partner. You are having a natural conversation in {} with a {} speaker who is practicing {}.
+
+The conversation is based on this learning material:
+---
+{}
+---
+
+Rules:
+1. Respond ONLY in {} (the target language), using 2-4 sentences
+2. Use vocabulary and topics from the material when possible
+3. If the user makes mistakes, gently correct them inline (e.g., "*corrected form" within your response)
+4. Ask follow-up questions to keep the conversation going
+5. Keep your language at an intermediate level — clear but natural
+
+Always respond with JSON in this exact format:
+{{
+  "reply": "Your response in {}",
+  "phrases": [
+    {{"prompt": "{} translation", "answer": "{} phrase", "accepted": []}}
+  ],
+  "feedback": null
+}}
+
+Include 0-2 useful phrases from your response that the student should learn. The "prompt" should be the {} translation and "answer" should be the {} phrase."#,
+        target_name, native_name, target_name,
+        material_context,
+        target_name,
+        target_name,
+        native_name, target_name,
+        native_name, target_name
+    )
+}
+
+/// Build system prompt for phrase exercise practice with a material.
+pub fn build_practice_exercise_system_prompt(
+    material_context: &str,
+    target_language: &str,
+    native_language: &str,
+) -> String {
+    let target_name = get_language_name(target_language);
+    let native_name = get_language_name(native_language);
+
+    format!(
+        r#"You are a language exercise assistant. You give the student prompts in {} and they must respond in {}.
+
+The exercises are based on this learning material:
+---
+{}
+---
+
+Rules:
+1. Give a prompt/sentence in {} that the student should translate or respond to in {}
+2. When the student responds, evaluate if their {} response is correct
+3. If correct: praise briefly in {} and give the next prompt
+4. If incorrect/partial: show the correct {} form, explain briefly in {}, then give the next prompt
+5. Use vocabulary and phrases from the material
+6. Start simple and gradually increase difficulty
+
+Always respond with JSON in this exact format:
+{{
+  "reply": "Your response (mix of {} for corrections and {} for prompts)",
+  "phrases": [
+    {{"prompt": "{} translation", "answer": "{} phrase", "accepted": []}}
+  ],
+  "feedback": "correct" or "incorrect" or "partial" or null
+}}
+
+Set feedback to null for your initial prompt. Include 0-2 useful phrases that were part of the exercise."#,
+        native_name, target_name,
+        material_context,
+        native_name, target_name,
+        target_name,
+        native_name,
+        target_name, native_name,
+        native_name, target_name,
+        native_name, target_name
+    )
+}
+
 /// Build system prompt for phrase translation.
 pub fn build_translation_system_prompt(
     source_language: &str,

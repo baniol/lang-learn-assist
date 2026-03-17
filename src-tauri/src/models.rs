@@ -361,6 +361,36 @@ pub struct AskAboutSentenceResponse {
     pub phrases: Vec<SuggestedPhrase>,
 }
 
+// Practice sessions (conversational practice with materials)
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PracticeSession {
+    pub id: i64,
+    pub material_id: i64,
+    pub mode: String,
+    pub messages: Vec<PracticeMessage>,
+    pub suggested_phrases: Option<Vec<SuggestedPhrase>>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PracticeMessage {
+    pub id: String,
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PracticeResponse {
+    pub reply: String,
+    pub phrases: Vec<SuggestedPhrase>,
+    pub feedback: Option<String>,
+}
+
 /// Translation preview for phrase translation feature
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
