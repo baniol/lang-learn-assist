@@ -1,4 +1,5 @@
 import { LANGUAGE_OPTIONS } from "../../types";
+import { TagDropdown } from "./TagDropdown";
 
 export type FilterStatus = "all" | "new" | "learning" | "learned";
 export type LanguageFilter = "all" | "current" | string;
@@ -11,6 +12,8 @@ interface PhraseFiltersProps {
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
   currentLanguage?: string;
+  selectedTagId: number | null;
+  onTagSelect: (tagId: number | null) => void;
 }
 
 export function PhraseFilters({
@@ -19,9 +22,14 @@ export function PhraseFilters({
   searchQuery,
   onSearchQueryChange,
   currentLanguage,
+  selectedTagId,
+  onTagSelect,
 }: PhraseFiltersProps) {
   return (
     <div className="flex flex-wrap items-center gap-4 mb-6">
+      {/* Tag filter */}
+      <TagDropdown selectedTagId={selectedTagId} onTagSelect={onTagSelect} />
+
       {/* Language filter */}
       <div className="flex items-center gap-1">
         <select

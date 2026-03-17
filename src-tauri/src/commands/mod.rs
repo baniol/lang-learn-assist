@@ -5,4 +5,5 @@ pub mod materials;
 pub mod phrases;
 pub mod practice;
 pub mod settings;
+pub mod tags;
 pub mod tts;

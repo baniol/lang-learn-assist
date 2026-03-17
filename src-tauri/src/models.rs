@@ -391,6 +391,15 @@ pub struct PracticeResponse {
     pub feedback: Option<String>,
 }
 
+/// Tag for grouping phrases
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Tag {
+    pub id: i64,
+    pub name: String,
+    pub created_at: String,
+}
+
 /// Translation preview for phrase translation feature
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

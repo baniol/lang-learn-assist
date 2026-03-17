@@ -366,5 +366,29 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         conn.execute("DROP INDEX IF EXISTS idx_phrase_progress_srs_pool", []),
     );
 
+    // Tags table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+
+    // Junction table for phrase-tag many-to-many
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS phrase_tags (
+            phrase_id INTEGER NOT NULL REFERENCES phrases(id) ON DELETE CASCADE,
+            tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY (phrase_id, tag_id)
+        )",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_phrase_tags_tag ON phrase_tags(tag_id)",
+        [],
+    )?;
+
     Ok(())
 }

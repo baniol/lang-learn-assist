@@ -8,12 +8,11 @@ import {
   PhraseFilters,
   PhraseListItem,
   AddPhraseDialog,
-  TranslateDialog,
   type FilterStatus,
   type LanguageFilter,
 } from "../components/phrases";
 import { useSettings } from "../contexts/SettingsContext";
-import { useToast } from "../contexts/ToastContext";
+
 import {
   getPhrases,
   createPhrase,
@@ -23,14 +22,12 @@ import {
   updatePhraseAudio,
 } from "../api";
 import {
-  LANGUAGE_OPTIONS,
   type CreatePhraseRequest,
   type Phrase,
 } from "../types";
 
 export function PhraseLibraryView() {
   const { settings } = useSettings();
-  const toast = useToast();
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
@@ -38,13 +35,13 @@ export function PhraseLibraryView() {
     useState<LanguageFilter>("current");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [refiningPhrase, setRefiningPhrase] = useState<Phrase | null>(null);
-  const [translatingPhrase, setTranslatingPhrase] = useState<Phrase | null>(null);
 
   const handleAudioGenerated = useCallback(
     async (phraseId: number, audioPath: string) => {
@@ -93,6 +90,7 @@ export function PhraseLibraryView() {
     debouncedSearch,
     languageFilter,
     settings?.targetLanguage,
+    selectedTagId,
   ]);
 
   const loadPhrases = async () => {
@@ -107,6 +105,7 @@ export function PhraseLibraryView() {
 
       const data = await getPhrases({
         targetLanguage: targetLang,
+        tagId: selectedTagId ?? undefined,
       });
 
       // Apply client-side filtering for search
@@ -208,13 +207,6 @@ export function PhraseLibraryView() {
     );
   };
 
-  const handleTranslated = (newPhrase: Phrase) => {
-    setTranslatingPhrase(null);
-
-    const langName = LANGUAGE_OPTIONS.find(l => l.code === newPhrase.targetLanguage)?.name || newPhrase.targetLanguage;
-    toast.success(`Phrase copied to ${langName}`);
-  };
-
   const totalPhrases = phrases.length;
 
   return (
@@ -244,6 +236,8 @@ export function PhraseLibraryView() {
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         currentLanguage={settings?.targetLanguage}
+        selectedTagId={selectedTagId}
+        onTagSelect={setSelectedTagId}
       />
 
       {/* Phrases List */}
@@ -278,7 +272,7 @@ export function PhraseLibraryView() {
               onToggleStar={handleToggleStar}
               onPlay={() => handlePlay(phrase)}
               onRefine={() => setRefiningPhrase(phrase)}
-              onTranslate={() => setTranslatingPhrase(phrase)}
+
               onDelete={() => setDeleteConfirmId(phrase.id)}
             />
           ))}
@@ -322,13 +316,6 @@ export function PhraseLibraryView() {
         />
       )}
 
-      {/* Translate Dialog */}
-      <TranslateDialog
-        isOpen={translatingPhrase !== null}
-        phrase={translatingPhrase}
-        onClose={() => setTranslatingPhrase(null)}
-        onTranslated={handleTranslated}
-      />
     </div>
   );
 }

@@ -17,9 +17,11 @@ import type {
 export async function getPhrases(options?: {
   targetLanguage?: string;
   materialId?: number;
+  tagId?: number;
 }): Promise<Phrase[]> {
   return invoke<Phrase[]>("get_phrases", {
     targetLanguage: options?.targetLanguage ?? null,
+    tagId: options?.tagId ?? null,
   });
 }
 

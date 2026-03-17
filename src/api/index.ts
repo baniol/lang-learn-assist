@@ -11,6 +11,7 @@
 // Core domain APIs
 export * as phrasesApi from "./phrases";
 export * as settingsApi from "./settings";
+export * as tagsApi from "./tags";
 
 // Re-export from lib (these already exist as wrappers)
 export * as audioApi from "../lib/audio";
@@ -42,3 +43,13 @@ export {
   saveSettings,
   testLlmConnection,
 } from "./settings";
+
+export {
+  // Tags
+  getTags,
+  createTag,
+  deleteTag,
+  addTagToPhrase,
+  removeTagFromPhrase,
+  getPhraseTags,
+} from "./tags";

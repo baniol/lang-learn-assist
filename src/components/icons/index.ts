@@ -48,6 +48,9 @@ export {
 // Media Icons
 export { MicrophoneIcon, MicrophoneOutlineIcon, VolumeUpIcon, VolumeOffIcon } from "./Icons";
 
+// Category Icons
+export { TagIcon } from "./Icons";
+
 // Special Icons (with custom props)
 export {
   StarIcon,

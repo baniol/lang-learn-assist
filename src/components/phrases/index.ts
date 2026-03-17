@@ -6,4 +6,4 @@ export {
 export { PhraseActions } from "./PhraseActions";
 export { PhraseListItem } from "./PhraseListItem";
 export { AddPhraseDialog } from "./AddPhraseDialog";
-export { TranslateDialog } from "./TranslateDialog";
+export { TagDropdown } from "./TagDropdown";

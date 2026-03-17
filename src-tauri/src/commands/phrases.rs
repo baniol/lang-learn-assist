@@ -15,12 +15,14 @@ pub fn get_phrases(
     starredOnly: Option<bool>,
     targetLanguage: Option<String>,
     searchQuery: Option<String>,
+    tagId: Option<i64>,
 ) -> Result<Vec<Phrase>, String> {
     let conn = get_conn()?;
 
     // Build query with parameter placeholders
     let mut conditions = Vec::new();
     let mut param_values: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+    let mut joins = String::new();
 
     if starredOnly.unwrap_or(false) {
         conditions.push("p.starred = 1");
@@ -41,6 +43,13 @@ pub fn get_phrases(
         }
     }
 
+    // Tag filter
+    if let Some(tid) = tagId {
+        joins = " INNER JOIN phrase_tags pt ON pt.phrase_id = p.id".to_string();
+        conditions.push("pt.tag_id = ?");
+        param_values.push(Box::new(tid));
+    }
+
     let where_clause = if conditions.is_empty() {
         String::new()
     } else {
@@ -50,9 +59,9 @@ pub fn get_phrases(
     let query = format!(
         "SELECT p.id, p.prompt, p.answer, p.accepted_json,
                 p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at, p.material_id, p.refined
-         FROM phrases p{}
+         FROM phrases p{}{}
          ORDER BY p.created_at DESC",
-        where_clause
+        joins, where_clause
     );
 
     let mut stmt = conn
