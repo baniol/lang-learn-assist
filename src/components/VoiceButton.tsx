@@ -11,9 +11,9 @@ interface VoiceButtonProps {
 
 // Map VoiceButton sizes to icon system sizes
 const iconSizeMap: Record<"sm" | "md" | "lg", IconProps["size"]> = {
-  sm: "md",  // w-5 h-5
-  md: "lg",  // w-6 h-6
-  lg: "xl",  // w-8 h-8
+  sm: "md", // w-5 h-5
+  md: "lg", // w-6 h-6
+  lg: "xl", // w-8 h-8
 };
 
 export function VoiceButton({

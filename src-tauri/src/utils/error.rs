@@ -121,7 +121,10 @@ mod tests {
     #[test]
     fn test_config_error() {
         let error = AppError::config("API key not configured");
-        assert_eq!(error.to_string(), "Configuration error: API key not configured");
+        assert_eq!(
+            error.to_string(),
+            "Configuration error: API key not configured"
+        );
     }
 
     #[test]

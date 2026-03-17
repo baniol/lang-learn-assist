@@ -16,10 +16,7 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  (
-    { className, label, options, error, hint, id, placeholder, ...props },
-    ref
-  ) => {
+  ({ className, label, options, error, hint, id, placeholder, ...props }, ref) => {
     const selectId = id || label?.toLowerCase().replace(/\s+/g, "-");
 
     return (
@@ -32,9 +29,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             {label}
           </label>
         )}
-        {hint && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>
-        )}
+        {hint && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
         <select
           ref={ref}
           id={selectId}
@@ -44,9 +39,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "transition-colors",
-            error
-              ? "border-red-500 dark:border-red-500"
-              : "border-slate-200 dark:border-slate-700",
+            error ? "border-red-500 dark:border-red-500" : "border-slate-200 dark:border-slate-700",
             className
           )}
           {...props}
@@ -57,18 +50,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           )}
           {options.map((option) => (
-            <option
-              key={option.value}
-              value={option.value}
-              disabled={option.disabled}
-            >
+            <option key={option.value} value={option.value} disabled={option.disabled}>
               {option.label}
             </option>
           ))}
         </select>
-        {error && (
-          <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-500 dark:text-red-400">{error}</p>}
       </div>
     );
   }
@@ -102,11 +89,7 @@ export const InlineSelect = forwardRef<
         </option>
       )}
       {options.map((option) => (
-        <option
-          key={option.value}
-          value={option.value}
-          disabled={option.disabled}
-        >
+        <option key={option.value} value={option.value} disabled={option.disabled}>
           {option.label}
         </option>
       ))}

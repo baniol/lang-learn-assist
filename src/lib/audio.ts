@@ -47,7 +47,7 @@ export async function isWhisperReady(): Promise<boolean> {
 export async function transcribeAudio(
   audioPath: string,
   language?: string,
-  prompt?: string,
+  prompt?: string
 ): Promise<string> {
   return invoke<string>("transcribe_audio", { audioPath, language, prompt });
 }
@@ -61,7 +61,7 @@ export interface TranscriptionWithAudio {
 // Transcribe audio and preserve the audio file for later playback
 export async function transcribeAndPreserveAudio(
   audioPath: string,
-  language?: string,
+  language?: string
 ): Promise<TranscriptionWithAudio> {
   return invoke<TranscriptionWithAudio>("transcribe_and_preserve_audio", {
     audioPath,

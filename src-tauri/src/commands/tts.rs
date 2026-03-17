@@ -68,10 +68,7 @@ async fn get_elevenlabs_voices(api_key: &str) -> Result<Vec<TtsVoice>, String> {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         eprintln!("[TTS Debug] Error response body: {}", body);
-        return Err(format!(
-            "ElevenLabs API error: HTTP {} - {}",
-            status, body
-        ));
+        return Err(format!("ElevenLabs API error: HTTP {} - {}", status, body));
     }
 
     let data: ElevenLabsVoicesResponse = response
@@ -138,8 +135,14 @@ pub async fn generate_tts(
 
     match settings.tts_provider.as_str() {
         "elevenlabs" => {
-            generate_elevenlabs_tts(&settings.tts_api_key, &effective_voice_id, &text, phrase_id, force)
-                .await
+            generate_elevenlabs_tts(
+                &settings.tts_api_key,
+                &effective_voice_id,
+                &text,
+                phrase_id,
+                force,
+            )
+            .await
         }
         "none" | "" => Err("TTS not configured".to_string()),
         _ => Err(format!("Unknown TTS provider: {}", settings.tts_provider)),
@@ -232,10 +235,7 @@ async fn generate_elevenlabs_tts(
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-    let url = format!(
-        "https://api.elevenlabs.io/v1/text-to-speech/{}",
-        voice_id
-    );
+    let url = format!("https://api.elevenlabs.io/v1/text-to-speech/{}", voice_id);
 
     let body = serde_json::json!({
         "text": text,
@@ -259,7 +259,10 @@ async fn generate_elevenlabs_tts(
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
-        return Err(format!("ElevenLabs API error: HTTP {} - {}", status, error_text));
+        return Err(format!(
+            "ElevenLabs API error: HTTP {} - {}",
+            status, error_text
+        ));
     }
 
     let audio_bytes = response
@@ -282,7 +285,10 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 #[tauri::command]
 pub async fn get_audio_base64(path: String) -> Result<String, String> {
     let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read audio file: {}", e))?;
-    Ok(format!("data:audio/mpeg;base64,{}", STANDARD.encode(&bytes)))
+    Ok(format!(
+        "data:audio/mpeg;base64,{}",
+        STANDARD.encode(&bytes)
+    ))
 }
 
 #[tauri::command]

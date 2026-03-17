@@ -2,12 +2,7 @@ import { useState, useEffect } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { getSettings, saveSettings, testLlmConnection } from "../api";
 import { testTtsConnection, getAvailableVoices } from "../lib/tts";
-import {
-  getAvailableModels,
-  getModelStatus,
-  downloadModel,
-  deleteModel,
-} from "../lib/audio";
+import { getAvailableModels, getModelStatus, downloadModel, deleteModel } from "../lib/audio";
 import { exportToFile, readFileAsJson, importData } from "../lib/dataExport";
 import { Button, ConfirmDialog } from "../components/ui";
 import { CheckIcon } from "../components/icons";
@@ -19,23 +14,16 @@ import {
   LanguageSettingsSection,
   DataManagementSection,
 } from "../components/settings";
-import type {
-  AppSettings,
-  WhisperModel,
-  TtsVoice,
-  ImportMode,
-  ImportResult,
-} from "../types";
+import type { AppSettings, WhisperModel, TtsVoice, ImportMode, ImportResult } from "../types";
 
 export function SettingsView() {
-  const { updateSettings: updateGlobalSettings, refreshSettings } =
-    useSettings();
+  const { updateSettings: updateGlobalSettings, refreshSettings } = useSettings();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [whisperModels, setWhisperModels] = useState<
-    (WhisperModel & { downloaded: boolean })[]
-  >([]);
+  const [whisperModels, setWhisperModels] = useState<(WhisperModel & { downloaded: boolean })[]>(
+    []
+  );
   const [ttsVoices, setTtsVoices] = useState<TtsVoice[]>([]);
   const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
@@ -74,7 +62,7 @@ export function SettingsView() {
         updateSetting("llmModel", models[0].id);
       }
     }
-  }, [settings?.llmProvider]);
+  }, [settings?.llmProvider]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadSettings = async () => {
     try {
@@ -141,10 +129,7 @@ export function SettingsView() {
 
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const estimatedProgress = Math.min(
-        95,
-        (elapsed / estimatedDurationMs) * 100
-      );
+      const estimatedProgress = Math.min(95, (elapsed / estimatedDurationMs) * 100);
       setDownloadProgress(estimatedProgress);
     }, 200);
 
@@ -221,10 +206,7 @@ export function SettingsView() {
     }
   };
 
-  const updateSetting = <K extends keyof AppSettings>(
-    key: K,
-    value: AppSettings[K]
-  ) => {
+  const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings((prev) => (prev ? { ...prev, [key]: value } : null));
   };
 
@@ -288,9 +270,7 @@ export function SettingsView() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
-          Settings
-        </h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Settings</h1>
         <Button onClick={handleSave} disabled={isSaving} isLoading={isSaving}>
           <CheckIcon size="sm" />
           Save Settings
@@ -329,9 +309,7 @@ export function SettingsView() {
           testResult={testResults.tts}
           onProviderChange={(p) => updateSetting("ttsProvider", p)}
           onApiKeyChange={(k) => updateSetting("ttsApiKey", k)}
-          onVoicesPerLanguageChange={(v) =>
-            updateSetting("ttsVoicesPerLanguage", v)
-          }
+          onVoicesPerLanguageChange={(v) => updateSetting("ttsVoicesPerLanguage", v)}
           onRefreshVoices={loadTtsVoices}
           onTest={handleTestTts}
         />
@@ -352,7 +330,6 @@ export function SettingsView() {
           onExport={handleExport}
           onImport={handleImport}
         />
-
       </div>
 
       <ConfirmDialog

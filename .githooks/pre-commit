@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -e
+
+echo "Running pre-commit checks..."
+echo ""
+
+make check-all
+
+echo ""
+echo "Pre-commit checks passed."

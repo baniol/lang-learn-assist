@@ -45,21 +45,11 @@ function AppContent() {
   const renderView = () => {
     // Type-safe view rendering using discriminated unions
     if (isMaterialPracticeView(viewState)) {
-      return (
-        <MaterialPracticeView
-          materialId={viewState.materialId}
-          onNavigate={legacyNavigate}
-        />
-      );
+      return <MaterialPracticeView materialId={viewState.materialId} onNavigate={legacyNavigate} />;
     }
 
     if (isMaterialReviewView(viewState)) {
-      return (
-        <MaterialReviewView
-          materialId={viewState.materialId}
-          onNavigate={legacyNavigate}
-        />
-      );
+      return <MaterialReviewView materialId={viewState.materialId} onNavigate={legacyNavigate} />;
     }
 
     // Views without data
@@ -79,10 +69,7 @@ function AppContent() {
 
   return (
     <>
-      <Layout
-        currentView={currentView}
-        onNavigate={legacyNavigate}
-      >
+      <Layout currentView={currentView} onNavigate={legacyNavigate}>
         <ErrorBoundary
           onReset={() => navigate("phrase-library")}
           onError={(error) => console.error("View error:", error)}

@@ -6,12 +6,25 @@ Tauri desktop app: React/TypeScript frontend + Rust backend. Language learning w
 ```bash
 make dev          # Run development
 make build        # Production build
+make check-all    # Lint + format-check + type-check + all tests (pre-commit)
 make type-check   # TypeScript check
+make lint         # ESLint
+make format       # Prettier format
 make test-rust    # Rust tests
 npm test          # Run frontend tests (Vitest)
-npm run test:ui   # Run tests with UI
-npm run coverage  # Run tests with coverage report
 ```
+
+## Changelog & Versioning
+
+- **After each feature commit:** update `## [Unreleased]` in `CHANGELOG.md` (Added/Changed/Fixed/Removed)
+- **Releasing:** `make bump-patch` (or `bump-minor`/`bump-major`) → `git push && git push --tags`
+  - Updates `package.json`, `Cargo.toml`, `CHANGELOG.md`, creates commit + tag
+  - `tauri.conf.json` reads version from `package.json` automatically
+
+## Pre-commit Hook
+
+The pre-commit hook runs `make check-all` before every commit.
+Setup once: `make setup-hooks` (or `make install`)
 
 ## Adding Features
 

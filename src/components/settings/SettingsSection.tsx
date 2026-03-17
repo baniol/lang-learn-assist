@@ -31,13 +31,9 @@ export function SettingsSection({
       <div className={cn("mb-4", icon && "flex items-center gap-3")}>
         {icon}
         <div>
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
-            {title}
-          </h2>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-white">{title}</h2>
           {description && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {description}
-            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
           )}
         </div>
       </div>

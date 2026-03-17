@@ -10,9 +10,7 @@ use crate::utils::lock::SafeRwLock;
 use std::time::Duration;
 use tauri::State;
 
-use super::types::{
-    AnthropicError, AnthropicResponse, LlmResponse, OpenAiError, OpenAiResponse,
-};
+use super::types::{AnthropicError, AnthropicResponse, LlmResponse, OpenAiError, OpenAiResponse};
 
 /// Call OpenAI API
 pub async fn call_openai(
@@ -190,7 +188,8 @@ pub async fn test_llm_connection(state: State<'_, AppState>) -> Result<String, S
         return Err("LLM API key not configured".to_string());
     }
 
-    let test_messages = vec![serde_json::json!({"role": "user", "content": "Say hello in one word."})];
+    let test_messages =
+        vec![serde_json::json!({"role": "user", "content": "Say hello in one word."})];
 
     let response = call_llm(&settings, &test_messages, None, TEST_CONNECTION_MAX_TOKENS).await?;
 

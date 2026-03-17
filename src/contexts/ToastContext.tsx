@@ -1,13 +1,13 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { UI } from "../lib/constants";
-import { CheckCircleIcon, ExclamationCircleIcon, InfoCircleIcon, WarningIcon, CloseIcon } from "../components/icons";
+import {
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  InfoCircleIcon,
+  WarningIcon,
+  CloseIcon,
+} from "../components/icons";
 
 export type ToastType = "success" | "error" | "info" | "warning";
 

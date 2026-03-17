@@ -3,10 +3,14 @@
 //! This module contains Tauri commands for processing learning materials,
 //! including transcript parsing, token estimation, and sentence Q&A.
 
-use crate::constants::llm::{ASK_SENTENCE_MAX_TOKENS, MATERIAL_CHUNK_MAX_TOKENS, MAX_CHUNK_INPUT_TOKENS};
+use crate::constants::llm::{
+    ASK_SENTENCE_MAX_TOKENS, MATERIAL_CHUNK_MAX_TOKENS, MAX_CHUNK_INPUT_TOKENS,
+};
 use crate::constants::tokens::CHARS_PER_TOKEN_GERMAN;
 use crate::db::get_conn;
-use crate::models::{get_language_name, AskAboutSentenceResponse, MaterialThreadMessage, TextSegment};
+use crate::models::{
+    get_language_name, AskAboutSentenceResponse, MaterialThreadMessage, TextSegment,
+};
 use crate::state::AppState;
 use crate::utils::lock::SafeRwLock;
 use crate::utils::regex::TIMESTAMP_REGEX;
@@ -36,7 +40,10 @@ fn parse_transcript_with_timestamps(text: &str) -> Vec<(String, String)> {
                 result.push((current_ts.clone(), current_text.join(" ")));
                 current_text.clear();
             }
-            current_ts = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+            current_ts = caps
+                .get(1)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
         } else {
             current_text.push(line.to_string());
         }
@@ -54,7 +61,7 @@ fn parse_transcript_with_timestamps(text: &str) -> Vec<(String, String)> {
 /// German text uses about 1 token per 3 chars, English about 1 per 4.
 fn estimate_tokens(text: &str) -> usize {
     // Use conservative estimate (3 chars per token for German)
-    (text.len() + CHARS_PER_TOKEN_GERMAN - 1) / CHARS_PER_TOKEN_GERMAN
+    text.len().div_ceil(CHARS_PER_TOKEN_GERMAN)
 }
 
 /// Split transcript chunks into batches that fit within token limits.
@@ -96,7 +103,11 @@ pub fn estimate_material_tokens(
         vec![("".to_string(), text.clone())]
     };
 
-    let total_text: String = chunks.iter().map(|(_, t)| t.as_str()).collect::<Vec<_>>().join(" ");
+    let total_text: String = chunks
+        .iter()
+        .map(|(_, t)| t.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
     let estimated_tokens = estimate_tokens(&total_text);
 
     let batches = split_into_batches(chunks);
@@ -104,8 +115,8 @@ pub fn estimate_material_tokens(
 
     // Rough cost estimate (GPT-4 pricing ~$0.03/1K input, $0.06/1K output)
     // Output is roughly 2x input for translation
-    let estimated_cost_usd = (estimated_tokens as f64 / 1000.0) * 0.03
-        + (estimated_tokens as f64 * 2.0 / 1000.0) * 0.06;
+    let estimated_cost_usd =
+        (estimated_tokens as f64 / 1000.0) * 0.03 + (estimated_tokens as f64 * 2.0 / 1000.0) * 0.06;
 
     Ok(TokenEstimate {
         estimated_tokens,
@@ -191,12 +202,15 @@ pub async fn process_material(
     };
 
     // Emit initial progress
-    let _ = app.emit("material-processing-progress", &MaterialProcessingProgress {
-        material_id: materialId,
-        current_chunk: start_batch,
-        total_chunks: total_batches,
-        percent: initial_percent,
-    });
+    let _ = app.emit(
+        "material-processing-progress",
+        &MaterialProcessingProgress {
+            material_id: materialId,
+            current_chunk: start_batch,
+            total_chunks: total_batches,
+            percent: initial_percent,
+        },
+    );
 
     // Process each batch (skip already processed ones)
     for (batch_idx, batch) in batches.into_iter().enumerate() {
@@ -268,12 +282,24 @@ Response format (JSON array only):
 
         let (json_start, json_end) = match (json_start, json_end) {
             (Some(start), Some(end)) if end >= start => (start, end),
-            _ => return Err(format!("Failed to parse LLM response for batch {}. Raw: {}", batch_idx + 1, response.content)),
+            _ => {
+                return Err(format!(
+                    "Failed to parse LLM response for batch {}. Raw: {}",
+                    batch_idx + 1,
+                    response.content
+                ))
+            }
         };
 
         let json_str = &response.content[json_start..=json_end];
-        let batch_segments: Vec<TextSegment> = serde_json::from_str(json_str)
-            .map_err(|e| format!("Failed to parse segments for batch {}: {}. Raw JSON: {}", batch_idx + 1, e, json_str))?;
+        let batch_segments: Vec<TextSegment> = serde_json::from_str(json_str).map_err(|e| {
+            format!(
+                "Failed to parse segments for batch {}: {}. Raw JSON: {}",
+                batch_idx + 1,
+                e,
+                json_str
+            )
+        })?;
 
         all_segments.extend(batch_segments);
 
@@ -429,10 +455,13 @@ Response format (JSON array only):
 
         let (json_start, json_end) = match (json_start, json_end) {
             (Some(start), Some(end)) if end >= start => (start, end),
-            _ => return Err(format!(
-                "Failed to parse LLM response for batch {}. Raw: {}",
-                batch_idx + 1, response.content
-            )),
+            _ => {
+                return Err(format!(
+                    "Failed to parse LLM response for batch {}. Raw: {}",
+                    batch_idx + 1,
+                    response.content
+                ))
+            }
         };
 
         let json_str = &response.content[json_start..=json_end];
@@ -443,11 +472,14 @@ Response format (JSON array only):
             translation: String,
         }
 
-        let translations: Vec<TranslationItem> = serde_json::from_str(json_str)
-            .map_err(|e| format!(
+        let translations: Vec<TranslationItem> = serde_json::from_str(json_str).map_err(|e| {
+            format!(
                 "Failed to parse translations for batch {}: {}. Raw JSON: {}",
-                batch_idx + 1, e, json_str
-            ))?;
+                batch_idx + 1,
+                e,
+                json_str
+            )
+        })?;
 
         // Map translations back to segments
         for (i, seg) in batch.iter().enumerate() {
@@ -521,25 +553,31 @@ pub async fn ask_about_sentence(
         return Err("LLM API key not configured".to_string());
     }
 
-    let system_prompt = build_sentence_qa_system_prompt(
-        &sentence,
-        &translation,
-        &targetLanguage,
-        &nativeLanguage,
-    );
+    let system_prompt =
+        build_sentence_qa_system_prompt(&sentence, &translation, &targetLanguage, &nativeLanguage);
 
     // Build conversation history
     let mut llm_messages: Vec<serde_json::Value> = previousMessages
         .iter()
         .map(|m| {
-            let role = if m.role == "user" { "user" } else { "assistant" };
+            let role = if m.role == "user" {
+                "user"
+            } else {
+                "assistant"
+            };
             serde_json::json!({"role": role, "content": m.content})
         })
         .collect();
 
     llm_messages.push(serde_json::json!({"role": "user", "content": question}));
 
-    let response = call_llm(&settings, &llm_messages, Some(&system_prompt), ASK_SENTENCE_MAX_TOKENS).await?;
+    let response = call_llm(
+        &settings,
+        &llm_messages,
+        Some(&system_prompt),
+        ASK_SENTENCE_MAX_TOKENS,
+    )
+    .await?;
 
     // Parse JSON response
     let json_start = response.content.find('{');

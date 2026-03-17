@@ -77,7 +77,10 @@ pub fn get_model_status(app: tauri::AppHandle, file_name: String) -> bool {
 
 /// Check if active model file exists
 #[tauri::command]
-pub fn is_model_downloaded(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
+pub fn is_model_downloaded(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
     let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let settings = state.settings.safe_read()?;
     let active_model = &settings.active_whisper_model;
@@ -398,7 +401,9 @@ pub fn transcribe_and_preserve_audio(
     }
 
     // Check file size
-    let file_size = std::fs::metadata(&source_path).map(|m| m.len()).unwrap_or(0);
+    let file_size = std::fs::metadata(&source_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
     if file_size < 100 {
         return Err(format!(
             "Audio file too small ({file_size} bytes). Microphone permission may be denied."
@@ -417,8 +422,8 @@ pub fn transcribe_and_preserve_audio(
         .map_err(|e| format!("Failed to copy audio file: {e}"))?;
 
     // Read WAV file for transcription (same as transcribe_audio)
-    let reader = hound::WavReader::open(&source_path)
-        .map_err(|e| format!("Failed to read WAV: {e}"))?;
+    let reader =
+        hound::WavReader::open(&source_path).map_err(|e| format!("Failed to read WAV: {e}"))?;
     let spec = reader.spec();
 
     // Read samples based on format

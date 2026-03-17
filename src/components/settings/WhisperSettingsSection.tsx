@@ -44,9 +44,7 @@ export function WhisperSettingsSection({
               <div className="flex items-center gap-3 flex-1">
                 <button
                   type="button"
-                  onClick={() =>
-                    model.downloaded && onSelectModel(model.fileName)
-                  }
+                  onClick={() => model.downloaded && onSelectModel(model.fileName)}
                   disabled={!model.downloaded}
                   className={cn(
                     "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors",
@@ -64,9 +62,7 @@ export function WhisperSettingsSection({
 
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-slate-800 dark:text-white">
-                      {model.name}
-                    </p>
+                    <p className="font-medium text-slate-800 dark:text-white">{model.name}</p>
                     <span className="text-sm text-slate-500 dark:text-slate-400">
                       ({model.sizeMb} MB)
                     </span>
@@ -107,9 +103,7 @@ export function WhisperSettingsSection({
                     disabled={downloadingModel !== null}
                     className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm font-medium transition-colors"
                   >
-                    {downloadingModel === model.fileName
-                      ? "Downloading..."
-                      : "Download"}
+                    {downloadingModel === model.fileName ? "Downloading..." : "Download"}
                   </button>
                 )}
               </div>

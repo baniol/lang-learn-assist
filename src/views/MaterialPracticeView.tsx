@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getMaterial } from "../lib/materials";
-import {
-  createPracticeSession,
-  updatePracticeSession,
-  practiceSendMessage,
-} from "../lib/practice";
+import { createPracticeSession, updatePracticeSession, practiceSendMessage } from "../lib/practice";
 import { createPhrase } from "../api";
 import { AIChatPanel } from "../components/ui";
 import { VoiceButton } from "../components/VoiceButton";
@@ -28,10 +24,7 @@ interface MaterialPracticeViewProps {
   onNavigate: (view: ViewType, data?: unknown) => void;
 }
 
-export function MaterialPracticeView({
-  materialId,
-  onNavigate,
-}: MaterialPracticeViewProps) {
+export function MaterialPracticeView({ materialId, onNavigate }: MaterialPracticeViewProps) {
   const { settings } = useSettings();
   const [material, setMaterial] = useState<Material | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,12 +72,16 @@ export function MaterialPracticeView({
     setInputValue((prev) => (prev ? prev + " " + text : text));
   }, []);
 
-  const { status: voiceStatus, isAvailable: voiceAvailable, startRecording, stopRecording } =
-    useVoiceRecording({
-      enabled: true,
-      language: material?.targetLanguage || settings?.targetLanguage,
-      onTranscription: handleTranscription,
-    });
+  const {
+    status: voiceStatus,
+    isAvailable: voiceAvailable,
+    startRecording,
+    stopRecording,
+  } = useVoiceRecording({
+    enabled: true,
+    language: material?.targetLanguage || settings?.targetLanguage,
+    onTranscription: handleTranscription,
+  });
 
   const handleSend = useCallback(async () => {
     if (!inputValue.trim() || isSending || !material) return;
@@ -159,9 +156,7 @@ export function MaterialPracticeView({
       );
     } catch (err) {
       if (mountedRef.current) {
-        setError(
-          `Failed to get response: ${err instanceof Error ? err.message : String(err)}`
-        );
+        setError(`Failed to get response: ${err instanceof Error ? err.message : String(err)}`);
       }
     } finally {
       if (mountedRef.current) {
@@ -275,11 +270,7 @@ export function MaterialPracticeView({
       setPendingPhrases(updated);
 
       if (session) {
-        await updatePracticeSession(
-          session.id,
-          messages,
-          updated.length > 0 ? updated : null
-        );
+        await updatePracticeSession(session.id, messages, updated.length > 0 ? updated : null);
       }
     } catch (err) {
       setError(`Failed to save phrase: ${err}`);
@@ -292,11 +283,7 @@ export function MaterialPracticeView({
 
     if (session) {
       try {
-        await updatePracticeSession(
-          session.id,
-          messages,
-          updated.length > 0 ? updated : null
-        );
+        await updatePracticeSession(session.id, messages, updated.length > 0 ? updated : null);
       } catch (err) {
         console.error("Failed to update session:", err);
       }
@@ -312,14 +299,10 @@ export function MaterialPracticeView({
   }
 
   if (!material) {
-    return (
-      <div className="p-4 text-red-500">Material not found</div>
-    );
+    return <div className="p-4 text-red-500">Material not found</div>;
   }
 
-  const segments: TextSegment[] = material.segmentsJson
-    ? JSON.parse(material.segmentsJson)
-    : [];
+  const segments: TextSegment[] = material.segmentsJson ? JSON.parse(material.segmentsJson) : [];
 
   if (segments.length === 0) {
     return (
@@ -397,9 +380,7 @@ export function MaterialPracticeView({
                 className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-800 dark:text-white truncate">
-                    {phrase.answer}
-                  </p>
+                  <p className="text-sm text-slate-800 dark:text-white truncate">{phrase.answer}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                     {phrase.prompt}
                   </p>

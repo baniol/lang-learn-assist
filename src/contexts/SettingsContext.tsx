@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { getSettings, saveSettings } from "../api";
 import type { AppSettings } from "../types";
 
@@ -19,10 +12,7 @@ interface SettingsContextValue {
   /** Update and persist settings */
   updateSettings: (settings: AppSettings) => Promise<void>;
   /** Update a single setting field */
-  updateSetting: <K extends keyof AppSettings>(
-    key: K,
-    value: AppSettings[K]
-  ) => Promise<void>;
+  updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => Promise<void>;
   /** Reload settings from backend */
   refreshSettings: () => Promise<void>;
 }

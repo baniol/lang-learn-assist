@@ -50,7 +50,7 @@ export function AddPhraseDialog({ isOpen, onClose, onAdded }: AddPhraseDialogPro
         query,
         messages.map(({ role, content }) => ({ role, content })),
         settings?.targetLanguage,
-        settings?.nativeLanguage,
+        settings?.nativeLanguage
       );
 
       const assistantMessage: ChatMessage = {

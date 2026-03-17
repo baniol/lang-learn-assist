@@ -1,10 +1,4 @@
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  type DependencyList,
-} from "react";
+import { useState, useEffect, useCallback, useRef, type DependencyList } from "react";
 
 export interface UseQueryOptions<T> {
   /** If false, query won't run automatically on mount */

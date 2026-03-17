@@ -83,9 +83,7 @@ export function PhraseListItem({
       <button
         onClick={() => onToggleStar(phrase.id)}
         className={`p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors flex-shrink-0 ${
-          phrase.starred
-            ? "text-yellow-500"
-            : "text-slate-300 dark:text-slate-600"
+          phrase.starred ? "text-yellow-500" : "text-slate-300 dark:text-slate-600"
         }`}
       >
         <StarIcon size="sm" filled={phrase.starred} />
@@ -93,12 +91,8 @@ export function PhraseListItem({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
-          {phrase.prompt}
-        </p>
-        <p className="text-base font-medium text-slate-800 dark:text-white">
-          {phrase.answer}
-        </p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{phrase.prompt}</p>
+        <p className="text-base font-medium text-slate-800 dark:text-white">{phrase.answer}</p>
         {/* Tags */}
         {phraseTags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">

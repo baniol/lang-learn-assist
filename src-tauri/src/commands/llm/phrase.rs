@@ -3,8 +3,13 @@
 //! This module contains Tauri commands for refining phrases with AI assistance
 //! and generating titles for conversations.
 
-use crate::constants::llm::{GENERATE_PHRASES_MAX_TOKENS, REFINE_PHRASE_MAX_TOKENS, TITLE_MAX_TOKENS};
-use crate::models::{AskAboutSentenceResponse, get_language_name, Phrase, PhraseThreadMessage, RefinePhraseSuggestion};
+use crate::constants::llm::{
+    GENERATE_PHRASES_MAX_TOKENS, REFINE_PHRASE_MAX_TOKENS, TITLE_MAX_TOKENS,
+};
+use crate::models::{
+    get_language_name, AskAboutSentenceResponse, Phrase, PhraseThreadMessage,
+    RefinePhraseSuggestion,
+};
 use crate::state::AppState;
 use crate::utils::lock::SafeRwLock;
 use serde::Deserialize;
@@ -33,14 +38,24 @@ pub async fn refine_phrase(
     let mut llm_messages: Vec<serde_json::Value> = messages
         .iter()
         .map(|m| {
-            let role = if m.role == "user" { "user" } else { "assistant" };
+            let role = if m.role == "user" {
+                "user"
+            } else {
+                "assistant"
+            };
             serde_json::json!({"role": role, "content": m.content})
         })
         .collect();
 
     llm_messages.push(serde_json::json!({"role": "user", "content": user_message}));
 
-    let response = call_llm(&settings, &llm_messages, Some(&system_prompt), REFINE_PHRASE_MAX_TOKENS).await?;
+    let response = call_llm(
+        &settings,
+        &llm_messages,
+        Some(&system_prompt),
+        REFINE_PHRASE_MAX_TOKENS,
+    )
+    .await?;
 
     // Parse the JSON response
     let json_start = response.content.find('{');
@@ -144,7 +159,13 @@ pub async fn generate_phrases(
     let mut llm_messages = previousMessages;
     llm_messages.push(serde_json::json!({"role": "user", "content": query}));
 
-    let response = call_llm(&settings, &llm_messages, Some(&system_prompt), GENERATE_PHRASES_MAX_TOKENS).await?;
+    let response = call_llm(
+        &settings,
+        &llm_messages,
+        Some(&system_prompt),
+        GENERATE_PHRASES_MAX_TOKENS,
+    )
+    .await?;
 
     let json_start = response.content.find('{');
     let json_end = response.content.rfind('}');

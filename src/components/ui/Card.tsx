@@ -14,12 +14,7 @@ const paddingStyles = {
   lg: "p-8",
 };
 
-export function Card({
-  children,
-  className,
-  padding = "md",
-  hover = false,
-}: CardProps) {
+export function Card({ children, className, padding = "md", hover = false }: CardProps) {
   return (
     <div
       className={cn(
@@ -42,12 +37,7 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "border-b border-slate-200 dark:border-slate-700 pb-4 mb-4",
-        className
-      )}
-    >
+    <div className={cn("border-b border-slate-200 dark:border-slate-700 pb-4 mb-4", className)}>
       {children}
     </div>
   );
@@ -61,12 +51,7 @@ export function CardTitle({
   className?: string;
 }) {
   return (
-    <h3
-      className={cn(
-        "text-lg font-semibold text-slate-800 dark:text-white",
-        className
-      )}
-    >
+    <h3 className={cn("text-lg font-semibold text-slate-800 dark:text-white", className)}>
       {children}
     </h3>
   );
@@ -79,11 +64,7 @@ export function CardDescription({
   children: React.ReactNode;
   className?: string;
 }) {
-  return (
-    <p className={cn("text-sm text-slate-500 dark:text-slate-400", className)}>
-      {children}
-    </p>
-  );
+  return <p className={cn("text-sm text-slate-500 dark:text-slate-400", className)}>{children}</p>;
 }
 
 export function CardContent({
@@ -131,10 +112,8 @@ export function StatsCard({
 }) {
   const variantStyles = {
     default: "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700",
-    success:
-      "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800",
-    warning:
-      "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800",
+    success: "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800",
+    warning: "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800",
     info: "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800",
   };
 
@@ -153,13 +132,7 @@ export function StatsCard({
   };
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border p-4 text-center",
-        variantStyles[variant],
-        className
-      )}
-    >
+    <div className={cn("rounded-lg border p-4 text-center", variantStyles[variant], className)}>
       <p className={cn("text-2xl font-bold", textStyles[variant])}>{value}</p>
       <p className={cn("text-sm", labelStyles[variant])}>{label}</p>
     </div>

@@ -13,13 +13,7 @@ import {
 } from "../components/phrases";
 import { useSettings } from "../contexts/SettingsContext";
 
-import {
-  getPhrases,
-  updatePhrase,
-  deletePhrase,
-  toggleStarred,
-  updatePhraseAudio,
-} from "../api";
+import { getPhrases, updatePhrase, deletePhrase, toggleStarred, updatePhraseAudio } from "../api";
 import { type Phrase } from "../types";
 
 export function PhraseLibraryView() {
@@ -27,8 +21,7 @@ export function PhraseLibraryView() {
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
-  const [languageFilter, setLanguageFilter] =
-    useState<LanguageFilter>("current");
+  const [languageFilter, setLanguageFilter] = useState<LanguageFilter>("current");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
@@ -39,23 +32,14 @@ export function PhraseLibraryView() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [refiningPhrase, setRefiningPhrase] = useState<Phrase | null>(null);
 
-  const handleAudioGenerated = useCallback(
-    async (phraseId: number, audioPath: string) => {
-      try {
-        await updatePhraseAudio(phraseId, audioPath);
-        setPhrases((prev) =>
-          prev.map((p) =>
-            p.id === phraseId
-              ? { ...p, audioPath }
-              : p
-          )
-        );
-      } catch (err) {
-        console.error("Failed to save audio path:", err);
-      }
-    },
-    []
-  );
+  const handleAudioGenerated = useCallback(async (phraseId: number, audioPath: string) => {
+    try {
+      await updatePhraseAudio(phraseId, audioPath);
+      setPhrases((prev) => prev.map((p) => (p.id === phraseId ? { ...p, audioPath } : p)));
+    } catch (err) {
+      console.error("Failed to save audio path:", err);
+    }
+  }, []);
 
   const tts = useTTS({
     enabled: true,
@@ -81,13 +65,8 @@ export function PhraseLibraryView() {
   // Load phrases when filters change
   useEffect(() => {
     loadPhrases();
-  }, [
-    filterStatus,
-    debouncedSearch,
-    languageFilter,
-    settings?.targetLanguage,
-    selectedTagId,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterStatus, debouncedSearch, languageFilter, settings?.targetLanguage, selectedTagId]);
 
   const loadPhrases = async () => {
     setIsLoading(true);
@@ -109,9 +88,7 @@ export function PhraseLibraryView() {
       if (debouncedSearch) {
         const search = debouncedSearch.toLowerCase();
         filtered = filtered.filter(
-          (p) =>
-            p.prompt.toLowerCase().includes(search) ||
-            p.answer.toLowerCase().includes(search)
+          (p) => p.prompt.toLowerCase().includes(search) || p.answer.toLowerCase().includes(search)
         );
       }
 
@@ -126,13 +103,7 @@ export function PhraseLibraryView() {
   const handleToggleStar = async (id: number) => {
     try {
       const newStarred = await toggleStarred(id);
-      setPhrases((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? { ...p, starred: newStarred }
-            : p
-        )
-      );
+      setPhrases((prev) => prev.map((p) => (p.id === id ? { ...p, starred: newStarred } : p)));
     } catch (err) {
       console.error("Failed to toggle starred:", err);
     }
@@ -177,22 +148,17 @@ export function PhraseLibraryView() {
 
   const handlePhraseAdded = useCallback(async () => {
     await loadPhrases();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRefineAccept = async (
-    prompt: string,
-    answer: string,
-    accepted: string[]
-  ) => {
+  const handleRefineAccept = async (prompt: string, answer: string, accepted: string[]) => {
     if (!refiningPhrase) return;
 
     await updatePhrase(refiningPhrase.id, { prompt, answer, accepted, refined: true });
 
     setPhrases((prev) =>
       prev.map((p) =>
-        p.id === refiningPhrase.id
-          ? { ...p, prompt, answer, accepted, refined: true }
-          : p
+        p.id === refiningPhrase.id ? { ...p, prompt, answer, accepted, refined: true } : p
       )
     );
   };
@@ -204,12 +170,8 @@ export function PhraseLibraryView() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
-            Phrase Library
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400">
-            {totalPhrases} phrases
-          </p>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Phrase Library</h1>
+          <p className="text-slate-500 dark:text-slate-400">{totalPhrases} phrases</p>
         </div>
         <Button onClick={() => setShowAddDialog(true)}>
           <PlusIcon size="sm" />
@@ -237,17 +199,10 @@ export function PhraseLibraryView() {
         </div>
       ) : phrases.length === 0 ? (
         <EmptyState
-          icon={
-            <BookIcon
-              size="xl"
-              className="text-slate-300 dark:text-slate-600"
-            />
-          }
+          icon={<BookIcon size="xl" className="text-slate-300 dark:text-slate-600" />}
           title="No phrases found"
           description={
-            searchQuery
-              ? "Try a different search"
-              : "Add phrases from conversations or manually"
+            searchQuery ? "Try a different search" : "Add phrases from conversations or manually"
           }
           className="py-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
         />
@@ -262,7 +217,6 @@ export function PhraseLibraryView() {
               onToggleStar={handleToggleStar}
               onPlay={() => handlePlay(phrase)}
               onRefine={() => setRefiningPhrase(phrase)}
-
               onDelete={() => setDeleteConfirmId(phrase.id)}
             />
           ))}
@@ -295,17 +249,12 @@ export function PhraseLibraryView() {
           onAccept={handleRefineAccept}
           onAudioRegenerated={(audioPath) => {
             setPhrases((prev) =>
-              prev.map((p) =>
-                p.id === refiningPhrase.id
-                  ? { ...p, audioPath }
-                  : p
-              )
+              prev.map((p) => (p.id === refiningPhrase.id ? { ...p, audioPath } : p))
             );
             setRefiningPhrase((prev) => (prev ? { ...prev, audioPath } : null));
           }}
         />
       )}
-
     </div>
   );
 }

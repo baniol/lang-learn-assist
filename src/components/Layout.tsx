@@ -1,13 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { cn } from "../lib/utils";
-import {
-  BookIcon,
-  ArchiveIcon,
-  SettingsIcon,
-  ChevronDownIcon,
-  CheckIcon,
-} from "./icons";
+import { BookIcon, ArchiveIcon, SettingsIcon, ChevronDownIcon, CheckIcon } from "./icons";
 import type { ViewType } from "../types";
 import { LANGUAGE_OPTIONS } from "../types";
 
@@ -43,28 +37,18 @@ const settingsNavItem: NavItem = {
   icon: <SettingsIcon />,
 };
 
-export function Layout({
-  currentView,
-  onNavigate,
-  children,
-}: LayoutProps) {
+export function Layout({ currentView, onNavigate, children }: LayoutProps) {
   const { settings, updateSetting } = useSettings();
   const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Build nav items based on settings
-  const navItems = [
-    ...baseNavItems,
-    settingsNavItem,
-  ];
+  const navItems = [...baseNavItems, settingsNavItem];
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setLanguageDropdownOpen(false);
       }
     };
@@ -83,9 +67,7 @@ export function Layout({
   };
 
   const currentLang = settings?.targetLanguage || "de";
-  const currentLangOption = LANGUAGE_OPTIONS.find(
-    (l) => l.code === currentLang,
-  );
+  const currentLangOption = LANGUAGE_OPTIONS.find((l) => l.code === currentLang);
   const currentFlag = LANGUAGE_FLAGS[currentLang] || "🌐";
 
   return (
@@ -94,9 +76,7 @@ export function Layout({
       <aside className="w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col">
         {/* Logo and Language Switcher */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-          <h1 className="text-xl font-bold text-slate-800 dark:text-white">
-            Lang Learn
-          </h1>
+          <h1 className="text-xl font-bold text-slate-800 dark:text-white">Lang Learn</h1>
           {/* Language Switcher */}
           <div className="relative mt-2" ref={dropdownRef}>
             <button
@@ -113,7 +93,7 @@ export function Layout({
                 size="sm"
                 className={cn(
                   "text-slate-500 dark:text-slate-400 transition-transform",
-                  languageDropdownOpen && "rotate-180",
+                  languageDropdownOpen && "rotate-180"
                 )}
               />
             </button>
@@ -129,16 +109,12 @@ export function Layout({
                       "w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors",
                       lang.code === currentLang
                         ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
-                        : "text-slate-700 dark:text-slate-200",
+                        : "text-slate-700 dark:text-slate-200"
                     )}
                   >
-                    <span className="text-lg">
-                      {LANGUAGE_FLAGS[lang.code] || "🌐"}
-                    </span>
+                    <span className="text-lg">{LANGUAGE_FLAGS[lang.code] || "🌐"}</span>
                     <span className="text-sm font-medium">{lang.name}</span>
-                    {lang.code === currentLang && (
-                      <CheckIcon size="sm" className="ml-auto" />
-                    )}
+                    {lang.code === currentLang && <CheckIcon size="sm" className="ml-auto" />}
                   </button>
                 ))}
               </div>
@@ -152,8 +128,7 @@ export function Layout({
             const isActive =
               currentView === item.id ||
               (item.id === "materials" &&
-                (currentView === "material-create" ||
-                  currentView === "material-review"));
+                (currentView === "material-create" || currentView === "material-review"));
 
             return (
               <button
@@ -164,7 +139,7 @@ export function Layout({
                   "transition-colors duration-150",
                   isActive
                     ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50",
+                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50"
                 )}
               >
                 {item.icon}

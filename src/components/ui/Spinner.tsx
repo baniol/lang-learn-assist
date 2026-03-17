@@ -41,13 +41,7 @@ export function PageSpinner() {
 /**
  * Inline loading spinner with optional text.
  */
-export function InlineSpinner({
-  text,
-  size = "sm",
-}: {
-  text?: string;
-  size?: SpinnerSize;
-}) {
+export function InlineSpinner({ text, size = "sm" }: { text?: string; size?: SpinnerSize }) {
   return (
     <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
       <Spinner size={size} />

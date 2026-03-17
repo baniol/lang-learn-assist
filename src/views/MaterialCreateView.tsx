@@ -27,12 +27,7 @@ import {
   StopIcon,
 } from "../components/icons";
 import { useSettings } from "../contexts/SettingsContext";
-import type {
-  ViewType,
-  MaterialType,
-  TokenEstimate,
-  MaterialProcessingProgress,
-} from "../types";
+import type { ViewType, MaterialType, TokenEstimate, MaterialProcessingProgress } from "../types";
 
 interface AudioSegment {
   text: string;
@@ -52,17 +47,12 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
   const [originalText, setOriginalText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tokenEstimate, setTokenEstimate] = useState<TokenEstimate | null>(
-    null,
-  );
-  const [progress, setProgress] = useState<MaterialProcessingProgress | null>(
-    null,
-  );
+  const [tokenEstimate, setTokenEstimate] = useState<TokenEstimate | null>(null);
+  const [progress, setProgress] = useState<MaterialProcessingProgress | null>(null);
 
   // Audio recording state
   const [audioSegments, setAudioSegments] = useState<AudioSegment[]>([]);
-  const [recordingStatus, setRecordingStatus] =
-    useState<RecordingStatus>("idle");
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>("idle");
   const [isWhisperAvailable, setIsWhisperAvailable] = useState(false);
   const whisperInitialized = useRef(false);
 
@@ -139,7 +129,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
       // Transcribe and preserve the audio
       const result: TranscriptionWithAudio = await transcribeAndPreserveAudio(
         audioPath,
-        settings?.targetLanguage,
+        settings?.targetLanguage
       );
 
       if (result.transcription && result.transcription.trim()) {
@@ -174,10 +164,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
 
     const timer = setTimeout(async () => {
       try {
-        const estimate = await estimateMaterialTokens(
-          originalText.trim(),
-          materialType,
-        );
+        const estimate = await estimateMaterialTokens(originalText.trim(), materialType);
         setTokenEstimate(estimate);
       } catch (err) {
         console.error("Failed to estimate tokens:", err);
@@ -189,12 +176,9 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
 
   // Listen for progress events
   useEffect(() => {
-    const unlisten = listen<MaterialProcessingProgress>(
-      "material-processing-progress",
-      (event) => {
-        setProgress(event.payload);
-      },
-    );
+    const unlisten = listen<MaterialProcessingProgress>("material-processing-progress", (event) => {
+      setProgress(event.payload);
+    });
 
     return () => {
       unlisten.then((fn) => fn());
@@ -252,7 +236,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
           material.id,
           segments,
           settings?.targetLanguage || "de",
-          settings?.nativeLanguage || "pl",
+          settings?.nativeLanguage || "pl"
         );
       } else {
         // For transcript/text, use existing processing
@@ -261,7 +245,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
           materialType,
           originalText.trim(),
           settings?.targetLanguage || "de",
-          settings?.nativeLanguage || "pl",
+          settings?.nativeLanguage || "pl"
         );
       }
 
@@ -270,9 +254,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
     } catch (err) {
       console.error("Failed to create material:", err);
       setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to process material. Please try again.",
+        err instanceof Error ? err.message : "Failed to process material. Please try again."
       );
       setIsProcessing(false);
       setProgress(null);
@@ -291,16 +273,10 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
       {/* Header */}
       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-4">
-          <Button
-            onClick={() => onNavigate("materials")}
-            variant="ghost"
-            size="sm"
-          >
+          <Button onClick={() => onNavigate("materials")} variant="ghost" size="sm">
             <ChevronLeftIcon size="sm" />
           </Button>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
-            Add Material
-          </h1>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Add Material</h1>
         </div>
       </div>
 
@@ -324,9 +300,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
                 <NoteIcon size="lg" />
                 <div className="text-left">
                   <div className="font-medium">Article / Text</div>
-                  <div className="text-xs opacity-75">
-                    Sentence-by-sentence translation
-                  </div>
+                  <div className="text-xs opacity-75">Sentence-by-sentence translation</div>
                 </div>
               </button>
               <button
@@ -340,9 +314,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
                 <MicrophoneIcon size="lg" />
                 <div className="text-left">
                   <div className="font-medium">Voice Recording</div>
-                  <div className="text-xs opacity-75">
-                    Record and transcribe audio
-                  </div>
+                  <div className="text-xs opacity-75">Record and transcribe audio</div>
                 </div>
               </button>
             </div>
@@ -405,10 +377,8 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
                 )}
 
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {recordingStatus === "idle" &&
-                    "Click to start recording a segment"}
-                  {recordingStatus === "recording" &&
-                    "Recording... Click to stop"}
+                  {recordingStatus === "idle" && "Click to start recording a segment"}
+                  {recordingStatus === "recording" && "Recording... Click to stop"}
                   {recordingStatus === "transcribing" && "Transcribing..."}
                 </p>
               </div>
@@ -445,8 +415,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
               )}
 
               <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
-                Record multiple short segments. Each will be transcribed and
-                translated separately.
+                Record multiple short segments. Each will be transcribed and translated separately.
               </p>
             </div>
           )}
@@ -477,9 +446,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
                   </span>{" "}
                   tokens
                   {tokenEstimate.chunkCount > 1 && (
-                    <span className="ml-2">
-                      ({tokenEstimate.chunkCount} chunks)
-                    </span>
+                    <span className="ml-2">({tokenEstimate.chunkCount} chunks)</span>
                   )}
                 </div>
                 <div className="text-slate-500 dark:text-slate-400">
@@ -494,8 +461,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
                 <span>
-                  Processing chunk {progress.currentChunk} of{" "}
-                  {progress.totalChunks}
+                  Processing chunk {progress.currentChunk} of {progress.totalChunks}
                 </span>
                 <span>{Math.round(progress.percent)}%</span>
               </div>
@@ -517,11 +483,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
 
           {/* Submit */}
           <div className="flex justify-end gap-3 pt-4">
-            <Button
-              onClick={() => onNavigate("materials")}
-              disabled={isProcessing}
-              variant="ghost"
-            >
+            <Button onClick={() => onNavigate("materials")} disabled={isProcessing} variant="ghost">
               Cancel
             </Button>
             <Button
@@ -529,9 +491,7 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
               disabled={
                 isProcessing ||
                 !title.trim() ||
-                (materialType === "audio"
-                  ? audioSegments.length === 0
-                  : !originalText.trim())
+                (materialType === "audio" ? audioSegments.length === 0 : !originalText.trim())
               }
               isLoading={isProcessing}
             >

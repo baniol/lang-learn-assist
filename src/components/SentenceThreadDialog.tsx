@@ -39,7 +39,7 @@ export function SentenceThreadDialog({
 
   useEffect(() => {
     loadThread();
-  }, [material.id, segmentIndex]);
+  }, [material.id, segmentIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadThread = async () => {
     setIsLoading(true);
@@ -88,7 +88,7 @@ export function SentenceThreadDialog({
         question,
         currentThread.messages,
         material.targetLanguage,
-        material.nativeLanguage,
+        material.nativeLanguage
       );
 
       const assistantMessage: MaterialThreadMessage = {
@@ -104,13 +104,11 @@ export function SentenceThreadDialog({
       const savedThread = await updateMaterialThread(
         currentThread.id,
         finalMessages,
-        newPhrases.length > 0 ? newPhrases : null,
+        newPhrases.length > 0 ? newPhrases : null
       );
       setThread(savedThread);
     } catch (err) {
-      setError(
-        `Failed to get response: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      setError(`Failed to get response: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsSending(false);
     }
@@ -133,11 +131,7 @@ export function SentenceThreadDialog({
       setPendingPhrases(updated);
 
       if (thread) {
-        await updateMaterialThread(
-          thread.id,
-          thread.messages,
-          updated.length > 0 ? updated : null,
-        );
+        await updateMaterialThread(thread.id, thread.messages, updated.length > 0 ? updated : null);
       }
     } catch (err) {
       setError(`Failed to save phrase: ${err}`);
@@ -150,11 +144,7 @@ export function SentenceThreadDialog({
 
     if (thread) {
       try {
-        await updateMaterialThread(
-          thread.id,
-          thread.messages,
-          updated.length > 0 ? updated : null,
-        );
+        await updateMaterialThread(thread.id, thread.messages, updated.length > 0 ? updated : null);
       } catch (err) {
         console.error("Failed to update thread:", err);
       }
@@ -167,9 +157,7 @@ export function SentenceThreadDialog({
         {/* Header */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white">
-              Ask About Sentence
-            </h2>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Ask About Sentence</h2>
             <button
               onClick={onClose}
               className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
@@ -186,17 +174,13 @@ export function SentenceThreadDialog({
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Original ({material.targetLanguage.toUpperCase()})
               </label>
-              <p className="text-slate-800 dark:text-white font-medium mt-1">
-                {segment.text}
-              </p>
+              <p className="text-slate-800 dark:text-white font-medium mt-1">{segment.text}</p>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Translation ({material.nativeLanguage.toUpperCase()})
               </label>
-              <p className="text-slate-600 dark:text-slate-300 mt-1">
-                {segment.translation}
-              </p>
+              <p className="text-slate-600 dark:text-slate-300 mt-1">{segment.translation}</p>
             </div>
           </div>
         </div>

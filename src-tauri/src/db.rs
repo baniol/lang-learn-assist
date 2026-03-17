@@ -279,7 +279,10 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             ),
         );
 
-        log_migration_result("drop old phrases table", conn.execute("DROP TABLE phrases", []));
+        log_migration_result(
+            "drop old phrases table",
+            conn.execute("DROP TABLE phrases", []),
+        );
 
         log_migration_result(
             "rename phrases_new to phrases",
@@ -292,11 +295,17 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         // Recreate indexes
         log_migration_result(
             "recreate idx_phrases_starred",
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_phrases_starred ON phrases(starred)", []),
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_phrases_starred ON phrases(starred)",
+                [],
+            ),
         );
         log_migration_result(
             "recreate idx_phrases_material",
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_phrases_material ON phrases(material_id)", []),
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_phrases_material ON phrases(material_id)",
+                [],
+            ),
         );
     }
 

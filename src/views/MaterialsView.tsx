@@ -2,12 +2,7 @@ import { useState } from "react";
 import { getMaterials, deleteMaterial } from "../lib/materials";
 import { Button, Spinner, Badge, ConfirmDialog } from "../components/ui";
 import { EmptyState } from "../components/shared";
-import {
-  PlusIcon,
-  TrashIcon,
-  ArchiveIcon,
-  NoteIcon,
-} from "../components/icons";
+import { PlusIcon, TrashIcon, ArchiveIcon, NoteIcon } from "../components/icons";
 import { useSettings } from "../contexts/SettingsContext";
 import { useToast } from "../contexts/ToastContext";
 import { useQuery, useMutation } from "../hooks";
@@ -29,11 +24,7 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
     isLoading,
     refetch,
   } = useQuery(
-    () =>
-      getMaterials(
-        settings?.targetLanguage,
-        typeFilter === "all" ? undefined : typeFilter,
-      ),
+    () => getMaterials(settings?.targetLanguage, typeFilter === "all" ? undefined : typeFilter),
     [settings?.targetLanguage, typeFilter],
     {
       onError: (err) => toast.error(`Failed to load materials: ${err.message}`),
@@ -41,20 +32,17 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
   );
 
   // Delete mutation
-  const deleteMutation = useMutation(
-    (id: number) => deleteMaterial(id),
-    {
-      onSuccess: () => {
-        setDeleteConfirm(null);
-        refetch();
-        toast.success("Material deleted");
-      },
-      onError: (err) => {
-        setDeleteConfirm(null);
-        toast.error(`Failed to delete material: ${err.message}`);
-      },
-    }
-  );
+  const deleteMutation = useMutation((id: number) => deleteMaterial(id), {
+    onSuccess: () => {
+      setDeleteConfirm(null);
+      refetch();
+      toast.success("Material deleted");
+    },
+    onError: (err) => {
+      setDeleteConfirm(null);
+      toast.error(`Failed to delete material: ${err.message}`);
+    },
+  });
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + "Z");
@@ -111,9 +99,7 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
       {/* Header */}
       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
-            Materials
-          </h1>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Materials</h1>
           <Button onClick={() => onNavigate("material-create")}>
             <PlusIcon size="sm" />
             Add Material
@@ -142,12 +128,7 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
       <div className="flex-1 overflow-y-auto p-6">
         {!materials || materials.length === 0 ? (
           <EmptyState
-            icon={
-              <ArchiveIcon
-                size="xl"
-                className="text-slate-300 dark:text-slate-600"
-              />
-            }
+            icon={<ArchiveIcon size="xl" className="text-slate-300 dark:text-slate-600" />}
             title="No materials yet"
             description="Import articles or record audio to analyze and learn from."
             action={{

@@ -1,10 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import type {
-  Phrase,
-  PhraseThread,
-  PhraseThreadMessage,
-  RefinePhraseSuggestion,
-} from "../types";
+import type { Phrase, PhraseThread, PhraseThreadMessage, RefinePhraseSuggestion } from "../types";
 import {
   getPhraseThread,
   createPhraseThread,
@@ -16,25 +11,14 @@ import {
 import { updatePhraseAudio } from "../api";
 import { generateTts, getAudioBase64 } from "../lib/tts";
 import { AIChatPanel } from "./ui";
-import {
-  CloseIcon,
-  CheckIcon,
-  PlayIcon,
-  PauseIcon,
-  RefreshIcon,
-  SparklesIcon,
-} from "./icons";
+import { CloseIcon, CheckIcon, PlayIcon, PauseIcon, RefreshIcon, SparklesIcon } from "./icons";
 
 type EditMode = "ai" | "manual";
 
 interface PhraseRefinementDialogProps {
   phrase: Phrase;
   onClose: () => void;
-  onAccept: (
-    prompt: string,
-    answer: string,
-    accepted: string[],
-  ) => Promise<void>;
+  onAccept: (prompt: string, answer: string, accepted: string[]) => Promise<void>;
   onAudioRegenerated?: (audioPath: string) => void;
   initialMessage?: string;
 }
@@ -62,36 +46,28 @@ export function PhraseRefinementDialog({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Pending AI suggestions
-  const [pendingSuggestion, setPendingSuggestion] =
-    useState<RefinePhraseSuggestion | null>(null);
+  const [pendingSuggestion, setPendingSuggestion] = useState<RefinePhraseSuggestion | null>(null);
 
   // Edited values
   const [editedPrompt, setEditedPrompt] = useState(phrase.prompt);
   const [editedAnswer, setEditedAnswer] = useState(phrase.answer);
-  const [editedAccepted, setEditedAccepted] = useState(
-    phrase.accepted.join(", "),
-  );
+  const [editedAccepted, setEditedAccepted] = useState(phrase.accepted.join(", "));
 
   useEffect(() => {
     if (mode === "ai") {
       loadOrCreateThread();
     }
-  }, [phrase.id, mode]);
+  }, [phrase.id, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (
-      initialMessage &&
-      thread &&
-      !initialMessageSent &&
-      !isLoading &&
-      mode === "ai"
-    ) {
+    if (initialMessage && thread && !initialMessageSent && !isLoading && mode === "ai") {
       setInitialMessageSent(true);
       setUserInput(initialMessage);
       setTimeout(() => {
         handleSendMessage(initialMessage);
       }, 100);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMessage, thread, initialMessageSent, isLoading, mode]);
 
   const loadOrCreateThread = async () => {
@@ -137,11 +113,7 @@ export function PhraseRefinementDialog({
           .filter(Boolean),
       };
 
-      const suggestion = await refinePhrase(
-        currentPhrase,
-        thread.messages,
-        text,
-      );
+      const suggestion = await refinePhrase(currentPhrase, thread.messages, text);
 
       const assistantMessage: PhraseThreadMessage = {
         id: `assistant-${Date.now()}`,
@@ -150,13 +122,7 @@ export function PhraseRefinementDialog({
       };
       const finalMessages = [...updatedMessages, assistantMessage];
 
-      const updatedThread = await updatePhraseThread(
-        thread.id,
-        finalMessages,
-        null,
-        null,
-        null,
-      );
+      const updatedThread = await updatePhraseThread(thread.id, finalMessages, null, null, null);
 
       setThread(updatedThread);
 
@@ -182,9 +148,7 @@ export function PhraseRefinementDialog({
       setPendingSuggestion((prev) => (prev ? { ...prev, answer: null } : null));
     } else if (field === "accepted" && pendingSuggestion.accepted) {
       setEditedAccepted(pendingSuggestion.accepted.join(", "));
-      setPendingSuggestion((prev) =>
-        prev ? { ...prev, accepted: null } : null,
-      );
+      setPendingSuggestion((prev) => (prev ? { ...prev, accepted: null } : null));
     }
   };
 
@@ -268,7 +232,7 @@ export function PhraseRefinementDialog({
         phrase.id,
         undefined,
         phrase.targetLanguage,
-        true, // forceRegenerate - bypass cache
+        true // forceRegenerate - bypass cache
       );
       setAudioPath(newPath);
 
@@ -294,9 +258,7 @@ export function PhraseRefinementDialog({
         {/* Header with mode tabs */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white">
-              Edit Phrase
-            </h2>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Edit Phrase</h2>
             <button
               onClick={handleDismiss}
               className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
@@ -392,9 +354,7 @@ export function PhraseRefinementDialog({
                     )}
                   </button>
                 ) : (
-                  <span className="text-sm text-slate-500 dark:text-slate-400 py-2">
-                    No audio
-                  </span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400 py-2">No audio</span>
                 )}
                 <button
                   onClick={handleRegenerateAudio}
@@ -408,8 +368,7 @@ export function PhraseRefinementDialog({
                     </>
                   ) : (
                     <>
-                      <RefreshIcon size="sm" />{" "}
-                      {audioPath ? "Regenerate" : "Generate"}
+                      <RefreshIcon size="sm" /> {audioPath ? "Regenerate" : "Generate"}
                     </>
                   )}
                 </button>

@@ -12,10 +12,7 @@ function TestWrapper({ children }: { children: ReactNode }) {
 /**
  * Custom render function that wraps components with test providers.
  */
-function customRender(
-  ui: ReactElement,
-  options?: Omit<RenderOptions, "wrapper">
-) {
+function customRender(ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) {
   return render(ui, { wrapper: TestWrapper, ...options });
 }
 
@@ -51,10 +48,7 @@ export function createDeferred<T>() {
 /**
  * Helper to wait for a condition to be true.
  */
-export async function waitForCondition(
-  condition: () => boolean,
-  timeout = 1000
-): Promise<void> {
+export async function waitForCondition(condition: () => boolean, timeout = 1000): Promise<void> {
   const start = Date.now();
   while (!condition()) {
     if (Date.now() - start > timeout) {

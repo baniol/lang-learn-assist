@@ -1,8 +1,7 @@
 import { forwardRef, type TextareaHTMLAttributes } from "react";
 import { cn } from "../../lib/utils";
 
-export interface TextareaProps
-  extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
   hint?: string;
@@ -22,9 +21,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
             {label}
           </label>
         )}
-        {hint && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>
-        )}
+        {hint && <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
         <textarea
           ref={ref}
           id={textareaId}
@@ -36,16 +33,12 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
             "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "transition-colors",
-            error
-              ? "border-red-500 dark:border-red-500"
-              : "border-slate-200 dark:border-slate-700",
+            error ? "border-red-500 dark:border-red-500" : "border-slate-200 dark:border-slate-700",
             className
           )}
           {...props}
         />
-        {error && (
-          <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-500 dark:text-red-400">{error}</p>}
       </div>
     );
   }

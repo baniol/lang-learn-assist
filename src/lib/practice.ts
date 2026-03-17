@@ -7,9 +7,7 @@ import type {
   SuggestedPhrase,
 } from "../types";
 
-export async function getPracticeSessions(
-  materialId: number
-): Promise<PracticeSession[]> {
+export async function getPracticeSessions(materialId: number): Promise<PracticeSession[]> {
   return invoke<PracticeSession[]>("get_practice_sessions", { materialId });
 }
 

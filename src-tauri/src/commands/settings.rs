@@ -34,7 +34,9 @@ fn load_settings_from_db(conn: &Connection) -> AppSettings {
             "tts_voice_id_a" => settings.tts_voice_id_a = value,
             "tts_voice_id_b" => settings.tts_voice_id_b = value,
             "tts_voices_per_language" => {
-                if let Ok(parsed) = serde_json::from_str::<HashMap<String, LanguageVoiceSettings>>(&value) {
+                if let Ok(parsed) =
+                    serde_json::from_str::<HashMap<String, LanguageVoiceSettings>>(&value)
+                {
                     settings.tts_voices_per_language = parsed;
                 }
             }
@@ -77,7 +79,10 @@ fn save_settings_to_db(conn: &Connection, settings: &AppSettings) -> Result<(), 
         ("llm_provider", settings.llm_provider.clone()),
         ("llm_api_key", settings.llm_api_key.clone()),
         ("llm_model", settings.llm_model.clone()),
-        ("active_whisper_model", settings.active_whisper_model.clone()),
+        (
+            "active_whisper_model",
+            settings.active_whisper_model.clone(),
+        ),
         ("tts_provider", settings.tts_provider.clone()),
         ("tts_api_key", settings.tts_api_key.clone()),
         ("tts_voice_id", settings.tts_voice_id.clone()),
@@ -117,8 +122,7 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
 #[tauri::command]
 pub fn save_settings(state: State<'_, AppState>, settings: AppSettings) -> Result<(), String> {
     let db_path = get_db_path();
-    let conn =
-        Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
     save_settings_to_db(&conn, &settings)?;
 

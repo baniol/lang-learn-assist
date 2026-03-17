@@ -21,9 +21,7 @@ interface TtsSettingsSectionProps {
   testResult?: string;
   onProviderChange: (provider: TtsProvider) => void;
   onApiKeyChange: (key: string) => void;
-  onVoicesPerLanguageChange: (
-    voices: Record<string, LanguageVoiceSettings>
-  ) => void;
+  onVoicesPerLanguageChange: (voices: Record<string, LanguageVoiceSettings>) => void;
   onRefreshVoices: () => void;
   onTest: () => void;
 }
@@ -104,9 +102,7 @@ export function TtsSettingsSection({
                 </button>
               </div>
 
-              {voicesError && (
-                <p className="text-sm text-red-500 mb-2">{voicesError}</p>
-              )}
+              {voicesError && <p className="text-sm text-red-500 mb-2">{voicesError}</p>}
 
               {voicesLoading ? (
                 <div className="flex items-center gap-2 py-2 text-slate-500">
@@ -142,9 +138,7 @@ export function TtsSettingsSection({
                   {/* Voice settings for selected language */}
                   <div className="space-y-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4">
                     <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      {VOICE_LANGUAGES.find((l) => l.code === selectedLanguage)
-                        ?.name}{" "}
-                      Voices
+                      {VOICE_LANGUAGES.find((l) => l.code === selectedLanguage)?.name} Voices
                     </h4>
 
                     {/* Default Voice */}
@@ -155,11 +149,7 @@ export function TtsSettingsSection({
                       <select
                         value={voicesPerLanguage[selectedLanguage]?.default || ""}
                         onChange={(e) =>
-                          updateLanguageVoice(
-                            selectedLanguage,
-                            "default",
-                            e.target.value
-                          )
+                          updateLanguageVoice(selectedLanguage, "default", e.target.value)
                         }
                         className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
                       >
@@ -183,15 +173,9 @@ export function TtsSettingsSection({
                             Voice A
                           </label>
                           <select
-                            value={
-                              voicesPerLanguage[selectedLanguage]?.voiceA || ""
-                            }
+                            value={voicesPerLanguage[selectedLanguage]?.voiceA || ""}
                             onChange={(e) =>
-                              updateLanguageVoice(
-                                selectedLanguage,
-                                "voiceA",
-                                e.target.value
-                              )
+                              updateLanguageVoice(selectedLanguage, "voiceA", e.target.value)
                             }
                             className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm"
                           >
@@ -208,15 +192,9 @@ export function TtsSettingsSection({
                             Voice B
                           </label>
                           <select
-                            value={
-                              voicesPerLanguage[selectedLanguage]?.voiceB || ""
-                            }
+                            value={voicesPerLanguage[selectedLanguage]?.voiceB || ""}
                             onChange={(e) =>
-                              updateLanguageVoice(
-                                selectedLanguage,
-                                "voiceB",
-                                e.target.value
-                              )
+                              updateLanguageVoice(selectedLanguage, "voiceB", e.target.value)
                             }
                             className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm"
                           >
@@ -230,15 +208,14 @@ export function TtsSettingsSection({
                         </div>
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                        Alternate between Voice A and Voice B when playing
-                        conversation messages
+                        Alternate between Voice A and Voice B when playing conversation messages
                       </p>
                     </div>
                   </div>
                 </div>
               ) : (
                 <p className="text-sm text-slate-500 dark:text-slate-400 py-2">
-                  Save settings first, then click "Refresh voices"
+                  Save settings first, then click &quot;Refresh voices&quot;
                 </p>
               )}
             </div>

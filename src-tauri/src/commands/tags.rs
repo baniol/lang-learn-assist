@@ -31,11 +31,8 @@ pub fn get_tags() -> Result<Vec<Tag>, String> {
 pub fn create_tag(name: String) -> Result<Tag, String> {
     let conn = get_conn()?;
 
-    conn.execute(
-        "INSERT INTO tags (name) VALUES (?1)",
-        params![name.trim()],
-    )
-    .map_err(|e| format!("Failed to create tag: {}", e))?;
+    conn.execute("INSERT INTO tags (name) VALUES (?1)", params![name.trim()])
+        .map_err(|e| format!("Failed to create tag: {}", e))?;
 
     let id = conn.last_insert_rowid();
 

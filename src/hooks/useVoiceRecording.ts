@@ -3,12 +3,7 @@ import {
   startRecording as micStart,
   stopRecording as micStop,
 } from "tauri-plugin-mic-recorder-api";
-import {
-  initWhisper,
-  isWhisperReady,
-  isModelDownloaded,
-  transcribeAudio,
-} from "../lib/audio";
+import { initWhisper, isWhisperReady, isModelDownloaded, transcribeAudio } from "../lib/audio";
 
 export type RecordingStatus = "idle" | "recording" | "transcribing" | "error";
 

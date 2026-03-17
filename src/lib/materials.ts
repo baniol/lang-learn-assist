@@ -11,9 +11,7 @@ import type {
   TokenEstimate,
 } from "../types";
 
-export async function createMaterial(
-  request: CreateMaterialRequest
-): Promise<Material> {
+export async function createMaterial(request: CreateMaterialRequest): Promise<Material> {
   return invoke<Material>("create_material", { request });
 }
 
@@ -149,4 +147,3 @@ export async function askAboutSentence(
     nativeLanguage,
   });
 }
-

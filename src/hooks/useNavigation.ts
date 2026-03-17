@@ -46,18 +46,15 @@ export function useNavigation(
 ): UseNavigationResult {
   const [viewState, setViewState] = useState<ViewState>(initialView);
 
-  const navigate = useCallback(
-    (view: ViewType, data?: Record<string, unknown>) => {
-      if (data) {
-        setViewState(
-          createViewState(view as ViewWithData, data as unknown as ViewDataFor<ViewWithData>)
-        );
-      } else {
-        setViewState(createViewState(view as ViewWithoutData));
-      }
-    },
-    []
-  ) as UseNavigationResult["navigate"];
+  const navigate = useCallback((view: ViewType, data?: Record<string, unknown>) => {
+    if (data) {
+      setViewState(
+        createViewState(view as ViewWithData, data as unknown as ViewDataFor<ViewWithData>)
+      );
+    } else {
+      setViewState(createViewState(view as ViewWithoutData));
+    }
+  }, []) as UseNavigationResult["navigate"];
 
   return {
     viewState,

@@ -1,11 +1,6 @@
 import { cn } from "../../lib/utils";
 import { Spinner } from "../ui";
-import {
-  PlayIcon,
-  PauseIcon,
-  LightbulbIcon,
-  CloseIcon,
-} from "../icons";
+import { PlayIcon, PauseIcon, LightbulbIcon, CloseIcon } from "../icons";
 
 interface PhraseActionsProps {
   phraseId: number;

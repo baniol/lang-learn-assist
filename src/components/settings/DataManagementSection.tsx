@@ -2,10 +2,7 @@ import { useRef, useState } from "react";
 import { SettingsSection } from "./SettingsSection";
 import { UploadIcon, DownloadIcon, TrashIcon } from "../icons";
 import { ConfirmDialog } from "../ui";
-import {
-  deleteAllPhrases,
-  deleteAllMaterials,
-} from "../../lib/dataExport";
+import { deleteAllPhrases, deleteAllMaterials } from "../../lib/dataExport";
 import type { ImportMode, ImportResult } from "../../types";
 
 interface DataManagementSectionProps {
@@ -32,9 +29,7 @@ export function DataManagementSection({
   onImport,
 }: DataManagementSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [deleteTarget, setDeleteTarget] = useState<
-    "phrases" | "materials" | null
-  >(null);
+  const [deleteTarget, setDeleteTarget] = useState<"phrases" | "materials" | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteResult, setDeleteResult] = useState<{
     type: "success" | "error";
@@ -89,8 +84,8 @@ export function DataManagementSection({
     <SettingsSection title="Data Management">
       <div className="space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Export all your data (conversations, phrases, progress, settings) to a
-          JSON file for backup or transfer to another device.
+          Export all your data (conversations, phrases, progress, settings) to a JSON file for
+          backup or transfer to another device.
         </p>
 
         {/* Export */}
@@ -126,9 +121,7 @@ export function DataManagementSection({
                   className="w-4 h-4 text-blue-500"
                 />
                 <div>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">
-                    Merge
-                  </span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">Merge</span>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     Add new items, update existing if newer
                   </p>
@@ -144,9 +137,7 @@ export function DataManagementSection({
                   className="w-4 h-4 text-blue-500"
                 />
                 <div>
-                  <span className="text-sm text-slate-700 dark:text-slate-300">
-                    Overwrite
-                  </span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">Overwrite</span>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     Replace all data with imported data
                   </p>
@@ -189,16 +180,10 @@ export function DataManagementSection({
             {operationResult.details && (
               <div className="mt-2 text-xs space-y-1">
                 {operationResult.details.stats.settingsImported > 0 && (
-                  <p>
-                    Settings: {operationResult.details.stats.settingsImported}{" "}
-                    imported
-                  </p>
+                  <p>Settings: {operationResult.details.stats.settingsImported} imported</p>
                 )}
                 {operationResult.details.stats.phrasesImported > 0 && (
-                  <p>
-                    Phrases: {operationResult.details.stats.phrasesImported}{" "}
-                    imported
-                  </p>
+                  <p>Phrases: {operationResult.details.stats.phrasesImported} imported</p>
                 )}
               </div>
             )}
@@ -206,8 +191,8 @@ export function DataManagementSection({
         )}
 
         <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-3 py-2 rounded-lg">
-          Note: API keys are included in exports. Keep your export files secure.
-          Audio files are not exported (only file paths).
+          Note: API keys are included in exports. Keep your export files secure. Audio files are not
+          exported (only file paths).
         </p>
 
         {/* Delete Data */}
@@ -216,8 +201,7 @@ export function DataManagementSection({
             Delete Data
           </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            Permanently delete all items of a specific type. This cannot be
-            undone.
+            Permanently delete all items of a specific type. This cannot be undone.
           </p>
           <div className="flex flex-wrap gap-2">
             <button

@@ -7,15 +7,11 @@ import type {
   RefinePhraseSuggestion,
 } from "../types";
 
-export async function getPhraseThread(
-  phraseId: number
-): Promise<PhraseThread | null> {
+export async function getPhraseThread(phraseId: number): Promise<PhraseThread | null> {
   return invoke<PhraseThread | null>("get_phrase_thread", { phraseId });
 }
 
-export async function createPhraseThread(
-  phraseId: number
-): Promise<PhraseThread> {
+export async function createPhraseThread(phraseId: number): Promise<PhraseThread> {
   return invoke<PhraseThread>("create_phrase_thread", { phraseId });
 }
 
@@ -52,7 +48,7 @@ export async function generatePhrases(
   query: string,
   previousMessages: GeneratePhraseMessage[],
   targetLanguage?: string,
-  nativeLanguage?: string,
+  nativeLanguage?: string
 ): Promise<AskAboutSentenceResponse> {
   return invoke<AskAboutSentenceResponse>("generate_phrases", {
     query,

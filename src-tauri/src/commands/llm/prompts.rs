@@ -87,12 +87,16 @@ Always respond with JSON in this exact format:
     {{"prompt": "{} translation", "answer": "{} sentence", "accepted": []}}
   ]
 }}"#,
-        native_name, target_name,
-        target_name, sentence,
-        native_name, translation,
+        native_name,
+        target_name,
+        target_name,
+        sentence,
+        native_name,
+        translation,
         native_name,
         native_name,
-        native_name, target_name
+        native_name,
+        target_name
     )
 }
 
@@ -130,12 +134,16 @@ Always respond with JSON in this exact format:
 }}
 
 Include 0-2 useful phrases from your response that the student should learn. The "prompt" should be the {} translation and "answer" should be the {} phrase."#,
-        target_name, native_name, target_name,
+        target_name,
+        native_name,
+        target_name,
         material_context,
         target_name,
         target_name,
-        native_name, target_name,
-        native_name, target_name
+        native_name,
+        target_name,
+        native_name,
+        target_name
     )
 }
 
@@ -174,14 +182,19 @@ Always respond with JSON in this exact format:
 }}
 
 Set feedback to null for your initial prompt. Include 0-2 useful phrases that were part of the exercise."#,
-        native_name, target_name,
+        native_name,
+        target_name,
         material_context,
-        native_name, target_name,
+        native_name,
+        target_name,
         target_name,
         native_name,
-        target_name, native_name,
-        native_name, target_name,
-        native_name, target_name
+        target_name,
+        native_name,
+        native_name,
+        target_name,
+        native_name,
+        target_name
     )
 }
 
@@ -210,10 +223,7 @@ Always respond with JSON in this exact format:
     {{"prompt": "{} meaning", "answer": "{} phrase", "accepted": ["alternative1"]}}
   ]
 }}"#,
-        native_name, target_name,
-        native_name,
-        native_name,
-        native_name, target_name
+        native_name, target_name, native_name, native_name, native_name, target_name
     )
 }
 
@@ -250,10 +260,12 @@ Respond with JSON in this exact format:
 }}
 
 If there are no accepted alternatives, return an empty array for "accepted"."#,
-        source_name, target_name,
+        source_name,
+        target_name,
         source_name,
         source_name,
-        source_name, target_name,
+        source_name,
+        target_name,
         native_name,
         target_name,
         target_name

@@ -1,5 +1,8 @@
 use crate::db::get_conn;
-use crate::models::{CreateMaterialRequest, Material, MaterialThread, MaterialThreadMessage, SuggestedPhrase, TextSegment, UpdateMaterialRequest};
+use crate::models::{
+    CreateMaterialRequest, Material, MaterialThread, MaterialThreadMessage, SuggestedPhrase,
+    TextSegment, UpdateMaterialRequest,
+};
 use crate::state::AppState;
 use crate::utils::lock::SafeRwLock;
 use crate::utils::regex::TIMESTAMP_REGEX;
@@ -132,7 +135,11 @@ fn parse_timestamps_from_original(text: &str) -> Vec<String> {
 }
 
 /// Enrich segments with timestamps from original text if missing
-fn enrich_segments_with_timestamps(segments_json: &str, original_text: &str, material_type: &str) -> String {
+fn enrich_segments_with_timestamps(
+    segments_json: &str,
+    original_text: &str,
+    material_type: &str,
+) -> String {
     if material_type != "transcript" {
         return segments_json.to_string();
     }
@@ -174,14 +181,15 @@ fn enrich_segments_with_timestamps(segments_json: &str, original_text: &str, mat
 pub fn get_material(id: i64) -> Result<Material, String> {
     let conn = get_conn()?;
 
-    let mut material = conn.query_row(
-        "SELECT id, title, material_type, source_url, original_text, segments_json,
+    let mut material = conn
+        .query_row(
+            "SELECT id, title, material_type, source_url, original_text, segments_json,
                 target_language, native_language, status, bookmark_index, created_at, updated_at
          FROM materials WHERE id = ?1",
-        params![id],
-        row_to_material,
-    )
-    .map_err(|e| format!("Material not found: {}", e))?;
+            params![id],
+            row_to_material,
+        )
+        .map_err(|e| format!("Material not found: {}", e))?;
 
     // Enrich segments with timestamps if missing
     if let Some(ref segments_json) = material.segments_json {
@@ -254,8 +262,11 @@ pub fn delete_all_materials() -> Result<i64, String> {
     conn.execute("DELETE FROM material_threads", [])
         .map_err(|e| format!("Failed to delete material threads: {}", e))?;
     // SET NULL on phrases that reference materials
-    conn.execute("UPDATE phrases SET material_id = NULL WHERE material_id IS NOT NULL", [])
-        .map_err(|e| format!("Failed to clear phrase material references: {}", e))?;
+    conn.execute(
+        "UPDATE phrases SET material_id = NULL WHERE material_id IS NOT NULL",
+        [],
+    )
+    .map_err(|e| format!("Failed to clear phrase material references: {}", e))?;
     conn.execute("DELETE FROM materials", [])
         .map_err(|e| format!("Failed to delete materials: {}", e))?;
 
@@ -280,10 +291,11 @@ pub fn update_material_bookmark(id: i64, bookmarkIndex: Option<i32>) -> Result<(
 
 fn row_to_material_thread(row: &rusqlite::Row) -> Result<MaterialThread, rusqlite::Error> {
     let messages_json: String = row.get(3)?;
-    let messages: Vec<MaterialThreadMessage> = serde_json::from_str(&messages_json).unwrap_or_default();
+    let messages: Vec<MaterialThreadMessage> =
+        serde_json::from_str(&messages_json).unwrap_or_default();
     let suggested_phrases_json: Option<String> = row.get(4)?;
-    let suggested_phrases: Option<Vec<SuggestedPhrase>> = suggested_phrases_json
-        .and_then(|j| serde_json::from_str(&j).ok());
+    let suggested_phrases: Option<Vec<SuggestedPhrase>> =
+        suggested_phrases_json.and_then(|j| serde_json::from_str(&j).ok());
 
     Ok(MaterialThread {
         id: row.get(0)?,
@@ -298,7 +310,10 @@ fn row_to_material_thread(row: &rusqlite::Row) -> Result<MaterialThread, rusqlit
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn get_material_thread(materialId: i64, segmentIndex: i32) -> Result<Option<MaterialThread>, String> {
+pub fn get_material_thread(
+    materialId: i64,
+    segmentIndex: i32,
+) -> Result<Option<MaterialThread>, String> {
     let conn = get_conn()?;
 
     let result = conn.query_row(
@@ -320,7 +335,10 @@ pub fn get_material_thread(materialId: i64, segmentIndex: i32) -> Result<Option<
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn create_material_thread(materialId: i64, segmentIndex: i32) -> Result<MaterialThread, String> {
+pub fn create_material_thread(
+    materialId: i64,
+    segmentIndex: i32,
+) -> Result<MaterialThread, String> {
     let conn = get_conn()?;
 
     conn.execute(
@@ -352,8 +370,8 @@ pub fn update_material_thread(
 
     let messages_json = serde_json::to_string(&messages)
         .map_err(|e| format!("Failed to serialize messages: {}", e))?;
-    let phrases_json = suggestedPhrases
-        .map(|p| serde_json::to_string(&p).unwrap_or_else(|_| "[]".to_string()));
+    let phrases_json =
+        suggestedPhrases.map(|p| serde_json::to_string(&p).unwrap_or_else(|_| "[]".to_string()));
 
     conn.execute(
         "UPDATE material_threads
@@ -377,8 +395,11 @@ pub fn update_material_thread(
 pub fn delete_material_thread(threadId: i64) -> Result<(), String> {
     let conn = get_conn()?;
 
-    conn.execute("DELETE FROM material_threads WHERE id = ?1", params![threadId])
-        .map_err(|e| format!("Failed to delete material thread: {}", e))?;
+    conn.execute(
+        "DELETE FROM material_threads WHERE id = ?1",
+        params![threadId],
+    )
+    .map_err(|e| format!("Failed to delete material thread: {}", e))?;
 
     Ok(())
 }

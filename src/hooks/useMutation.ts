@@ -6,11 +6,7 @@ export interface UseMutationOptions<TData, TVariables> {
   /** Called on error */
   onError?: (error: Error, variables: TVariables) => void;
   /** Called when mutation completes (success or error) */
-  onSettled?: (
-    data: TData | null,
-    error: Error | null,
-    variables: TVariables
-  ) => void;
+  onSettled?: (data: TData | null, error: Error | null, variables: TVariables) => void;
 }
 
 export interface UseMutationResult<TData, TVariables> {

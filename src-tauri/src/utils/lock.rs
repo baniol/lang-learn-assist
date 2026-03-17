@@ -17,8 +17,7 @@ pub trait SafeLock<T> {
 
 impl<T> SafeLock<T> for Mutex<T> {
     fn safe_lock(&self) -> Result<MutexGuard<'_, T>, String> {
-        self.lock()
-            .map_err(|e| format!("Mutex poisoned: {}", e))
+        self.lock().map_err(|e| format!("Mutex poisoned: {}", e))
     }
 }
 

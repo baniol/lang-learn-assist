@@ -231,9 +231,7 @@ describe("useAudioPlayback", () => {
     });
 
     it("should use explicit voice when provided", async () => {
-      const { result } = renderHook(() =>
-        useAudioPlayback({ voiceA: "explicit-voice" })
-      );
+      const { result } = renderHook(() => useAudioPlayback({ voiceA: "explicit-voice" }));
 
       act(() => {
         result.current.playMessage("Hello", "msg-1", 0);

@@ -1,21 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
-import type {
-  ExportData,
-  ImportMode,
-  ImportResult,
-  RemoveDuplicatesResult,
-} from "../types";
+import type { ExportData, ImportMode, ImportResult, RemoveDuplicatesResult } from "../types";
 
 export async function exportData(): Promise<ExportData> {
   return invoke<ExportData>("export_data");
 }
 
-export async function importData(
-  data: ExportData,
-  mode: ImportMode
-): Promise<ImportResult> {
+export async function importData(data: ExportData, mode: ImportMode): Promise<ImportResult> {
   return invoke<ImportResult>("import_data", { data, mode });
 }
 
@@ -56,7 +48,7 @@ export function readFileAsJson(file: File): Promise<ExportData> {
           return;
         }
         resolve(data);
-      } catch (err) {
+      } catch (_err) {
         reject(new Error("Failed to parse JSON file"));
       }
     };

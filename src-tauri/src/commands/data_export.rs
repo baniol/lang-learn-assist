@@ -1,9 +1,7 @@
 use crate::db::get_conn;
 use crate::models::{
-    ExportData, ExportMaterial,
-    ExportMaterialThread, ExportPhrase, ExportPhraseThread,
-    ExportSetting, ImportMode, ImportResult,
-    ImportStats,
+    ExportData, ExportMaterial, ExportMaterialThread, ExportPhrase, ExportPhraseThread,
+    ExportSetting, ImportMode, ImportResult, ImportStats,
 };
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
@@ -16,7 +14,6 @@ pub fn export_data() -> Result<ExportData, String> {
 
 /// Core export logic that can be tested with any connection
 pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
-
     // Export settings
     let mut stmt = conn
         .prepare("SELECT key, value FROM settings")
@@ -463,10 +460,7 @@ pub fn import_data_with_conn(
 
     Ok(ImportResult {
         success: true,
-        message: format!(
-            "Import completed successfully (mode: {:?})",
-            mode
-        ),
+        message: format!("Import completed successfully (mode: {:?})", mode),
         stats,
     })
 }
@@ -694,7 +688,8 @@ mod tests {
 
         // First import
         let data1 = create_test_export_data();
-        import_data_with_conn(&mut conn, data1, ImportMode::Overwrite).expect("First import failed");
+        import_data_with_conn(&mut conn, data1, ImportMode::Overwrite)
+            .expect("First import failed");
 
         // Second import with different data
         let mut data2 = create_test_export_data();

@@ -1,12 +1,6 @@
 import { cn } from "../../lib/utils";
 
-export type BadgeVariant =
-  | "default"
-  | "success"
-  | "warning"
-  | "error"
-  | "info"
-  | "purple";
+export type BadgeVariant = "default" | "success" | "warning" | "error" | "info" | "purple";
 
 export type BadgeSize = "sm" | "md";
 
@@ -31,12 +25,7 @@ interface BadgeProps {
   className?: string;
 }
 
-export function Badge({
-  variant = "default",
-  size = "md",
-  children,
-  className,
-}: BadgeProps) {
+export function Badge({ variant = "default", size = "md", children, className }: BadgeProps) {
   return (
     <span
       className={cn(
@@ -79,10 +68,12 @@ export function PhraseStatusBadge({
 /**
  * Determines phrase status from progress data.
  */
-export function getPhraseStatus(progress: {
-  totalAttempts: number;
-  correctStreak: number;
-} | null): "new" | "learning" | "learned" {
+export function getPhraseStatus(
+  progress: {
+    totalAttempts: number;
+    correctStreak: number;
+  } | null
+): "new" | "learning" | "learned" {
   if (!progress || progress.totalAttempts === 0) return "new";
   if (progress.correctStreak >= 2) return "learned";
   return "learning";

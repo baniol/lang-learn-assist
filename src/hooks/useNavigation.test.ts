@@ -13,9 +13,7 @@ describe("useNavigation", () => {
     });
 
     it("should accept custom initial view", () => {
-      const { result } = renderHook(() =>
-        useNavigation({ type: "settings" })
-      );
+      const { result } = renderHook(() => useNavigation({ type: "settings" }));
 
       expect(result.current.viewState).toEqual({ type: "settings" });
       expect(result.current.currentView).toBe("settings");
@@ -38,9 +36,7 @@ describe("useNavigation", () => {
   describe("navigate", () => {
     describe("views without data", () => {
       it("should navigate to phrase-library", () => {
-        const { result } = renderHook(() =>
-          useNavigation({ type: "settings" })
-        );
+        const { result } = renderHook(() => useNavigation({ type: "settings" }));
 
         act(() => {
           result.current.navigate("phrase-library");
@@ -121,11 +117,7 @@ describe("useNavigation", () => {
     it("should return the view itself for top-level views", () => {
       const { result } = renderHook(() => useNavigation());
 
-      const topLevelViews = [
-        "phrase-library",
-        "settings",
-        "materials",
-      ] as const;
+      const topLevelViews = ["phrase-library", "settings", "materials"] as const;
 
       for (const view of topLevelViews) {
         act(() => {

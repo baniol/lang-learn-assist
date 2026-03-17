@@ -6,8 +6,4 @@ export {
   useNativeLanguage,
 } from "./SettingsContext";
 
-export {
-  ToastProvider,
-  useToast,
-  type ToastType,
-} from "./ToastContext";
+export { ToastProvider, useToast, type ToastType } from "./ToastContext";

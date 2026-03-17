@@ -55,16 +55,18 @@ export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudi
       Promise.all([
         getVoiceForLanguage(language, "voiceA"),
         getVoiceForLanguage(language, "voiceB"),
-      ]).then(([a, b]) => {
-        if (mounted) {
-          setLanguageVoiceA(a || undefined);
-          setLanguageVoiceB(b || undefined);
-        }
-      }).catch((err) => {
-        if (mounted) {
-          console.error("Failed to load per-language voices:", err);
-        }
-      });
+      ])
+        .then(([a, b]) => {
+          if (mounted) {
+            setLanguageVoiceA(a || undefined);
+            setLanguageVoiceB(b || undefined);
+          }
+        })
+        .catch((err) => {
+          if (mounted) {
+            console.error("Failed to load per-language voices:", err);
+          }
+        });
     } else {
       setLanguageVoiceA(undefined);
       setLanguageVoiceB(undefined);

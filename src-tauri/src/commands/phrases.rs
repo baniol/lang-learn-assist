@@ -1,7 +1,6 @@
 use crate::db::get_conn;
 use crate::models::{
-    CreatePhraseRequest, Phrase, PhraseThread, PhraseThreadMessage,
-    UpdatePhraseRequest,
+    CreatePhraseRequest, Phrase, PhraseThread, PhraseThreadMessage, UpdatePhraseRequest,
 };
 use crate::state::AppState;
 use crate::utils::db::row_to_phrase;
@@ -149,7 +148,10 @@ pub fn create_phrases_batch(
     // Get default languages from settings
     let (default_target_lang, default_native_lang) = {
         let settings = state.settings.safe_read()?;
-        (settings.target_language.clone(), settings.native_language.clone())
+        (
+            settings.target_language.clone(),
+            settings.native_language.clone(),
+        )
     };
 
     // Use transaction for atomicity - all phrases created or none
@@ -231,8 +233,8 @@ pub fn update_phrase(id: i64, request: UpdatePhraseRequest) -> Result<Phrase, St
     }
 
     if let Some(accepted) = &request.accepted {
-        let accepted_json =
-            serde_json::to_string(accepted).map_err(|e| format!("Failed to serialize accepted: {}", e))?;
+        let accepted_json = serde_json::to_string(accepted)
+            .map_err(|e| format!("Failed to serialize accepted: {}", e))?;
         conn.execute(
             "UPDATE phrases SET accepted_json = ?1 WHERE id = ?2",
             params![accepted_json, id],
@@ -284,9 +286,11 @@ pub fn toggle_starred(id: i64) -> Result<bool, String> {
     .map_err(|e| format!("Failed to toggle starred: {}", e))?;
 
     let starred: i32 = conn
-        .query_row("SELECT starred FROM phrases WHERE id = ?1", params![id], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT starred FROM phrases WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
         .map_err(|e| format!("Failed to get starred status: {}", e))?;
 
     Ok(starred != 0)
@@ -333,10 +337,11 @@ pub fn delete_all_phrases() -> Result<i64, String> {
 
 fn row_to_phrase_thread(row: &rusqlite::Row) -> Result<PhraseThread, rusqlite::Error> {
     let messages_json: String = row.get(2)?;
-    let messages: Vec<PhraseThreadMessage> = serde_json::from_str(&messages_json).unwrap_or_default();
+    let messages: Vec<PhraseThreadMessage> =
+        serde_json::from_str(&messages_json).unwrap_or_default();
     let suggested_accepted_json: Option<String> = row.get(5)?;
-    let suggested_accepted: Option<Vec<String>> = suggested_accepted_json
-        .and_then(|j| serde_json::from_str(&j).ok());
+    let suggested_accepted: Option<Vec<String>> =
+        suggested_accepted_json.and_then(|j| serde_json::from_str(&j).ok());
 
     Ok(PhraseThread {
         id: row.get(0)?,
@@ -411,15 +416,21 @@ pub fn update_phrase_thread(
 
     let messages_json = serde_json::to_string(&messages)
         .map_err(|e| format!("Failed to serialize messages: {}", e))?;
-    let accepted_json = suggestedAccepted
-        .map(|a| serde_json::to_string(&a).unwrap_or_else(|_| "[]".to_string()));
+    let accepted_json =
+        suggestedAccepted.map(|a| serde_json::to_string(&a).unwrap_or_else(|_| "[]".to_string()));
 
     conn.execute(
         "UPDATE phrase_threads
          SET messages_json = ?1, suggested_prompt = ?2, suggested_answer = ?3,
              suggested_accepted = ?4, updated_at = datetime('now')
          WHERE id = ?5",
-        params![messages_json, suggestedPrompt, suggestedAnswer, accepted_json, threadId],
+        params![
+            messages_json,
+            suggestedPrompt,
+            suggestedAnswer,
+            accepted_json,
+            threadId
+        ],
     )
     .map_err(|e| format!("Failed to update phrase thread: {}", e))?;
 
@@ -452,8 +463,11 @@ pub fn accept_phrase_thread(threadId: i64) -> Result<(), String> {
 pub fn delete_phrase_thread(threadId: i64) -> Result<(), String> {
     let conn = get_conn()?;
 
-    conn.execute("DELETE FROM phrase_threads WHERE id = ?1", params![threadId])
-        .map_err(|e| format!("Failed to delete phrase thread: {}", e))?;
+    conn.execute(
+        "DELETE FROM phrase_threads WHERE id = ?1",
+        params![threadId],
+    )
+    .map_err(|e| format!("Failed to delete phrase thread: {}", e))?;
 
     Ok(())
 }

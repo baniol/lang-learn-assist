@@ -7,22 +7,16 @@ import { ChevronLeftIcon, LightbulbIcon, BookmarkIcon, VolumeUpIcon } from "../c
 import { ChatIcon } from "../components/icons";
 import type { ViewType, Material, TextSegment } from "../types";
 
-
 interface MaterialReviewViewProps {
   materialId: number;
   onNavigate: (view: ViewType, data?: unknown) => void;
 }
 
-export function MaterialReviewView({
-  materialId,
-  onNavigate,
-}: MaterialReviewViewProps) {
+export function MaterialReviewView({ materialId, onNavigate }: MaterialReviewViewProps) {
   const [material, setMaterial] = useState<Material | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [threadDates, setThreadDates] = useState<Map<number, string>>(
-    new Map(),
-  );
+  const [threadDates, setThreadDates] = useState<Map<number, string>>(new Map());
   const [bookmarkIndex, setBookmarkIndex] = useState<number | null>(null);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const sentenceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -55,17 +49,20 @@ export function MaterialReviewView({
     setSelectedIndex(null);
   };
 
-  const handleToggleBookmark = useCallback(async (index: number) => {
-    const newBookmarkIndex = bookmarkIndex === index ? null : index;
-    setBookmarkIndex(newBookmarkIndex);
-    try {
-      await updateMaterialBookmark(materialId, newBookmarkIndex);
-    } catch (err) {
-      console.error("Failed to update bookmark:", err);
-      // Revert on error
-      setBookmarkIndex(bookmarkIndex);
-    }
-  }, [materialId, bookmarkIndex]);
+  const handleToggleBookmark = useCallback(
+    async (index: number) => {
+      const newBookmarkIndex = bookmarkIndex === index ? null : index;
+      setBookmarkIndex(newBookmarkIndex);
+      try {
+        await updateMaterialBookmark(materialId, newBookmarkIndex);
+      } catch (err) {
+        console.error("Failed to update bookmark:", err);
+        // Revert on error
+        setBookmarkIndex(bookmarkIndex);
+      }
+    },
+    [materialId, bookmarkIndex]
+  );
 
   const scrollToBookmark = useCallback(() => {
     if (bookmarkIndex !== null) {
@@ -76,18 +73,21 @@ export function MaterialReviewView({
     }
   }, [bookmarkIndex]);
 
-  const handlePlayAudio = useCallback(async (index: number, audioPath: string) => {
-    if (playingIndex === index) return;
+  const handlePlayAudio = useCallback(
+    async (index: number, audioPath: string) => {
+      if (playingIndex === index) return;
 
-    setPlayingIndex(index);
-    try {
-      await playAudioFile(audioPath);
-    } catch (err) {
-      console.error("Failed to play audio:", err);
-    } finally {
-      setPlayingIndex(null);
-    }
-  }, [playingIndex]);
+      setPlayingIndex(index);
+      try {
+        await playAudioFile(audioPath);
+      } catch (err) {
+        console.error("Failed to play audio:", err);
+      } finally {
+        setPlayingIndex(null);
+      }
+    },
+    [playingIndex]
+  );
 
   if (isLoading) {
     return (
@@ -101,9 +101,7 @@ export function MaterialReviewView({
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <p className="text-slate-500 dark:text-slate-400">
-            Material not found
-          </p>
+          <p className="text-slate-500 dark:text-slate-400">Material not found</p>
           <Button onClick={() => onNavigate("materials")} className="mt-4">
             Back to Materials
           </Button>
@@ -112,9 +110,7 @@ export function MaterialReviewView({
     );
   }
 
-  const segments: TextSegment[] = material.segmentsJson
-    ? JSON.parse(material.segmentsJson)
-    : [];
+  const segments: TextSegment[] = material.segmentsJson ? JSON.parse(material.segmentsJson) : [];
 
   const selectedSegment =
     selectedIndex !== null && selectedIndex >= 0 && selectedIndex < segments.length
@@ -126,22 +122,13 @@ export function MaterialReviewView({
       {/* Header */}
       <div className="p-4 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-4">
-          <Button
-            onClick={() => onNavigate("materials")}
-            variant="ghost"
-            size="sm"
-          >
+          <Button onClick={() => onNavigate("materials")} variant="ghost" size="sm">
             <ChevronLeftIcon size="sm" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-slate-800 dark:text-white">
-              {material.title}
-            </h1>
+            <h1 className="text-xl font-bold text-slate-800 dark:text-white">{material.title}</h1>
             <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
-              <span>
-                {segments.length} sentences - Click the bulb to ask about any
-                sentence
-              </span>
+              <span>{segments.length} sentences - Click the bulb to ask about any sentence</span>
             </div>
           </div>
           <button
@@ -185,9 +172,7 @@ export function MaterialReviewView({
                   else sentenceRefs.current.delete(index);
                 }}
                 className={`flex items-start p-4 gap-4 ${
-                  isBookmarked
-                    ? "bg-blue-50 dark:bg-blue-900/20"
-                    : "bg-white dark:bg-slate-800"
+                  isBookmarked ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"
                 }`}
               >
                 {/* Action buttons */}
@@ -237,12 +222,8 @@ export function MaterialReviewView({
 
                 {/* Original & Translation */}
                 <div className="flex-1 grid grid-cols-2 gap-6">
-                  <div className="text-slate-800 dark:text-white">
-                    {segment.text}
-                  </div>
-                  <div className="text-slate-500 dark:text-slate-400">
-                    {segment.translation}
-                  </div>
+                  <div className="text-slate-800 dark:text-white">{segment.text}</div>
+                  <div className="text-slate-500 dark:text-slate-400">{segment.translation}</div>
                 </div>
               </div>
             );

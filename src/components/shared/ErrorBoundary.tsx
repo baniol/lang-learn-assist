@@ -27,10 +27,7 @@ interface ErrorBoundaryState {
  * </ErrorBoundary>
  * ```
  */
-export class ErrorBoundary extends Component<
-  ErrorBoundaryProps,
-  ErrorBoundaryState
-> {
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -55,9 +52,7 @@ export class ErrorBoundary extends Component<
       if (this.props.fallback) {
         return this.props.fallback;
       }
-      return (
-        <ErrorFallback error={this.state.error} onReset={this.handleReset} />
-      );
+      return <ErrorFallback error={this.state.error} onReset={this.handleReset} />;
     }
 
     return this.props.children;
@@ -76,8 +71,7 @@ export function withErrorBoundary<P extends object>(
   WrappedComponent: React.ComponentType<P>,
   errorBoundaryProps?: Omit<ErrorBoundaryProps, "children">
 ) {
-  const displayName =
-    WrappedComponent.displayName || WrappedComponent.name || "Component";
+  const displayName = WrappedComponent.displayName || WrappedComponent.name || "Component";
 
   const ComponentWithBoundary = (props: P) => (
     <ErrorBoundary {...errorBoundaryProps}>

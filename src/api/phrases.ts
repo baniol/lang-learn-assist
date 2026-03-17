@@ -29,16 +29,11 @@ export async function createPhrase(request: CreatePhraseRequest): Promise<Phrase
   return invoke<Phrase>("create_phrase", { request });
 }
 
-export async function createPhrasesBatch(
-  phrases: CreatePhraseRequest[]
-): Promise<Phrase[]> {
+export async function createPhrasesBatch(phrases: CreatePhraseRequest[]): Promise<Phrase[]> {
   return invoke<Phrase[]>("create_phrases_batch", { phrases });
 }
 
-export async function updatePhrase(
-  id: number,
-  request: UpdatePhraseRequest
-): Promise<Phrase> {
+export async function updatePhrase(id: number, request: UpdatePhraseRequest): Promise<Phrase> {
   return invoke<Phrase>("update_phrase", { id, request });
 }
 
@@ -58,10 +53,7 @@ export async function toggleStarred(id: number): Promise<boolean> {
 // Audio
 // ============================================================================
 
-export async function updatePhraseAudio(
-  id: number,
-  audioPath: string
-): Promise<void> {
+export async function updatePhraseAudio(id: number, audioPath: string): Promise<void> {
   return invoke("update_phrase_audio", { id, audioPath });
 }
 
@@ -69,15 +61,11 @@ export async function updatePhraseAudio(
 // Phrase Refinement Threads
 // ============================================================================
 
-export async function getPhraseThread(
-  phraseId: number
-): Promise<PhraseThread | null> {
+export async function getPhraseThread(phraseId: number): Promise<PhraseThread | null> {
   return invoke<PhraseThread | null>("get_phrase_thread", { phraseId });
 }
 
-export async function createPhraseThread(
-  phraseId: number
-): Promise<PhraseThread> {
+export async function createPhraseThread(phraseId: number): Promise<PhraseThread> {
   return invoke<PhraseThread>("create_phrase_thread", { phraseId });
 }
 

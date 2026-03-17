@@ -33,18 +33,14 @@ export function TagDropdown({ selectedTagId, onTagSelect }: TagDropdownProps) {
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
         setDeleteConfirmId(null);
       }
     }
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isOpen]);
 
@@ -111,10 +107,7 @@ export function TagDropdown({ selectedTagId, onTagSelect }: TagDropdownProps) {
           {tags.length > 0 && (
             <div className="border-t border-slate-200 dark:border-slate-700">
               {tags.map((tag) => (
-                <div
-                  key={tag.id}
-                  className="flex items-center group"
-                >
+                <div key={tag.id} className="flex items-center group">
                   <button
                     onClick={() => {
                       onTagSelect(tag.id);

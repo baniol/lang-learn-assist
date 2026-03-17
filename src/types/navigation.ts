@@ -26,22 +26,17 @@ export type ViewType = ViewState["type"];
  * Get the data type for a specific view.
  * Returns never for views without data, or the data shape for views with data.
  */
-export type ViewDataFor<T extends ViewType> = Extract<
-  ViewState,
-  { type: T }
-> extends { type: T } & infer R
-  ? Omit<R, "type"> extends Record<string, never>
-    ? undefined
-    : Omit<R, "type">
-  : never;
+export type ViewDataFor<T extends ViewType> =
+  Extract<ViewState, { type: T }> extends { type: T } & infer R
+    ? Omit<R, "type"> extends Record<string, never>
+      ? undefined
+      : Omit<R, "type">
+    : never;
 
 /**
  * Views that require additional data.
  */
-export type ViewWithData = Extract<
-  ViewState,
-  { type: string; materialId: number }
->["type"];
+export type ViewWithData = Extract<ViewState, { type: string; materialId: number }>["type"];
 
 /**
  * Views that don't require any data.
@@ -61,14 +56,8 @@ export interface NavigateFn {
  * Creates the initial view state for a given view type.
  */
 export function createViewState<T extends ViewWithoutData>(view: T): ViewState;
-export function createViewState<T extends ViewWithData>(
-  view: T,
-  data: ViewDataFor<T>
-): ViewState;
-export function createViewState(
-  view: ViewType,
-  data?: Record<string, unknown>
-): ViewState {
+export function createViewState<T extends ViewWithData>(view: T, data: ViewDataFor<T>): ViewState;
+export function createViewState(view: ViewType, data?: Record<string, unknown>): ViewState {
   return { type: view, ...data } as ViewState;
 }
 

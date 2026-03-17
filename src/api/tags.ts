@@ -16,17 +16,11 @@ export async function deleteTag(id: number): Promise<void> {
   return invoke("delete_tag", { id });
 }
 
-export async function addTagToPhrase(
-  phraseId: number,
-  tagId: number
-): Promise<void> {
+export async function addTagToPhrase(phraseId: number, tagId: number): Promise<void> {
   return invoke("add_tag_to_phrase", { phraseId, tagId });
 }
 
-export async function removeTagFromPhrase(
-  phraseId: number,
-  tagId: number
-): Promise<void> {
+export async function removeTagFromPhrase(phraseId: number, tagId: number): Promise<void> {
   return invoke("remove_tag_from_phrase", { phraseId, tagId });
 }
 

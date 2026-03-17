@@ -65,9 +65,7 @@ describe("useQuery", () => {
     it("should not fetch when enabled is false", () => {
       const queryFn = vi.fn().mockResolvedValue({ data: "test" });
 
-      const { result } = renderHook(() =>
-        useQuery(queryFn, [], { enabled: false })
-      );
+      const { result } = renderHook(() => useQuery(queryFn, [], { enabled: false }));
 
       expect(result.current.isLoading).toBe(false);
       expect(queryFn).not.toHaveBeenCalled();
@@ -76,10 +74,9 @@ describe("useQuery", () => {
     it("should fetch when enabled changes to true", async () => {
       const queryFn = vi.fn().mockResolvedValue({ data: "test" });
 
-      const { result, rerender } = renderHook(
-        ({ enabled }) => useQuery(queryFn, [], { enabled }),
-        { initialProps: { enabled: false } }
-      );
+      const { result, rerender } = renderHook(({ enabled }) => useQuery(queryFn, [], { enabled }), {
+        initialProps: { enabled: false },
+      });
 
       expect(queryFn).not.toHaveBeenCalled();
 
@@ -97,10 +94,9 @@ describe("useQuery", () => {
     it("should refetch when dependencies change", async () => {
       const queryFn = vi.fn().mockResolvedValue({ data: "test" });
 
-      const { result, rerender } = renderHook(
-        ({ id }) => useQuery(queryFn, [id]),
-        { initialProps: { id: 1 } }
-      );
+      const { result, rerender } = renderHook(({ id }) => useQuery(queryFn, [id]), {
+        initialProps: { id: 1 },
+      });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -123,9 +119,7 @@ describe("useQuery", () => {
       const initialData = { cached: true };
       const queryFn = vi.fn().mockResolvedValue({ cached: false });
 
-      const { result } = renderHook(() =>
-        useQuery(queryFn, [], { initialData })
-      );
+      const { result } = renderHook(() => useQuery(queryFn, [], { initialData }));
 
       expect(result.current.data).toEqual(initialData);
     });
@@ -186,9 +180,7 @@ describe("useQuery", () => {
       const queryFn = vi.fn().mockResolvedValue(mockData);
       const initialData = { initial: true };
 
-      const { result } = renderHook(() =>
-        useQuery(queryFn, [], { initialData })
-      );
+      const { result } = renderHook(() => useQuery(queryFn, [], { initialData }));
 
       await waitFor(() => {
         expect(result.current.data).toEqual(mockData);

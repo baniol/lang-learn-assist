@@ -14,8 +14,7 @@ use regex::Regex;
 /// - `(\d+:\d+(?::\d+)?)` - Capture group: digits:digits, optionally followed by :digits
 /// - `\]?\s*$` - Optional closing bracket, optional whitespace, end of line
 pub static TIMESTAMP_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^\[?(\d+:\d+(?::\d+)?)\]?\s*$")
-        .expect("Invalid timestamp regex pattern")
+    Regex::new(r"^\[?(\d+:\d+(?::\d+)?)\]?\s*$").expect("Invalid timestamp regex pattern")
 });
 
 #[cfg(test)]

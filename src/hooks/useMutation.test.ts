@@ -117,9 +117,7 @@ describe("useMutation", () => {
       const mutationFn = vi.fn().mockResolvedValue(mockData);
       const onSuccess = vi.fn();
 
-      const { result } = renderHook(() =>
-        useMutation(mutationFn, { onSuccess })
-      );
+      const { result } = renderHook(() => useMutation(mutationFn, { onSuccess }));
 
       await act(async () => {
         await result.current.mutateAsync({ name: "Test" });
@@ -133,9 +131,7 @@ describe("useMutation", () => {
       const mutationFn = vi.fn().mockRejectedValue(error);
       const onError = vi.fn();
 
-      const { result } = renderHook(() =>
-        useMutation(mutationFn, { onError })
-      );
+      const { result } = renderHook(() => useMutation(mutationFn, { onError }));
 
       await act(async () => {
         try {
@@ -153,9 +149,7 @@ describe("useMutation", () => {
       const mutationFn = vi.fn().mockResolvedValue(mockData);
       const onSettled = vi.fn();
 
-      const { result } = renderHook(() =>
-        useMutation(mutationFn, { onSettled })
-      );
+      const { result } = renderHook(() => useMutation(mutationFn, { onSettled }));
 
       await act(async () => {
         await result.current.mutateAsync({ name: "Test" });
@@ -169,9 +163,7 @@ describe("useMutation", () => {
       const mutationFn = vi.fn().mockRejectedValue(error);
       const onSettled = vi.fn();
 
-      const { result } = renderHook(() =>
-        useMutation(mutationFn, { onSettled })
-      );
+      const { result } = renderHook(() => useMutation(mutationFn, { onSettled }));
 
       await act(async () => {
         try {
@@ -248,9 +240,7 @@ describe("useOptimisticMutation", () => {
     const mutationFn = vi.fn().mockResolvedValue({ id: 1 });
     const onMutate = vi.fn().mockReturnValue({ previousData: [1, 2, 3] });
 
-    const { result } = renderHook(() =>
-      useOptimisticMutation({ mutationFn, onMutate })
-    );
+    const { result } = renderHook(() => useOptimisticMutation({ mutationFn, onMutate }));
 
     await act(async () => {
       await result.current.mutate({ id: 1 });
@@ -267,9 +257,7 @@ describe("useOptimisticMutation", () => {
     const onMutate = vi.fn().mockReturnValue(context);
     const onSuccess = vi.fn();
 
-    const { result } = renderHook(() =>
-      useOptimisticMutation({ mutationFn, onMutate, onSuccess })
-    );
+    const { result } = renderHook(() => useOptimisticMutation({ mutationFn, onMutate, onSuccess }));
 
     await act(async () => {
       await result.current.mutate({ id: 1 });
@@ -285,9 +273,7 @@ describe("useOptimisticMutation", () => {
     const onMutate = vi.fn().mockReturnValue(context);
     const onError = vi.fn();
 
-    const { result } = renderHook(() =>
-      useOptimisticMutation({ mutationFn, onMutate, onError })
-    );
+    const { result } = renderHook(() => useOptimisticMutation({ mutationFn, onMutate, onError }));
 
     await act(async () => {
       try {
@@ -307,9 +293,7 @@ describe("useOptimisticMutation", () => {
     const onMutate = vi.fn().mockReturnValue(context);
     const onSettled = vi.fn();
 
-    const { result } = renderHook(() =>
-      useOptimisticMutation({ mutationFn, onMutate, onSettled })
-    );
+    const { result } = renderHook(() => useOptimisticMutation({ mutationFn, onMutate, onSettled }));
 
     await act(async () => {
       await result.current.mutate({ id: 1 });
@@ -324,9 +308,7 @@ describe("useOptimisticMutation", () => {
     const onMutate = vi.fn().mockResolvedValue(context);
     const onSuccess = vi.fn();
 
-    const { result } = renderHook(() =>
-      useOptimisticMutation({ mutationFn, onMutate, onSuccess })
-    );
+    const { result } = renderHook(() => useOptimisticMutation({ mutationFn, onMutate, onSuccess }));
 
     await act(async () => {
       await result.current.mutate({ id: 1 });
@@ -344,9 +326,7 @@ describe("useOptimisticMutation", () => {
       });
     });
 
-    const { result } = renderHook(() =>
-      useOptimisticMutation({ mutationFn })
-    );
+    const { result } = renderHook(() => useOptimisticMutation({ mutationFn }));
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBe(null);

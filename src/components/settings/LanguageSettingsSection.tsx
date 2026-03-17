@@ -67,8 +67,8 @@ export function LanguageSettingsSection({
         </div>
       </div>
       <p className="mt-3 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg">
-        New conversations and practice sessions will use these languages. You
-        can also quickly switch languages using the dropdown in the sidebar.
+        New conversations and practice sessions will use these languages. You can also quickly
+        switch languages using the dropdown in the sidebar.
       </p>
     </SettingsSection>
   );

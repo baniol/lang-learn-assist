@@ -5,14 +5,18 @@
 use crate::constants::practice::{MATERIAL_CONTEXT_MAX_TOKENS, PRACTICE_RESPONSE_MAX_TOKENS};
 use crate::constants::tokens::CHARS_PER_TOKEN_GERMAN;
 use crate::db::get_conn;
-use crate::models::{PracticeMessage, PracticeResponse, PracticeSession, SuggestedPhrase, TextSegment};
+use crate::models::{
+    PracticeMessage, PracticeResponse, PracticeSession, SuggestedPhrase, TextSegment,
+};
 use crate::state::AppState;
 use crate::utils::lock::SafeRwLock;
 use rusqlite::params;
 use tauri::State;
 
 use super::llm::client::call_llm;
-use super::llm::prompts::{build_practice_exercise_system_prompt, build_practice_free_system_prompt};
+use super::llm::prompts::{
+    build_practice_exercise_system_prompt, build_practice_free_system_prompt,
+};
 
 /// Build a context string from material segments, truncated to fit within token budget.
 fn build_material_context(segments: &[TextSegment], max_tokens: usize) -> String {
@@ -52,8 +56,7 @@ pub fn get_practice_sessions(materialId: i64) -> Result<Vec<PracticeSession>, St
                 material_id: row.get(1)?,
                 mode: row.get(2)?,
                 messages: serde_json::from_str(&messages_json).unwrap_or_default(),
-                suggested_phrases: phrases_json
-                    .and_then(|j| serde_json::from_str(&j).ok()),
+                suggested_phrases: phrases_json.and_then(|j| serde_json::from_str(&j).ok()),
                 created_at: row.get(5)?,
                 updated_at: row.get(6)?,
             })
@@ -92,8 +95,7 @@ pub fn create_practice_session(materialId: i64, mode: String) -> Result<Practice
             material_id: row.get(1)?,
             mode: row.get(2)?,
             messages: serde_json::from_str(&messages_json).unwrap_or_default(),
-            suggested_phrases: phrases_json
-                .and_then(|j| serde_json::from_str(&j).ok()),
+            suggested_phrases: phrases_json.and_then(|j| serde_json::from_str(&j).ok()),
             created_at: row.get(5)?,
             updated_at: row.get(6)?,
         })
@@ -110,11 +112,13 @@ pub fn update_practice_session(
     suggestedPhrases: Option<Vec<SuggestedPhrase>>,
 ) -> Result<PracticeSession, String> {
     let conn = get_conn()?;
-    let messages_json =
-        serde_json::to_string(&messages).map_err(|e| format!("Failed to serialize messages: {}", e))?;
+    let messages_json = serde_json::to_string(&messages)
+        .map_err(|e| format!("Failed to serialize messages: {}", e))?;
     let phrases_json = suggestedPhrases
         .as_ref()
-        .map(|p| serde_json::to_string(p).map_err(|e| format!("Failed to serialize phrases: {}", e)))
+        .map(|p| {
+            serde_json::to_string(p).map_err(|e| format!("Failed to serialize phrases: {}", e))
+        })
         .transpose()?;
 
     conn.execute(
@@ -138,8 +142,7 @@ pub fn update_practice_session(
             material_id: row.get(1)?,
             mode: row.get(2)?,
             messages: serde_json::from_str(&messages_json).unwrap_or_default(),
-            suggested_phrases: phrases_json
-                .and_then(|j| serde_json::from_str(&j).ok()),
+            suggested_phrases: phrases_json.and_then(|j| serde_json::from_str(&j).ok()),
             created_at: row.get(5)?,
             updated_at: row.get(6)?,
         })
@@ -198,7 +201,11 @@ pub async fn practice_send_message(
 
     // Build mode-specific system prompt
     let system_prompt = match mode.as_str() {
-        "exercise" => build_practice_exercise_system_prompt(&material_context, &targetLanguage, &nativeLanguage),
+        "exercise" => build_practice_exercise_system_prompt(
+            &material_context,
+            &targetLanguage,
+            &nativeLanguage,
+        ),
         _ => build_practice_free_system_prompt(&material_context, &targetLanguage, &nativeLanguage),
     };
 
@@ -211,7 +218,11 @@ pub async fn practice_send_message(
     let mut llm_messages: Vec<serde_json::Value> = previousMessages[history_start..]
         .iter()
         .map(|m| {
-            let role = if m.role == "user" { "user" } else { "assistant" };
+            let role = if m.role == "user" {
+                "user"
+            } else {
+                "assistant"
+            };
             serde_json::json!({"role": role, "content": m.content})
         })
         .collect();
