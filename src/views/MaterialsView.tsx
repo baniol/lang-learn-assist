@@ -6,7 +6,6 @@ import {
   PlusIcon,
   TrashIcon,
   ArchiveIcon,
-  PlayCircleIcon,
   NoteIcon,
 } from "../components/icons";
 import { useSettings } from "../contexts/SettingsContext";
@@ -95,10 +94,7 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    if (type === "transcript") {
-      return <PlayCircleIcon size="sm" />;
-    }
+  const getTypeIcon = (_type: string) => {
     return <NoteIcon size="sm" />;
   };
 
@@ -126,7 +122,7 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
 
         {/* Type Filter */}
         <div className="flex gap-2">
-          {(["all", "transcript", "text"] as const).map((filter) => (
+          {(["all", "text", "audio"] as const).map((filter) => (
             <button
               key={filter}
               onClick={() => setTypeFilter(filter)}
@@ -136,11 +132,7 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
                   : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
               }`}
             >
-              {filter === "all"
-                ? "All"
-                : filter === "transcript"
-                  ? "Transcripts"
-                  : "Text"}
+              {filter === "all" ? "All" : filter === "text" ? "Text" : "Audio"}
             </button>
           ))}
         </div>
@@ -157,7 +149,7 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
               />
             }
             title="No materials yet"
-            description="Import YouTube transcripts or articles to analyze and learn from."
+            description="Import articles or record audio to analyze and learn from."
             action={{
               label: "Add your first material",
               onClick: () => onNavigate("material-create"),

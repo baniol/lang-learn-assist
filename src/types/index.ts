@@ -272,7 +272,7 @@ export interface ExportMaterialThread {
 
 // Materials (YouTube transcripts, articles, etc.)
 
-export type MaterialType = "transcript" | "text" | "audio";
+export type MaterialType = "text" | "audio";
 export type MaterialStatus = "pending" | "processing" | "ready" | "error";
 
 export interface Material {

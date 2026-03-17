@@ -21,7 +21,6 @@ import {
 import { Button, Spinner } from "../components/ui";
 import {
   ChevronLeftIcon,
-  PlayCircleIcon,
   NoteIcon,
   MicrophoneIcon,
   TrashIcon,
@@ -48,9 +47,8 @@ interface MaterialCreateViewProps {
 
 export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
   const { settings } = useSettings();
-  const [materialType, setMaterialType] = useState<MaterialType>("transcript");
+  const [materialType, setMaterialType] = useState<MaterialType>("text");
   const [title, setTitle] = useState("");
-  const [sourceUrl, setSourceUrl] = useState("");
   const [originalText, setOriginalText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -237,7 +235,6 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
       const material = await createMaterial({
         title: title.trim(),
         materialType,
-        sourceUrl: sourceUrl.trim() || undefined,
         originalText: textForMaterial,
         targetLanguage: settings?.targetLanguage,
         nativeLanguage: settings?.nativeLanguage,
@@ -317,22 +314,6 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
             </label>
             <div className="flex gap-2">
               <button
-                onClick={() => setMaterialType("transcript")}
-                className={`flex-1 flex items-center justify-center gap-2 p-4 rounded-lg border-2 transition-colors ${
-                  materialType === "transcript"
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
-                    : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
-                }`}
-              >
-                <PlayCircleIcon size="lg" />
-                <div className="text-left">
-                  <div className="font-medium">YouTube Transcript</div>
-                  <div className="text-xs opacity-75">
-                    With timestamps and video embed
-                  </div>
-                </div>
-              </button>
-              <button
                 onClick={() => setMaterialType("text")}
                 className={`flex-1 flex items-center justify-center gap-2 p-4 rounded-lg border-2 transition-colors ${
                   materialType === "text"
@@ -380,45 +361,6 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
               className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-
-          {/* YouTube URL (for transcripts) */}
-          {materialType === "transcript" && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                YouTube URL (optional)
-              </label>
-              <input
-                type="text"
-                value={sourceUrl}
-                onChange={(e) => setSourceUrl(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=..."
-                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                If provided, the video will be embedded for click-to-seek
-                playback.
-              </p>
-            </div>
-          )}
-
-          {/* Source URL (for audio) */}
-          {materialType === "audio" && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Source URL (optional)
-              </label>
-              <input
-                type="text"
-                value={sourceUrl}
-                onChange={(e) => setSourceUrl(e.target.value)}
-                placeholder="https://youtube.com/... or any link"
-                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Link to the source video/audio (will be shown in material review)
-              </p>
-            </div>
-          )}
 
           {/* Audio Recording UI */}
           {materialType === "audio" && (
@@ -509,29 +451,19 @@ export function MaterialCreateView({ onNavigate }: MaterialCreateViewProps) {
             </div>
           )}
 
-          {/* Content textarea (for transcript and text types) */}
+          {/* Content textarea (for text type) */}
           {materialType !== "audio" && (
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {materialType === "transcript" ? "Transcript" : "Text Content"}
+                Text Content
               </label>
               <textarea
                 value={originalText}
                 onChange={(e) => setOriginalText(e.target.value)}
-                placeholder={
-                  materialType === "transcript"
-                    ? "Paste the YouTube transcript here...\n\nFormat:\n0:15 Hallo, wie geht's?\n0:18 Mir geht es gut.\n..."
-                    : "Paste the article or text here..."
-                }
+                placeholder="Paste the article or text here..."
                 rows={12}
                 className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
               />
-              {materialType === "transcript" && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Each line should start with a timestamp (e.g., "0:15 Text
-                  here")
-                </p>
-              )}
             </div>
           )}
 

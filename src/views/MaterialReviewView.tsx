@@ -3,50 +3,10 @@ import { getMaterial, getMaterialThreadIndices, updateMaterialBookmark } from ".
 import { playAudioFile } from "../lib/audio";
 import { SentenceThreadDialog } from "../components/SentenceThreadDialog";
 import { Button, Spinner } from "../components/ui";
-import { ChevronLeftIcon, LightbulbIcon, BookmarkIcon, VolumeUpIcon, ExternalLinkIcon } from "../components/icons";
+import { ChevronLeftIcon, LightbulbIcon, BookmarkIcon, VolumeUpIcon } from "../components/icons";
 import { ChatIcon } from "../components/icons";
 import type { ViewType, Material, TextSegment } from "../types";
 
-/**
- * Parse timestamp string (e.g., "1:23" or "1:23:45") to seconds
- */
-function parseTimestampToSeconds(timestamp: string): number {
-  const parts = timestamp.split(":").map(Number);
-  if (parts.length === 2) {
-    // MM:SS
-    return parts[0] * 60 + parts[1];
-  } else if (parts.length === 3) {
-    // HH:MM:SS
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  }
-  return 0;
-}
-
-/**
- * Check if URL is a YouTube URL
- */
-function isYouTubeUrl(url: string | null): boolean {
-  if (!url) return false;
-  return url.includes("youtube.com") || url.includes("youtu.be");
-}
-
-/**
- * Build YouTube URL with timestamp
- */
-function buildYouTubeTimestampUrl(sourceUrl: string, timestamp: string): string {
-  const seconds = parseTimestampToSeconds(timestamp);
-  const url = new URL(sourceUrl);
-
-  // Handle youtu.be short URLs
-  if (url.hostname === "youtu.be") {
-    const videoId = url.pathname.slice(1);
-    return `https://www.youtube.com/watch?v=${videoId}&t=${seconds}`;
-  }
-
-  // Handle youtube.com URLs
-  url.searchParams.set("t", String(seconds));
-  return url.toString();
-}
 
 interface MaterialReviewViewProps {
   materialId: number;
@@ -182,17 +142,6 @@ export function MaterialReviewView({
                 {segments.length} sentences - Click the bulb to ask about any
                 sentence
               </span>
-              {material.sourceUrl && (
-                <a
-                  href={material.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
-                >
-                  <ExternalLinkIcon size="sm" />
-                  <span>Source</span>
-                </a>
-              )}
             </div>
           </div>
           <button
@@ -280,21 +229,9 @@ export function MaterialReviewView({
                     </button>
                   )}
                   {segment.timestamp && (
-                    material.materialType === "transcript" && isYouTubeUrl(material.sourceUrl) ? (
-                      <a
-                        href={buildYouTubeTimestampUrl(material.sourceUrl!, segment.timestamp!)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 mt-1 hover:underline"
-                        title="Open in YouTube"
-                      >
-                        {segment.timestamp}
-                      </a>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
-                        {segment.timestamp}
-                      </span>
-                    )
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                      {segment.timestamp}
+                    </span>
                   )}
                 </div>
 
