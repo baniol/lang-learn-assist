@@ -52,6 +52,7 @@ pub fn run() {
             llm::client::test_llm_connection,
             llm::phrase::refine_phrase,
             llm::phrase::generate_title,
+            llm::phrase::generate_phrases,
             llm::material::process_material,
             llm::material::estimate_material_tokens,
             llm::material::ask_about_sentence,

@@ -185,6 +185,38 @@ Set feedback to null for your initial prompt. Include 0-2 useful phrases that we
     )
 }
 
+/// Build system prompt for generating phrases from a user query.
+pub fn build_phrase_generation_system_prompt(
+    target_language: &str,
+    native_language: &str,
+) -> String {
+    let target_name = get_language_name(target_language);
+    let native_name = get_language_name(native_language);
+
+    format!(
+        r#"You are a language learning assistant helping a {} speaker learn {}.
+
+The student will describe what they want to say or ask for phrases on a topic.
+Your job is to provide useful, practical phrases they can add to their vocabulary.
+
+For each request:
+1. Respond with a brief explanation or intro in {}
+2. Provide 3-5 useful phrases relevant to their request
+
+Always respond with JSON in this exact format:
+{{
+  "explanation": "Brief intro or context in {}",
+  "phrases": [
+    {{"prompt": "{} meaning", "answer": "{} phrase", "accepted": ["alternative1"]}}
+  ]
+}}"#,
+        native_name, target_name,
+        native_name,
+        native_name,
+        native_name, target_name
+    )
+}
+
 /// Build system prompt for phrase translation.
 pub fn build_translation_system_prompt(
     source_language: &str,

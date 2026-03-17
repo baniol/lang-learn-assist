@@ -15,16 +15,12 @@ import { useSettings } from "../contexts/SettingsContext";
 
 import {
   getPhrases,
-  createPhrase,
   updatePhrase,
   deletePhrase,
   toggleStarred,
   updatePhraseAudio,
 } from "../api";
-import {
-  type CreatePhraseRequest,
-  type Phrase,
-} from "../types";
+import { type Phrase } from "../types";
 
 export function PhraseLibraryView() {
   const { settings } = useSettings();
@@ -179,15 +175,9 @@ export function PhraseLibraryView() {
     }
   };
 
-  const handleAddPhrase = async (request: CreatePhraseRequest) => {
-    try {
-      await createPhrase(request);
-      setShowAddDialog(false);
-      await loadPhrases();
-    } catch (err) {
-      console.error("Failed to create phrase:", err);
-    }
-  };
+  const handlePhraseAdded = useCallback(async () => {
+    await loadPhrases();
+  }, []);
 
   const handleRefineAccept = async (
     prompt: string,
@@ -283,7 +273,7 @@ export function PhraseLibraryView() {
       <AddPhraseDialog
         isOpen={showAddDialog}
         onClose={() => setShowAddDialog(false)}
-        onAdd={handleAddPhrase}
+        onAdded={handlePhraseAdded}
       />
 
       {/* Delete Confirmation Dialog */}

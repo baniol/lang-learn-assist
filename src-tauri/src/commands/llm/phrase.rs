@@ -3,15 +3,15 @@
 //! This module contains Tauri commands for refining phrases with AI assistance
 //! and generating titles for conversations.
 
-use crate::constants::llm::{REFINE_PHRASE_MAX_TOKENS, TITLE_MAX_TOKENS};
-use crate::models::{get_language_name, Phrase, PhraseThreadMessage, RefinePhraseSuggestion};
+use crate::constants::llm::{GENERATE_PHRASES_MAX_TOKENS, REFINE_PHRASE_MAX_TOKENS, TITLE_MAX_TOKENS};
+use crate::models::{AskAboutSentenceResponse, get_language_name, Phrase, PhraseThreadMessage, RefinePhraseSuggestion};
 use crate::state::AppState;
 use crate::utils::lock::SafeRwLock;
 use serde::Deserialize;
 use tauri::State;
 
 use super::client::call_llm;
-use super::prompts::build_refinement_system_prompt;
+use super::prompts::{build_phrase_generation_system_prompt, build_refinement_system_prompt};
 
 /// Refine a phrase based on user requests through conversation.
 #[tauri::command]
@@ -118,4 +118,51 @@ Title:"#,
         .to_string();
 
     Ok(title)
+}
+
+/// Generate phrase suggestions based on a user query (e.g. "how to ask for directions").
+#[tauri::command]
+#[allow(non_snake_case)]
+pub async fn generate_phrases(
+    state: State<'_, AppState>,
+    query: String,
+    previousMessages: Vec<serde_json::Value>,
+    targetLanguage: Option<String>,
+    nativeLanguage: Option<String>,
+) -> Result<AskAboutSentenceResponse, String> {
+    let settings = state.settings.safe_read()?.clone();
+
+    if settings.llm_api_key.is_empty() {
+        return Err("LLM API key not configured".to_string());
+    }
+
+    let target_lang = targetLanguage.unwrap_or_else(|| settings.target_language.clone());
+    let native_lang = nativeLanguage.unwrap_or_else(|| settings.native_language.clone());
+
+    let system_prompt = build_phrase_generation_system_prompt(&target_lang, &native_lang);
+
+    let mut llm_messages = previousMessages;
+    llm_messages.push(serde_json::json!({"role": "user", "content": query}));
+
+    let response = call_llm(&settings, &llm_messages, Some(&system_prompt), GENERATE_PHRASES_MAX_TOKENS).await?;
+
+    let json_start = response.content.find('{');
+    let json_end = response.content.rfind('}');
+
+    let (json_start, json_end) = match (json_start, json_end) {
+        (Some(start), Some(end)) if end >= start => (start, end),
+        _ => {
+            return Ok(AskAboutSentenceResponse {
+                explanation: response.content,
+                phrases: vec![],
+            });
+        }
+    };
+
+    let json_str = &response.content[json_start..=json_end];
+
+    let parsed: AskAboutSentenceResponse = serde_json::from_str(json_str)
+        .map_err(|e| format!("Failed to parse response: {}. Raw: {}", e, json_str))?;
+
+    Ok(parsed)
 }

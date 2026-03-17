@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  AskAboutSentenceResponse,
   Phrase,
   PhraseThread,
   PhraseThreadMessage,
   RefinePhraseSuggestion,
-  TranslationPreview,
 } from "../types";
 
 export async function getPhraseThread(
@@ -43,6 +43,25 @@ export async function deletePhraseThread(threadId: number): Promise<void> {
   return invoke<void>("delete_phrase_thread", { threadId });
 }
 
+export interface GeneratePhraseMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function generatePhrases(
+  query: string,
+  previousMessages: GeneratePhraseMessage[],
+  targetLanguage?: string,
+  nativeLanguage?: string,
+): Promise<AskAboutSentenceResponse> {
+  return invoke<AskAboutSentenceResponse>("generate_phrases", {
+    query,
+    previousMessages,
+    targetLanguage,
+    nativeLanguage,
+  });
+}
+
 export async function refinePhrase(
   phrase: Phrase,
   messages: PhraseThreadMessage[],
@@ -52,29 +71,5 @@ export async function refinePhrase(
     phrase,
     messages,
     userMessage,
-  });
-}
-
-export async function previewPhraseTranslation(
-  phraseId: number,
-  newTargetLanguage: string
-): Promise<TranslationPreview> {
-  return invoke<TranslationPreview>("preview_phrase_translation", {
-    phraseId,
-    newTargetLanguage,
-  });
-}
-
-export async function applyPhraseTranslation(
-  phraseId: number,
-  translatedAnswer: string,
-  translatedAccepted: string[],
-  newTargetLanguage: string
-): Promise<Phrase> {
-  return invoke<Phrase>("apply_phrase_translation", {
-    phraseId,
-    translatedAnswer,
-    translatedAccepted,
-    newTargetLanguage,
   });
 }

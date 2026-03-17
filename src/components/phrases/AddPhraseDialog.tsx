@@ -1,116 +1,155 @@
 import { useState } from "react";
-import { Button, Dialog } from "../ui";
-import type { CreatePhraseRequest } from "../../types";
+import { Dialog, AIChatPanel } from "../ui";
+import type { ChatMessage } from "../ui";
+import { CheckIcon, CloseIcon } from "../icons";
+import { generatePhrases } from "../../lib/phrases";
+import { createPhrase } from "../../api";
+import { useSettings } from "../../contexts/SettingsContext";
+import type { SuggestedPhrase } from "../../types";
 
 interface AddPhraseDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (request: CreatePhraseRequest) => void;
+  onAdded: () => void;
 }
 
-export function AddPhraseDialog({
-  isOpen,
-  onClose,
-  onAdd,
-}: AddPhraseDialogProps) {
-  const [newPhrase, setNewPhrase] = useState<CreatePhraseRequest>({
-    prompt: "",
-    answer: "",
-    accepted: [],
-    notes: "",
-  });
+export function AddPhraseDialog({ isOpen, onClose, onAdded }: AddPhraseDialogProps) {
+  const { settings } = useSettings();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [pendingPhrases, setPendingPhrases] = useState<SuggestedPhrase[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const handleClose = () => {
+    setMessages([]);
+    setInputValue("");
+    setPendingPhrases([]);
+    setError(null);
     onClose();
-    setNewPhrase({ prompt: "", answer: "", accepted: [], notes: "" });
   };
 
-  const handleAdd = () => {
-    if (!newPhrase.prompt.trim() || !newPhrase.answer.trim()) return;
-    onAdd(newPhrase);
-    handleClose();
+  const handleSend = async () => {
+    if (!inputValue.trim() || isSending) return;
+
+    const query = inputValue.trim();
+    setInputValue("");
+    setIsSending(true);
+    setError(null);
+
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: query,
+    };
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+
+    try {
+      const response = await generatePhrases(
+        query,
+        messages.map(({ role, content }) => ({ role, content })),
+        settings?.targetLanguage,
+        settings?.nativeLanguage,
+      );
+
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: response.explanation,
+      };
+      setMessages([...updatedMessages, assistantMessage]);
+      setPendingPhrases((prev) => [...prev, ...response.phrases]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setMessages(messages);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleAccept = async (phrase: SuggestedPhrase, index: number) => {
+    try {
+      await createPhrase({
+        prompt: phrase.prompt,
+        answer: phrase.answer,
+        accepted: phrase.accepted || [],
+        targetLanguage: settings?.targetLanguage,
+        nativeLanguage: settings?.nativeLanguage,
+      });
+      setPendingPhrases((prev) => prev.filter((_, i) => i !== index));
+      onAdded();
+    } catch (err) {
+      setError(`Failed to save phrase: ${err}`);
+    }
+  };
+
+  const handleReject = (index: number) => {
+    setPendingPhrases((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
-    <Dialog isOpen={isOpen} onClose={handleClose} title="Add New Phrase">
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Prompt (Polish)
-          </label>
-          <input
-            type="text"
-            value={newPhrase.prompt}
-            onChange={(e) =>
-              setNewPhrase({ ...newPhrase, prompt: e.target.value })
-            }
-            placeholder="What do you want to say..."
-            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-          />
-        </div>
+    <Dialog isOpen={isOpen} onClose={handleClose} title="Add Phrases with AI">
+      <div className="flex flex-col -mx-6 -mb-6" style={{ minHeight: 360 }}>
+        {/* Suggested Phrases */}
+        {pendingPhrases.length > 0 && (
+          <div className="px-6 py-3 border-b border-slate-200 dark:border-slate-700 bg-amber-50 dark:bg-amber-900/20">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
+              Suggested Phrases ({pendingPhrases.length})
+            </p>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {pendingPhrases.map((phrase, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-800 dark:text-white truncate">
+                      {phrase.answer}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {phrase.prompt}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => handleAccept(phrase, i)}
+                      className="p-1.5 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
+                      title="Add to phrases"
+                    >
+                      <CheckIcon size="sm" />
+                    </button>
+                    <button
+                      onClick={() => handleReject(i)}
+                      className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                      title="Dismiss"
+                    >
+                      <CloseIcon size="sm" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Answer (German)
-          </label>
-          <input
-            type="text"
-            value={newPhrase.answer}
-            onChange={(e) =>
-              setNewPhrase({ ...newPhrase, answer: e.target.value })
-            }
-            placeholder="The German translation..."
-            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-          />
-        </div>
+        {/* Chat */}
+        <AIChatPanel
+          messages={messages}
+          inputValue={inputValue}
+          onInputChange={setInputValue}
+          onSend={handleSend}
+          isSending={isSending}
+          placeholder="Describe what you want to say, e.g. 'how to ask for directions'..."
+          variant="blue"
+          className="flex-1"
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Accepted Alternatives (comma-separated)
-          </label>
-          <input
-            type="text"
-            value={newPhrase.accepted?.join(", ") || ""}
-            onChange={(e) =>
-              setNewPhrase({
-                ...newPhrase,
-                accepted: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="variant1, variant2..."
-            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Notes (optional)
-          </label>
-          <textarea
-            value={newPhrase.notes || ""}
-            onChange={(e) =>
-              setNewPhrase({ ...newPhrase, notes: e.target.value })
-            }
-            placeholder="Any helpful notes..."
-            rows={2}
-            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white resize-none"
-          />
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4">
-          <Button onClick={handleClose} variant="ghost">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAdd}
-            disabled={!newPhrase.prompt.trim() || !newPhrase.answer.trim()}
-          >
-            Add Phrase
-          </Button>
-        </div>
+        {error && (
+          <div className="px-6 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+            {error}
+          </div>
+        )}
       </div>
     </Dialog>
   );
