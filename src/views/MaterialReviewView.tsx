@@ -4,7 +4,6 @@ import { playAudioFile } from "../lib/audio";
 import { SentenceThreadDialog } from "../components/SentenceThreadDialog";
 import { Button, Spinner } from "../components/ui";
 import { ChevronLeftIcon, LightbulbIcon, BookmarkIcon, VolumeUpIcon } from "../components/icons";
-import { ChatIcon } from "../components/icons";
 import type { ViewType, Material, TextSegment } from "../types";
 
 interface MaterialReviewViewProps {
@@ -131,18 +130,6 @@ export function MaterialReviewView({ materialId, onNavigate }: MaterialReviewVie
               <span>{segments.length} sentences - Click the bulb to ask about any sentence</span>
             </div>
           </div>
-          <button
-            onClick={() => onNavigate("material-practice", { materialId })}
-            disabled={material.status !== "ready"}
-            className={`p-2 rounded-lg transition-colors ${
-              material.status === "ready"
-                ? "text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30"
-                : "text-slate-300 dark:text-slate-600 cursor-not-allowed"
-            }`}
-            title={material.status === "ready" ? "Practice conversation" : "Process material first"}
-          >
-            <ChatIcon size="md" />
-          </button>
           <button
             onClick={scrollToBookmark}
             disabled={bookmarkIndex === null}
