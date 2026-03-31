@@ -273,7 +273,7 @@ export interface ExportMaterialThread {
 
 // Materials (YouTube transcripts, articles, etc.)
 
-export type MaterialType = "text" | "audio";
+export type MaterialType = "text";
 export type MaterialStatus = "pending" | "processing" | "ready" | "error";
 
 export interface Material {
@@ -295,7 +295,6 @@ export interface TextSegment {
   text: string;
   translation: string;
   timestamp?: string;
-  audioPath?: string;
 }
 
 export interface CreateMaterialRequest {

@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getMaterial, getMaterialThreadIndices, updateMaterialBookmark } from "../lib/materials";
-import { playAudioFile } from "../lib/audio";
 import { SentenceThreadDialog } from "../components/SentenceThreadDialog";
 import { Button, Spinner } from "../components/ui";
-import { ChevronLeftIcon, LightbulbIcon, BookmarkIcon, VolumeUpIcon } from "../components/icons";
+import { ChevronLeftIcon, LightbulbIcon, BookmarkIcon } from "../components/icons";
 import type { ViewType, Material, TextSegment } from "../types";
 
 interface MaterialReviewViewProps {
@@ -17,7 +16,6 @@ export function MaterialReviewView({ materialId, onNavigate }: MaterialReviewVie
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [threadDates, setThreadDates] = useState<Map<number, string>>(new Map());
   const [bookmarkIndex, setBookmarkIndex] = useState<number | null>(null);
-  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const sentenceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const loadMaterial = useCallback(async () => {
@@ -71,22 +69,6 @@ export function MaterialReviewView({ materialId, onNavigate }: MaterialReviewVie
       }
     }
   }, [bookmarkIndex]);
-
-  const handlePlayAudio = useCallback(
-    async (index: number, audioPath: string) => {
-      if (playingIndex === index) return;
-
-      setPlayingIndex(index);
-      try {
-        await playAudioFile(audioPath);
-      } catch (err) {
-        console.error("Failed to play audio:", err);
-      } finally {
-        setPlayingIndex(null);
-      }
-    },
-    [playingIndex]
-  );
 
   if (isLoading) {
     return (
@@ -186,20 +168,6 @@ export function MaterialReviewView({ materialId, onNavigate }: MaterialReviewVie
                   >
                     <BookmarkIcon size="sm" filled={isBookmarked} />
                   </button>
-                  {segment.audioPath && (
-                    <button
-                      onClick={() => handlePlayAudio(index, segment.audioPath!)}
-                      disabled={playingIndex === index}
-                      className={`p-2 rounded-lg transition-colors ${
-                        playingIndex === index
-                          ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                          : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-green-500"
-                      }`}
-                      title="Play audio"
-                    >
-                      <VolumeUpIcon size="sm" />
-                    </button>
-                  )}
                   {segment.timestamp && (
                     <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                       {segment.timestamp}

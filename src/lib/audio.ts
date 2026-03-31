@@ -52,23 +52,6 @@ export async function transcribeAudio(
   return invoke<string>("transcribe_audio", { audioPath, language, prompt });
 }
 
-// Result of transcribing and preserving audio
-export interface TranscriptionWithAudio {
-  transcription: string;
-  savedAudioPath: string;
-}
-
-// Transcribe audio and preserve the audio file for later playback
-export async function transcribeAndPreserveAudio(
-  audioPath: string,
-  language?: string
-): Promise<TranscriptionWithAudio> {
-  return invoke<TranscriptionWithAudio>("transcribe_and_preserve_audio", {
-    audioPath,
-    language,
-  });
-}
-
 // Play audio file using Web Audio API
 let audioContext: AudioContext | null = null;
 

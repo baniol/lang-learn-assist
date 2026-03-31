@@ -108,7 +108,7 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
 
         {/* Type Filter */}
         <div className="flex gap-2">
-          {(["all", "text", "audio"] as const).map((filter) => (
+          {(["all", "text"] as const).map((filter) => (
             <button
               key={filter}
               onClick={() => setTypeFilter(filter)}
@@ -118,7 +118,7 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
                   : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
               }`}
             >
-              {filter === "all" ? "All" : filter === "text" ? "Text" : "Audio"}
+              {filter === "all" ? "All" : "Text"}
             </button>
           ))}
         </div>
