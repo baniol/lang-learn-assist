@@ -25,6 +25,7 @@ export function PhraseLibraryView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
+  const [starredOnly, setStarredOnly] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,7 +67,14 @@ export function PhraseLibraryView() {
   useEffect(() => {
     loadPhrases();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus, debouncedSearch, languageFilter, settings?.targetLanguage, selectedTagId]);
+  }, [
+    filterStatus,
+    debouncedSearch,
+    languageFilter,
+    settings?.targetLanguage,
+    selectedTagId,
+    starredOnly,
+  ]);
 
   const loadPhrases = async () => {
     setIsLoading(true);
@@ -81,6 +89,7 @@ export function PhraseLibraryView() {
       const data = await getPhrases({
         targetLanguage: targetLang,
         tagId: selectedTagId ?? undefined,
+        starredOnly: starredOnly || undefined,
       });
 
       // Apply client-side filtering for search
@@ -190,6 +199,8 @@ export function PhraseLibraryView() {
         currentLanguage={settings?.targetLanguage}
         selectedTagId={selectedTagId}
         onTagSelect={setSelectedTagId}
+        starredOnly={starredOnly}
+        onStarredOnlyChange={setStarredOnly}
       />
 
       {/* Phrases List */}

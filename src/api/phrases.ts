@@ -18,10 +18,12 @@ export async function getPhrases(options?: {
   targetLanguage?: string;
   materialId?: number;
   tagId?: number;
+  starredOnly?: boolean;
 }): Promise<Phrase[]> {
   return invoke<Phrase[]>("get_phrases", {
     targetLanguage: options?.targetLanguage ?? null,
     tagId: options?.tagId ?? null,
+    starredOnly: options?.starredOnly ?? null,
   });
 }
 

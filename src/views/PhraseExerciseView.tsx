@@ -14,6 +14,7 @@ import {
   VolumeUpIcon,
   MicrophoneIcon,
   EditIcon,
+  StarIcon,
 } from "../components/icons";
 import { cn } from "../lib/utils";
 import type { Tag, ExercisePhase, ExerciseSessionPhrase, CheckAnswerResult } from "../types";
@@ -37,6 +38,7 @@ export function PhraseExerciseView() {
   // Setup state
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
+  const [starredOnly, setStarredOnly] = useState(false);
   const [phraseCount, setPhraseCount] = useState<number | null>(null);
   const [isLoadingPhrases, setIsLoadingPhrases] = useState(false);
 
@@ -163,6 +165,7 @@ export function PhraseExerciseView() {
     getPhrases({
       targetLanguage,
       tagId: selectedTagId ?? undefined,
+      starredOnly: starredOnly || undefined,
     })
       .then((phrases) => {
         if (mountedRef.current) {
@@ -173,7 +176,7 @@ export function PhraseExerciseView() {
       .finally(() => {
         if (mountedRef.current) setIsLoadingPhrases(false);
       });
-  }, [selectedTagId, targetLanguage, settings]);
+  }, [selectedTagId, starredOnly, targetLanguage, settings]);
 
   // Start exercise
   const handleStart = useCallback(async () => {
@@ -181,6 +184,7 @@ export function PhraseExerciseView() {
       const phrases = await getPhrases({
         targetLanguage,
         tagId: selectedTagId ?? undefined,
+        starredOnly: starredOnly || undefined,
       });
       if (phrases.length === 0) return;
 
@@ -205,7 +209,7 @@ export function PhraseExerciseView() {
     } catch (err) {
       console.error("Failed to start exercise:", err);
     }
-  }, [targetLanguage, selectedTagId, inputMode]);
+  }, [targetLanguage, selectedTagId, starredOnly, inputMode]);
 
   // Advance: stay on same phrase until completed, then move to next
   const handleNext = useCallback(() => {
@@ -384,6 +388,22 @@ export function PhraseExerciseView() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Starred only toggle */}
+          <div>
+            <button
+              onClick={() => setStarredOnly((v) => !v)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors w-full",
+                starredOnly
+                  ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400"
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600"
+              )}
+            >
+              <StarIcon size="sm" filled={starredOnly} />
+              {starredOnly ? "Starred phrases only" : "All phrases (including unstarred)"}
+            </button>
           </div>
 
           {/* Phrase count */}

@@ -1,5 +1,7 @@
 import { LANGUAGE_OPTIONS } from "../../types";
 import { TagDropdown } from "./TagDropdown";
+import { StarIcon } from "../icons";
+import { cn } from "../../lib/utils";
 
 export type FilterStatus = "all" | "new" | "learning" | "learned";
 export type LanguageFilter = "all" | "current" | string;
@@ -14,6 +16,8 @@ interface PhraseFiltersProps {
   currentLanguage?: string;
   selectedTagId: number | null;
   onTagSelect: (tagId: number | null) => void;
+  starredOnly: boolean;
+  onStarredOnlyChange: (value: boolean) => void;
 }
 
 export function PhraseFilters({
@@ -24,11 +28,27 @@ export function PhraseFilters({
   currentLanguage,
   selectedTagId,
   onTagSelect,
+  starredOnly,
+  onStarredOnlyChange,
 }: PhraseFiltersProps) {
   return (
     <div className="flex flex-wrap items-center gap-4 mb-6">
       {/* Tag filter */}
       <TagDropdown selectedTagId={selectedTagId} onTagSelect={onTagSelect} />
+
+      {/* Starred filter */}
+      <button
+        onClick={() => onStarredOnlyChange(!starredOnly)}
+        className={cn(
+          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors",
+          starredOnly
+            ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400"
+            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+        )}
+      >
+        <StarIcon size="sm" filled={starredOnly} />
+        Starred
+      </button>
 
       {/* Language filter */}
       <div className="flex items-center gap-1">
