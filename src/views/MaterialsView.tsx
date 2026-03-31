@@ -6,7 +6,7 @@ import { PlusIcon, TrashIcon, ArchiveIcon, NoteIcon } from "../components/icons"
 import { useSettings } from "../contexts/SettingsContext";
 import { useToast } from "../contexts/ToastContext";
 import { useQuery, useMutation } from "../hooks";
-import type { ViewType, MaterialType } from "../types";
+import type { ViewType } from "../types";
 
 interface MaterialsViewProps {
   onNavigate: (view: ViewType, data?: unknown) => void;
@@ -15,7 +15,6 @@ interface MaterialsViewProps {
 export function MaterialsView({ onNavigate }: MaterialsViewProps) {
   const { settings } = useSettings();
   const toast = useToast();
-  const [typeFilter, setTypeFilter] = useState<MaterialType | "all">("all");
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   // Fetch materials
@@ -23,13 +22,9 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
     data: materials,
     isLoading,
     refetch,
-  } = useQuery(
-    () => getMaterials(settings?.targetLanguage, typeFilter === "all" ? undefined : typeFilter),
-    [settings?.targetLanguage, typeFilter],
-    {
-      onError: (err) => toast.error(`Failed to load materials: ${err.message}`),
-    }
-  );
+  } = useQuery(() => getMaterials(settings?.targetLanguage, "text"), [settings?.targetLanguage], {
+    onError: (err) => toast.error(`Failed to load materials: ${err.message}`),
+  });
 
   // Delete mutation
   const deleteMutation = useMutation((id: number) => deleteMaterial(id), {
@@ -104,23 +99,6 @@ export function MaterialsView({ onNavigate }: MaterialsViewProps) {
             <PlusIcon size="sm" />
             Add Material
           </Button>
-        </div>
-
-        {/* Type Filter */}
-        <div className="flex gap-2">
-          {(["all", "text"] as const).map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setTypeFilter(filter)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                typeFilter === filter
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
-              }`}
-            >
-              {filter === "all" ? "All" : "Text"}
-            </button>
-          ))}
         </div>
       </div>
 
