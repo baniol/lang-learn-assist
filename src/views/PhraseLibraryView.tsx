@@ -175,64 +175,69 @@ export function PhraseLibraryView() {
   const totalPhrases = phrases.length;
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Phrase Library</h1>
-          <p className="text-slate-500 dark:text-slate-400">{totalPhrases} phrases</p>
+    <div className="flex flex-col h-full">
+      {/* Sticky header + filters */}
+      <div className="flex-shrink-0 px-6 pt-6 pb-4 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Phrase Library</h1>
+            <p className="text-slate-500 dark:text-slate-400">{totalPhrases} phrases</p>
+          </div>
+          <Button onClick={() => setShowAddDialog(true)}>
+            <PlusIcon size="sm" />
+            Add Phrase
+          </Button>
         </div>
-        <Button onClick={() => setShowAddDialog(true)}>
-          <PlusIcon size="sm" />
-          Add Phrase
-        </Button>
+
+        {/* Filters */}
+        <PhraseFilters
+          filterStatus={filterStatus}
+          onFilterStatusChange={setFilterStatus}
+          languageFilter={languageFilter}
+          onLanguageFilterChange={setLanguageFilter}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          currentLanguage={settings?.targetLanguage}
+          selectedTagId={selectedTagId}
+          onTagSelect={setSelectedTagId}
+          starredOnly={starredOnly}
+          onStarredOnlyChange={setStarredOnly}
+        />
       </div>
 
-      {/* Filters */}
-      <PhraseFilters
-        filterStatus={filterStatus}
-        onFilterStatusChange={setFilterStatus}
-        languageFilter={languageFilter}
-        onLanguageFilterChange={setLanguageFilter}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        currentLanguage={settings?.targetLanguage}
-        selectedTagId={selectedTagId}
-        onTagSelect={setSelectedTagId}
-        starredOnly={starredOnly}
-        onStarredOnlyChange={setStarredOnly}
-      />
-
-      {/* Phrases List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Spinner size="lg" />
-        </div>
-      ) : phrases.length === 0 ? (
-        <EmptyState
-          icon={<BookIcon size="xl" className="text-slate-300 dark:text-slate-600" />}
-          title="No phrases found"
-          description={
-            searchQuery ? "Try a different search" : "Add phrases from conversations or manually"
-          }
-          className="py-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
-        />
-      ) : (
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
-          {phrases.map((phrase) => (
-            <PhraseListItem
-              key={phrase.id}
-              item={phrase}
-              isPlaying={playingId === phrase.id && tts.isPlaying}
-              isLoading={tts.isLoading && playingId === phrase.id}
-              onToggleStar={handleToggleStar}
-              onPlay={() => handlePlay(phrase)}
-              onRefine={() => setRefiningPhrase(phrase)}
-              onDelete={() => setDeleteConfirmId(phrase.id)}
-            />
-          ))}
-        </div>
-      )}
+      {/* Scrollable list */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Spinner size="lg" />
+          </div>
+        ) : phrases.length === 0 ? (
+          <EmptyState
+            icon={<BookIcon size="xl" className="text-slate-300 dark:text-slate-600" />}
+            title="No phrases found"
+            description={
+              searchQuery ? "Try a different search" : "Add phrases from conversations or manually"
+            }
+            className="py-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
+          />
+        ) : (
+          <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
+            {phrases.map((phrase) => (
+              <PhraseListItem
+                key={phrase.id}
+                item={phrase}
+                isPlaying={playingId === phrase.id && tts.isPlaying}
+                isLoading={tts.isLoading && playingId === phrase.id}
+                onToggleStar={handleToggleStar}
+                onPlay={() => handlePlay(phrase)}
+                onRefine={() => setRefiningPhrase(phrase)}
+                onDelete={() => setDeleteConfirmId(phrase.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Add Phrase Dialog */}
       <AddPhraseDialog
