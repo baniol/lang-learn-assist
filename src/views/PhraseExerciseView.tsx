@@ -317,12 +317,8 @@ export function PhraseExerciseView() {
     [sessionPhrases]
   );
   const correctAttempts = useMemo(
-    () =>
-      sessionPhrases.reduce(
-        (sum, sp) => sum + (sp.completed ? repetitionsRequired : sp.correctStreak),
-        0
-      ),
-    [sessionPhrases, repetitionsRequired]
+    () => sessionPhrases.reduce((sum, sp) => sum + sp.correctStreak, 0),
+    [sessionPhrases]
   );
   const elapsedSeconds = useMemo(
     () => (phase === "results" ? Math.round((Date.now() - startTime) / 1000) : 0),
@@ -565,19 +561,38 @@ export function PhraseExerciseView() {
                         : `Correct! Repeat to confirm (${currentPhrase.correctStreak}/${repetitionsRequired})`
                       : "Incorrect — try again"}
                   </p>
+                  {lastResult.correct && (
+                    <p className="text-sm mt-1 text-slate-700 dark:text-slate-300">
+                      Answer: <span className="font-medium">{lastResult.expectedAnswer}</span>
+                    </p>
+                  )}
+                  {lastResult.correct &&
+                    inputValue &&
+                    inputValue.trim().toLowerCase() !==
+                      lastResult.expectedAnswer.trim().toLowerCase() && (
+                      <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
+                        Recognized: <span className="italic">&ldquo;{inputValue}&rdquo;</span>
+                        {lastResult.similarity < 1.0 && (
+                          <span className="ml-1">({Math.round(lastResult.similarity * 100)}%)</span>
+                        )}
+                      </p>
+                    )}
                   {!lastResult.correct && (
                     <p className="text-sm mt-1 text-slate-700 dark:text-slate-300">
                       Expected: <span className="font-medium">{lastResult.expectedAnswer}</span>
                     </p>
                   )}
+                  {!lastResult.correct && inputValue && (
+                    <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
+                      Recognized: <span className="italic">&ldquo;{inputValue}&rdquo;</span>
+                      {lastResult.similarity > 0 && (
+                        <span className="ml-1">({Math.round(lastResult.similarity * 100)}%)</span>
+                      )}
+                    </p>
+                  )}
                   {lastResult.matchedAlternative && (
                     <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
                       Matched alternative: {lastResult.matchedAlternative}
-                    </p>
-                  )}
-                  {lastResult.correct && lastResult.similarity < 1.0 && (
-                    <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
-                      Close match ({Math.round(lastResult.similarity * 100)}% similar)
                     </p>
                   )}
                 </div>
