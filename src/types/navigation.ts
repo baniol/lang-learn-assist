@@ -15,7 +15,8 @@ export type ViewState =
   | { type: "materials" }
   | { type: "material-create" }
   | { type: "material-review"; materialId: number }
-  | { type: "material-practice"; materialId: number };
+  | { type: "material-practice"; materialId: number }
+  | { type: "phrase-exercise" };
 
 /**
  * Extract the view type string from ViewState.

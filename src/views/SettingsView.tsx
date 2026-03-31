@@ -13,6 +13,7 @@ import {
   TtsSettingsSection,
   LanguageSettingsSection,
   DataManagementSection,
+  ExerciseSettingsSection,
 } from "../components/settings";
 import type { AppSettings, WhisperModel, TtsVoice, ImportMode, ImportResult } from "../types";
 
@@ -319,6 +320,11 @@ export function SettingsView() {
           nativeLanguage={settings.nativeLanguage}
           onTargetLanguageChange={(l) => updateSetting("targetLanguage", l)}
           onNativeLanguageChange={(l) => updateSetting("nativeLanguage", l)}
+        />
+
+        <ExerciseSettingsSection
+          repetitionsRequired={settings.exerciseRepetitionsRequired}
+          onRepetitionsChange={(v) => updateSetting("exerciseRepetitionsRequired", v)}
         />
 
         <DataManagementSection

@@ -4,3 +4,4 @@ export { WhisperSettingsSection } from "./WhisperSettingsSection";
 export { TtsSettingsSection } from "./TtsSettingsSection";
 export { LanguageSettingsSection } from "./LanguageSettingsSection";
 export { DataManagementSection } from "./DataManagementSection";
+export { ExerciseSettingsSection } from "./ExerciseSettingsSection";

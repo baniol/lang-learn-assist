@@ -18,6 +18,7 @@ export * as audioApi from "../lib/audio";
 export * as ttsApi from "../lib/tts";
 export * as materialsApi from "../lib/materials";
 export * as dataExportApi from "../lib/dataExport";
+export * as exerciseApi from "../lib/exercise";
 
 // Re-export individual functions for convenience
 export {
@@ -43,6 +44,11 @@ export {
   saveSettings,
   testLlmConnection,
 } from "./settings";
+
+export {
+  // Exercise
+  checkExerciseAnswer,
+} from "../lib/exercise";
 
 export {
   // Tags

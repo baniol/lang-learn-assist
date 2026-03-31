@@ -8,6 +8,7 @@ import { MaterialsView } from "./views/MaterialsView";
 import { MaterialCreateView } from "./views/MaterialCreateView";
 import { MaterialReviewView } from "./views/MaterialReviewView";
 import { MaterialPracticeView } from "./views/MaterialPracticeView";
+import { PhraseExerciseView } from "./views/PhraseExerciseView";
 import { PageSpinner } from "./components/ui";
 import { useNavigation } from "./hooks";
 import { isMaterialReviewView, isMaterialPracticeView } from "./types/navigation";
@@ -56,6 +57,8 @@ function AppContent() {
     switch (currentView) {
       case "phrase-library":
         return <PhraseLibraryView />;
+      case "phrase-exercise":
+        return <PhraseExerciseView />;
       case "settings":
         return <SettingsView />;
       case "materials":

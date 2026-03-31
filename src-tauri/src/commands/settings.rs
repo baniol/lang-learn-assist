@@ -45,6 +45,9 @@ fn load_settings_from_db(conn: &Connection) -> AppSettings {
             "fuzzy_matching" => {
                 settings.fuzzy_matching = value == "true";
             }
+            "exercise_repetitions_required" => {
+                settings.exercise_repetitions_required = value.parse().unwrap_or(1);
+            }
             _ => {}
         }
     }
@@ -92,6 +95,10 @@ fn save_settings_to_db(conn: &Connection, settings: &AppSettings) -> Result<(), 
         ("target_language", settings.target_language.clone()),
         ("native_language", settings.native_language.clone()),
         ("fuzzy_matching", settings.fuzzy_matching.to_string()),
+        (
+            "exercise_repetitions_required",
+            settings.exercise_repetitions_required.to_string(),
+        ),
     ];
 
     for (key, value) in pairs {

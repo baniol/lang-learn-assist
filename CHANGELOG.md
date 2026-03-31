@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Phrase exercise module with voice recognition and text input
+- Exercise sets filterable by tags or all phrases
+- Configurable repetition count (correct in a row) in settings
+- Answer checking with fuzzy matching and accepted alternatives
+- Exercise progress tracking with streak indicators
+- Session results summary with accuracy and timing stats
+
 ## [0.1.0] - 2026-03-17
 
 ### Added

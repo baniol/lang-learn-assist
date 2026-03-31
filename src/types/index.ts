@@ -63,6 +63,7 @@ export interface AppSettings {
   targetLanguage: string;
   nativeLanguage: string;
   fuzzyMatching: boolean;
+  exerciseRepetitionsRequired: number;
 }
 
 export interface WhisperModel {
@@ -371,3 +372,23 @@ export interface MaterialProcessingProgress {
   totalChunks: number;
   percent: number;
 }
+
+// Exercise types (session-only, not persisted)
+
+export interface CheckAnswerResult {
+  correct: boolean;
+  expectedAnswer: string;
+  matchedAlternative: string | null;
+  similarity: number;
+}
+
+export interface ExerciseSessionPhrase {
+  phrase: Phrase;
+  correctStreak: number;
+  attempts: number;
+  completed: boolean;
+  /** Whether the user has ever answered incorrectly or peeked at the answer */
+  hasFailed: boolean;
+}
+
+export type ExercisePhase = "setup" | "exercise" | "results";

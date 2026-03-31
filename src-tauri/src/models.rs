@@ -74,6 +74,9 @@ pub struct AppSettings {
 
     // App settings
     pub fuzzy_matching: bool,
+
+    // Exercise settings
+    pub exercise_repetitions_required: i32,
 }
 
 impl AppSettings {
@@ -92,6 +95,7 @@ impl AppSettings {
             target_language: "de".to_string(),
             native_language: "pl".to_string(),
             fuzzy_matching: true,
+            exercise_repetitions_required: 1,
         }
     }
 }

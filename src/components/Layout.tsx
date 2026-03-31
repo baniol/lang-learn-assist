@@ -1,7 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { cn } from "../lib/utils";
-import { BookIcon, ArchiveIcon, SettingsIcon, ChevronDownIcon, CheckIcon } from "./icons";
+import {
+  BookIcon,
+  ArchiveIcon,
+  SettingsIcon,
+  ChevronDownIcon,
+  CheckIcon,
+  LightbulbIcon,
+} from "./icons";
 import type { ViewType } from "../types";
 import { LANGUAGE_OPTIONS } from "../types";
 
@@ -28,6 +35,7 @@ interface NavItem {
 
 const baseNavItems: NavItem[] = [
   { id: "phrase-library", label: "Phrases", icon: <BookIcon /> },
+  { id: "phrase-exercise", label: "Exercise", icon: <LightbulbIcon /> },
   { id: "materials", label: "Materials", icon: <ArchiveIcon /> },
 ];
 
