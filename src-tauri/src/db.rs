@@ -399,5 +399,21 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Exercise sessions table (for calendar/stats)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS exercise_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            phrases_completed INTEGER NOT NULL DEFAULT 0,
+            phrases_total INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_exercise_sessions_date ON exercise_sessions(date)",
+        [],
+    )?;
+
     Ok(())
 }

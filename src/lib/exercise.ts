@@ -14,3 +14,15 @@ export async function checkExerciseAnswer(
     fuzzy,
   });
 }
+
+export async function saveExerciseSession(
+  date: string,
+  phrasesCompleted: number,
+  phrasesTotal: number
+): Promise<void> {
+  return invoke("save_exercise_session", { date, phrasesCompleted, phrasesTotal });
+}
+
+export async function getExerciseCalendar(): Promise<string[]> {
+  return invoke<string[]>("get_exercise_calendar");
+}

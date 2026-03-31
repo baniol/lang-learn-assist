@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
 import { useTTS } from "../hooks/useTTS";
-import { getPhrases, getTags, checkExerciseAnswer } from "../api";
+import { getPhrases, getTags, checkExerciseAnswer, saveExerciseSession } from "../api";
 import { VoiceButton } from "../components/VoiceButton";
 import { Button, Spinner } from "../components/ui";
 import {
@@ -211,6 +211,15 @@ export function PhraseExerciseView() {
     }
   }, [targetLanguage, selectedTagId, starredOnly, inputMode]);
 
+  // Save session and transition to results
+  const handleFinish = useCallback((phrases: typeof sessionPhrases) => {
+    const completed = phrases.filter((sp) => sp.completed).length;
+    const total = phrases.length;
+    const date = new Date().toISOString().split("T")[0];
+    saveExerciseSession(date, completed, total).catch(console.error);
+    setPhase("results");
+  }, []);
+
   // Advance: stay on same phrase until completed, then move to next
   const handleNext = useCallback(() => {
     setLastResult(null);
@@ -232,7 +241,7 @@ export function PhraseExerciseView() {
       .filter(({ sp }) => !sp.completed);
 
     if (uncompleted.length === 0) {
-      setPhase("results");
+      handleFinish(sessionPhrases);
       return;
     }
 
@@ -251,7 +260,7 @@ export function PhraseExerciseView() {
     if (inputMode === "typing") {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [sessionPhrases, currentIndex, inputMode]);
+  }, [sessionPhrases, currentIndex, inputMode, handleFinish]);
 
   // Handle Enter key in typing mode
   const handleKeyDown = useCallback(
@@ -476,13 +485,7 @@ export function PhraseExerciseView() {
               <span className="text-sm text-slate-500 dark:text-slate-400">
                 {completedCount}/{totalCount} completed
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setPhase("results");
-                }}
-              >
+              <Button variant="ghost" size="sm" onClick={() => handleFinish(sessionPhrases)}>
                 End
               </Button>
             </div>

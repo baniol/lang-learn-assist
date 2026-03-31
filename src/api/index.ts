@@ -48,6 +48,8 @@ export {
 export {
   // Exercise
   checkExerciseAnswer,
+  saveExerciseSession,
+  getExerciseCalendar,
 } from "../lib/exercise";
 
 export {

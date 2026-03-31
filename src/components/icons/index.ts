@@ -9,6 +9,7 @@ export {
   QuestionCircleIcon,
   NoteIcon,
   SettingsIcon,
+  ChartIcon,
 } from "./Icons";
 
 // Action Icons

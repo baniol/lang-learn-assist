@@ -8,6 +8,7 @@ import {
   ChevronDownIcon,
   CheckIcon,
   LightbulbIcon,
+  ChartIcon,
 } from "./icons";
 import type { ViewType } from "../types";
 import { LANGUAGE_OPTIONS } from "../types";
@@ -36,6 +37,7 @@ interface NavItem {
 const baseNavItems: NavItem[] = [
   { id: "phrase-library", label: "Phrases", icon: <BookIcon /> },
   { id: "phrase-exercise", label: "Exercise", icon: <LightbulbIcon /> },
+  { id: "exercise-stats", label: "Stats", icon: <ChartIcon /> },
   { id: "materials", label: "Materials", icon: <ArchiveIcon /> },
 ];
 

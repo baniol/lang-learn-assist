@@ -1,3 +1,5 @@
+use crate::db::get_conn;
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,6 +149,36 @@ pub fn check_exercise_answer(
         matched_alternative: None,
         similarity: sim,
     })
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn save_exercise_session(
+    date: String,
+    phrasesCompleted: i64,
+    phrasesTotal: i64,
+) -> Result<(), String> {
+    let conn = get_conn()?;
+    conn.execute(
+        "INSERT INTO exercise_sessions (date, phrases_completed, phrases_total) VALUES (?1, ?2, ?3)",
+        params![date, phrasesCompleted, phrasesTotal],
+    )
+    .map_err(|e| format!("Failed to save exercise session: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_exercise_calendar() -> Result<Vec<String>, String> {
+    let conn = get_conn()?;
+    let mut stmt = conn
+        .prepare("SELECT DISTINCT date FROM exercise_sessions ORDER BY date ASC")
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+    let dates = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| format!("Query failed: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect dates: {}", e))?;
+    Ok(dates)
 }
 
 #[cfg(test)]
