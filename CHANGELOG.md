@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Answer checking with fuzzy matching and accepted alternatives
 - Exercise progress tracking with streak indicators
 - Session results summary with accuracy and timing stats
+- Per-phrase session data persistence (prompt, answer, attempts)
+- Failed phrases list (attempts > 1) in daily stats view per session
+- Orange highlighting for phrases requiring multiple attempts in exercise results
 
 ## [0.1.0] - 2026-03-17
 

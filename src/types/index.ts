@@ -400,3 +400,19 @@ export interface ExerciseSession {
   targetLanguage: string;
   createdAt: string;
 }
+
+export interface SessionPhraseInput {
+  prompt: string;
+  answer: string;
+  attempts: number;
+  completed: boolean;
+}
+
+export interface SessionPhraseRecord {
+  id: number;
+  sessionId: number;
+  prompt: string;
+  answer: string;
+  attempts: number;
+  completed: boolean;
+}

@@ -246,7 +246,15 @@ export function PhraseExerciseView() {
       const completed = phrases.filter((sp) => sp.completed).length;
       const total = phrases.length;
       const date = new Date().toISOString().split("T")[0];
-      saveExerciseSession(date, completed, total, targetLanguage).catch(console.error);
+      const phraseDetails = phrases.map((sp) => ({
+        prompt: sp.phrase.prompt,
+        answer: sp.phrase.answer,
+        attempts: sp.attempts,
+        completed: sp.completed,
+      }));
+      saveExerciseSession(date, completed, total, targetLanguage, phraseDetails).catch(
+        console.error
+      );
       setPhase("results");
     },
     [targetLanguage]
@@ -905,15 +913,21 @@ export function PhraseExerciseView() {
                 key={sp.phrase.id}
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-lg border",
-                  sp.completed
+                  sp.completed && sp.attempts <= 1
                     ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10"
-                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                    : sp.completed && sp.attempts > 1
+                      ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10"
+                      : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                 )}
               >
                 <div
                   className={cn(
                     "flex-shrink-0",
-                    sp.completed ? "text-green-600" : "text-slate-400"
+                    sp.completed && sp.attempts <= 1
+                      ? "text-green-600"
+                      : sp.completed && sp.attempts > 1
+                        ? "text-amber-600"
+                        : "text-slate-400"
                   )}
                 >
                   {sp.completed ? <CheckIcon size="sm" /> : <CloseIcon size="sm" />}

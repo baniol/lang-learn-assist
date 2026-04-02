@@ -437,5 +437,23 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         );
     }
 
+    // Exercise session phrases table (per-phrase details for each session)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS exercise_session_phrases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            prompt TEXT NOT NULL,
+            answer TEXT NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 1,
+            completed INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (session_id) REFERENCES exercise_sessions(id) ON DELETE CASCADE
+        )",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_exercise_session_phrases_session ON exercise_session_phrases(session_id)",
+        [],
+    )?;
+
     Ok(())
 }

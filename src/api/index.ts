@@ -52,6 +52,7 @@ export {
   getExerciseCalendar,
   getExerciseDayDetails,
   getAllExerciseSessions,
+  getSessionPhrases,
   deleteExerciseSession,
 } from "../lib/exercise";
 

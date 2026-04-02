@@ -3,6 +3,7 @@ import {
   getExerciseCalendar,
   getExerciseDayDetails,
   getAllExerciseSessions,
+  getSessionPhrases,
   deleteExerciseSession,
 } from "../api";
 import { Spinner } from "../components/ui";
@@ -15,7 +16,7 @@ import {
 } from "../components/icons";
 import { cn } from "../lib/utils";
 import { LANGUAGE_OPTIONS } from "../types";
-import type { ExerciseSession } from "../types";
+import type { ExerciseSession, SessionPhraseRecord } from "../types";
 
 // ============================================================================
 // Helpers
@@ -146,6 +147,53 @@ interface DayDetailsProps {
   sessions: ExerciseSession[];
   onClose: () => void;
   onDeleteSession: (sessionId: number) => void;
+}
+
+function SessionPhrasesList({ sessionId }: { sessionId: number }) {
+  const [phrases, setPhrases] = useState<SessionPhraseRecord[]>([]);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    getSessionPhrases(sessionId).then(setPhrases).catch(console.error);
+  }, [sessionId]);
+
+  const failedPhrases = phrases.filter((p) => p.attempts > 1);
+
+  if (failedPhrases.length === 0) return null;
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
+      >
+        {expanded ? "▾" : "▸"} {failedPhrases.length} failed{" "}
+        {failedPhrases.length === 1 ? "phrase" : "phrases"}
+      </button>
+      {expanded && (
+        <div className="mt-1.5 space-y-1">
+          {failedPhrases.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center justify-between px-2 py-1 bg-amber-50 dark:bg-amber-900/10 rounded text-xs border border-amber-100 dark:border-amber-800/50"
+            >
+              <div className="min-w-0 flex-1">
+                <span className="font-medium text-slate-700 dark:text-slate-200 truncate block">
+                  {p.prompt}
+                </span>
+                <span className="text-slate-500 dark:text-slate-400 truncate block">
+                  {p.answer}
+                </span>
+              </div>
+              <span className="text-amber-600 dark:text-amber-400 font-medium flex-shrink-0 ml-2">
+                {p.attempts}x
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function DayDetails({ date, sessions, onClose, onDeleteSession }: DayDetailsProps) {
@@ -294,6 +342,7 @@ function DayDetails({ date, sessions, onClose, onDeleteSession }: DayDetailsProp
                     {rate}%
                   </span>
                 </div>
+                <SessionPhrasesList sessionId={s.id} />
               </div>
             );
           })}

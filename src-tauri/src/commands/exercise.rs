@@ -15,6 +15,26 @@ pub struct ExerciseSession {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SessionPhraseInput {
+    pub prompt: String,
+    pub answer: String,
+    pub attempts: i64,
+    pub completed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionPhraseRecord {
+    pub id: i64,
+    pub session_id: i64,
+    pub prompt: String,
+    pub answer: String,
+    pub attempts: i64,
+    pub completed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CheckAnswerResult {
     pub correct: bool,
     pub expected_answer: String,
@@ -169,6 +189,7 @@ pub fn save_exercise_session(
     phrasesCompleted: i64,
     phrasesTotal: i64,
     targetLanguage: String,
+    phrases: Vec<SessionPhraseInput>,
 ) -> Result<(), String> {
     let conn = get_conn()?;
     conn.execute(
@@ -176,6 +197,17 @@ pub fn save_exercise_session(
         params![date, phrasesCompleted, phrasesTotal, targetLanguage],
     )
     .map_err(|e| format!("Failed to save exercise session: {}", e))?;
+
+    let session_id = conn.last_insert_rowid();
+
+    for p in &phrases {
+        conn.execute(
+            "INSERT INTO exercise_session_phrases (session_id, prompt, answer, attempts, completed) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![session_id, p.prompt, p.answer, p.attempts, p.completed as i64],
+        )
+        .map_err(|e| format!("Failed to save session phrase: {}", e))?;
+    }
+
     Ok(())
 }
 
@@ -247,8 +279,41 @@ pub fn get_all_exercise_sessions() -> Result<Vec<ExerciseSession>, String> {
 
 #[tauri::command]
 #[allow(non_snake_case)]
+pub fn get_session_phrases(sessionId: i64) -> Result<Vec<SessionPhraseRecord>, String> {
+    let conn = get_conn()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, session_id, prompt, answer, attempts, completed
+             FROM exercise_session_phrases WHERE session_id = ?1 ORDER BY id ASC",
+        )
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+    let phrases = stmt
+        .query_map(params![sessionId], |row| {
+            Ok(SessionPhraseRecord {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                prompt: row.get(2)?,
+                answer: row.get(3)?,
+                attempts: row.get(4)?,
+                completed: row.get::<_, i64>(5)? != 0,
+            })
+        })
+        .map_err(|e| format!("Query failed: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect phrases: {}", e))?;
+    Ok(phrases)
+}
+
+#[tauri::command]
+#[allow(non_snake_case)]
 pub fn delete_exercise_session(sessionId: i64) -> Result<(), String> {
     let conn = get_conn()?;
+    // Delete phrase details first
+    conn.execute(
+        "DELETE FROM exercise_session_phrases WHERE session_id = ?1",
+        params![sessionId],
+    )
+    .map_err(|e| format!("Failed to delete session phrases: {}", e))?;
     let affected = conn
         .execute(
             "DELETE FROM exercise_sessions WHERE id = ?1",
