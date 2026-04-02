@@ -391,3 +391,12 @@ export interface ExerciseSessionPhrase {
 }
 
 export type ExercisePhase = "setup" | "exercise" | "results";
+
+export interface ExerciseSession {
+  id: number;
+  date: string;
+  phrasesCompleted: number;
+  phrasesTotal: number;
+  targetLanguage: string;
+  createdAt: string;
+}

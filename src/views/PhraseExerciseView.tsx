@@ -12,6 +12,9 @@ import {
   RefreshIcon,
   ChevronRightIcon,
   VolumeUpIcon,
+  VolumeOffIcon,
+  EyeIcon,
+  EyeOffIcon,
   MicrophoneIcon,
   EditIcon,
   StarIcon,
@@ -19,7 +22,7 @@ import {
 import { cn } from "../lib/utils";
 import type { Tag, ExercisePhase, ExerciseSessionPhrase, CheckAnswerResult } from "../types";
 
-type InputMode = "typing" | "voice";
+type InputMode = "typing" | "voice" | "repeat";
 
 function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
@@ -50,6 +53,8 @@ export function PhraseExerciseView() {
   const [isChecking, setIsChecking] = useState(false);
   const [startTime, setStartTime] = useState<number>(0);
   const [showingAnswer, setShowingAnswer] = useState(false);
+  const [autoPlayAudio, setAutoPlayAudio] = useState(true);
+  const [showSentence, setShowSentence] = useState(true);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
@@ -144,7 +149,8 @@ export function PhraseExerciseView() {
     startRecording,
     stopRecording,
   } = useVoiceRecording({
-    enabled: inputMode === "voice" && phase === "exercise" && !lastResult,
+    enabled:
+      (inputMode === "voice" || inputMode === "repeat") && phase === "exercise" && !lastResult,
     language: targetLanguage,
     prompt: currentPhrase?.phrase.answer,
     onTranscription: handleTranscription,
@@ -212,13 +218,16 @@ export function PhraseExerciseView() {
   }, [targetLanguage, selectedTagId, starredOnly, inputMode]);
 
   // Save session and transition to results
-  const handleFinish = useCallback((phrases: typeof sessionPhrases) => {
-    const completed = phrases.filter((sp) => sp.completed).length;
-    const total = phrases.length;
-    const date = new Date().toISOString().split("T")[0];
-    saveExerciseSession(date, completed, total).catch(console.error);
-    setPhase("results");
-  }, []);
+  const handleFinish = useCallback(
+    (phrases: typeof sessionPhrases) => {
+      const completed = phrases.filter((sp) => sp.completed).length;
+      const total = phrases.length;
+      const date = new Date().toISOString().split("T")[0];
+      saveExerciseSession(date, completed, total, targetLanguage).catch(console.error);
+      setPhase("results");
+    },
+    [targetLanguage]
+  );
 
   // Advance: stay on same phrase until completed, then move to next
   const handleNext = useCallback(() => {
@@ -289,6 +298,33 @@ export function PhraseExerciseView() {
     }
   }, [currentPhrase, ttsSpeak]);
 
+  // Auto-play TTS in repeat mode when phrase changes
+  useEffect(() => {
+    if (
+      phase !== "exercise" ||
+      inputMode !== "repeat" ||
+      (!autoPlayAudio && showSentence) ||
+      !currentPhrase ||
+      lastResult
+    )
+      return;
+    ttsSpeak(
+      currentPhrase.phrase.answer,
+      currentPhrase.phrase.id,
+      currentPhrase.phrase.audioPath ?? undefined,
+      currentPhrase.phrase.targetLanguage
+    );
+  }, [
+    phase,
+    inputMode,
+    autoPlayAudio,
+    showSentence,
+    currentIndex,
+    currentPhrase,
+    lastResult,
+    ttsSpeak,
+  ]);
+
   // Keyboard shortcuts when result is showing
   useEffect(() => {
     if (phase !== "exercise" || !lastResult) return;
@@ -300,8 +336,8 @@ export function PhraseExerciseView() {
         handlePlayAnswer();
         return;
       }
-      // Space = next (voice mode only, typing mode uses Enter via input)
-      if (e.code === "Space" && inputMode === "voice") {
+      // Space = next (voice/repeat mode, typing mode uses Enter via input)
+      if (e.code === "Space" && (inputMode === "voice" || inputMode === "repeat")) {
         e.preventDefault();
         handleNext();
       }
@@ -376,6 +412,18 @@ export function PhraseExerciseView() {
               >
                 <EditIcon size="sm" />
                 Typing
+              </button>
+              <button
+                onClick={() => setInputMode("repeat")}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  inputMode === "repeat"
+                    ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm"
+                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                )}
+              >
+                <RefreshIcon size="sm" />
+                Repeat
               </button>
             </div>
           </div>
@@ -474,6 +522,10 @@ export function PhraseExerciseView() {
                   <>
                     <MicrophoneIcon size="xs" /> Voice
                   </>
+                ) : inputMode === "repeat" ? (
+                  <>
+                    <RefreshIcon size="xs" /> Repeat
+                  </>
                 ) : (
                   <>
                     <EditIcon size="xs" /> Typing
@@ -485,6 +537,52 @@ export function PhraseExerciseView() {
               <span className="text-sm text-slate-500 dark:text-slate-400">
                 {completedCount}/{totalCount} completed
               </span>
+              {inputMode === "repeat" && (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowSentence((v) => {
+                        if (v) setAutoPlayAudio(true);
+                        return !v;
+                      });
+                    }}
+                    className={cn(
+                      "p-1.5 rounded transition-colors",
+                      showSentence
+                        ? "text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                        : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                    )}
+                    title={showSentence ? "Text visible" : "Text hidden (audio only)"}
+                  >
+                    {showSentence ? <EyeIcon size="sm" /> : <EyeOffIcon size="sm" />}
+                  </button>
+                  <button
+                    onClick={() => setAutoPlayAudio((v) => !v)}
+                    disabled={!showSentence}
+                    className={cn(
+                      "p-1.5 rounded transition-colors",
+                      !showSentence
+                        ? "text-blue-600/50 dark:text-blue-400/50 cursor-not-allowed"
+                        : autoPlayAudio
+                          ? "text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                          : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                    )}
+                    title={
+                      !showSentence
+                        ? "Auto-play required when text is hidden"
+                        : autoPlayAudio
+                          ? "Auto-play on"
+                          : "Auto-play off"
+                    }
+                  >
+                    {autoPlayAudio || !showSentence ? (
+                      <VolumeUpIcon size="sm" />
+                    ) : (
+                      <VolumeOffIcon size="sm" />
+                    )}
+                  </button>
+                </>
+              )}
               <Button variant="ghost" size="sm" onClick={() => handleFinish(sessionPhrases)}>
                 End
               </Button>
@@ -520,34 +618,59 @@ export function PhraseExerciseView() {
 
           {/* Prompt */}
           <div className="text-center mb-8">
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Translate:</p>
-            <p className="text-2xl font-bold text-slate-800 dark:text-white">
-              {currentPhrase.phrase.prompt}
-            </p>
-
-            {/* Peek answer */}
-            {!lastResult &&
-              (showingAnswer ? (
-                <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+            {inputMode === "repeat" ? (
+              <>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                  {showSentence ? "Repeat:" : "Listen and repeat:"}
+                </p>
+                {showSentence && (
+                  <p className="text-2xl font-bold text-slate-800 dark:text-white">
                     {currentPhrase.phrase.answer}
                   </p>
+                )}
+                {!lastResult && (
                   <button
                     onClick={handlePlayAnswer}
-                    className="p-1 text-amber-600 hover:text-amber-800 dark:hover:text-amber-200 transition-colors rounded"
-                    title="Listen"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-blue-500 transition-colors"
+                    title="Listen (P)"
                   >
                     <VolumeUpIcon size="sm" />
+                    Listen
                   </button>
-                </div>
-              ) : (
-                <button
-                  onClick={handlePeekAnswer}
-                  className="mt-3 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline underline-offset-2"
-                >
-                  Show answer
-                </button>
-              ))}
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Translate:</p>
+                <p className="text-2xl font-bold text-slate-800 dark:text-white">
+                  {currentPhrase.phrase.prompt}
+                </p>
+
+                {/* Peek answer */}
+                {!lastResult &&
+                  (showingAnswer ? (
+                    <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                      <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                        {currentPhrase.phrase.answer}
+                      </p>
+                      <button
+                        onClick={handlePlayAnswer}
+                        className="p-1 text-amber-600 hover:text-amber-800 dark:hover:text-amber-200 transition-colors rounded"
+                        title="Listen"
+                      >
+                        <VolumeUpIcon size="sm" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handlePeekAnswer}
+                      className="mt-3 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline underline-offset-2"
+                    >
+                      Show answer
+                    </button>
+                  ))}
+              </>
+            )}
           </div>
 
           {/* Answer feedback */}
@@ -633,8 +756,8 @@ export function PhraseExerciseView() {
           {/* Input area */}
           <div className="w-full max-w-md">
             {!lastResult ? (
-              inputMode === "voice" ? (
-                /* VOICE MODE: large central mic button, Space press-and-hold */
+              inputMode === "voice" || inputMode === "repeat" ? (
+                /* VOICE/REPEAT MODE: large central mic button, Space press-and-hold */
                 <div className="flex flex-col items-center gap-4">
                   <VoiceButton
                     status={voiceStatus}
@@ -689,7 +812,7 @@ export function PhraseExerciseView() {
                     : "Try Again"}
                   <ChevronRightIcon size="sm" />
                 </Button>
-                {inputMode === "voice" && (
+                {(inputMode === "voice" || inputMode === "repeat") && (
                   <p className="text-xs text-slate-400 dark:text-slate-500">
                     Press Space to continue
                   </p>

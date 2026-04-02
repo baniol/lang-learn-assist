@@ -4,6 +4,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ExerciseSession {
+    pub id: i64,
+    pub date: String,
+    pub phrases_completed: i64,
+    pub phrases_total: i64,
+    pub target_language: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CheckAnswerResult {
     pub correct: bool,
     pub expected_answer: String,
@@ -157,11 +168,12 @@ pub fn save_exercise_session(
     date: String,
     phrasesCompleted: i64,
     phrasesTotal: i64,
+    targetLanguage: String,
 ) -> Result<(), String> {
     let conn = get_conn()?;
     conn.execute(
-        "INSERT INTO exercise_sessions (date, phrases_completed, phrases_total) VALUES (?1, ?2, ?3)",
-        params![date, phrasesCompleted, phrasesTotal],
+        "INSERT INTO exercise_sessions (date, phrases_completed, phrases_total, target_language) VALUES (?1, ?2, ?3, ?4)",
+        params![date, phrasesCompleted, phrasesTotal, targetLanguage],
     )
     .map_err(|e| format!("Failed to save exercise session: {}", e))?;
     Ok(())
@@ -179,6 +191,58 @@ pub fn get_exercise_calendar() -> Result<Vec<String>, String> {
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Failed to collect dates: {}", e))?;
     Ok(dates)
+}
+
+#[tauri::command]
+pub fn get_exercise_day_details(date: String) -> Result<Vec<ExerciseSession>, String> {
+    let conn = get_conn()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, date, phrases_completed, phrases_total, target_language, created_at
+             FROM exercise_sessions WHERE date = ?1 ORDER BY created_at ASC",
+        )
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+    let sessions = stmt
+        .query_map(params![date], |row| {
+            Ok(ExerciseSession {
+                id: row.get(0)?,
+                date: row.get(1)?,
+                phrases_completed: row.get(2)?,
+                phrases_total: row.get(3)?,
+                target_language: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })
+        .map_err(|e| format!("Query failed: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect sessions: {}", e))?;
+    Ok(sessions)
+}
+
+#[tauri::command]
+pub fn get_all_exercise_sessions() -> Result<Vec<ExerciseSession>, String> {
+    let conn = get_conn()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, date, phrases_completed, phrases_total, target_language, created_at
+             FROM exercise_sessions ORDER BY date DESC, created_at DESC",
+        )
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+    let sessions = stmt
+        .query_map([], |row| {
+            Ok(ExerciseSession {
+                id: row.get(0)?,
+                date: row.get(1)?,
+                phrases_completed: row.get(2)?,
+                phrases_total: row.get(3)?,
+                target_language: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })
+        .map_err(|e| format!("Query failed: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect sessions: {}", e))?;
+    Ok(sessions)
 }
 
 #[cfg(test)]

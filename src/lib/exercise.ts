@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CheckAnswerResult } from "../types";
+import type { CheckAnswerResult, ExerciseSession } from "../types";
 
 export async function checkExerciseAnswer(
   userAnswer: string,
@@ -18,11 +18,20 @@ export async function checkExerciseAnswer(
 export async function saveExerciseSession(
   date: string,
   phrasesCompleted: number,
-  phrasesTotal: number
+  phrasesTotal: number,
+  targetLanguage: string
 ): Promise<void> {
-  return invoke("save_exercise_session", { date, phrasesCompleted, phrasesTotal });
+  return invoke("save_exercise_session", { date, phrasesCompleted, phrasesTotal, targetLanguage });
 }
 
 export async function getExerciseCalendar(): Promise<string[]> {
   return invoke<string[]>("get_exercise_calendar");
+}
+
+export async function getExerciseDayDetails(date: string): Promise<ExerciseSession[]> {
+  return invoke<ExerciseSession[]>("get_exercise_day_details", { date });
+}
+
+export async function getAllExerciseSessions(): Promise<ExerciseSession[]> {
+  return invoke<ExerciseSession[]>("get_all_exercise_sessions");
 }

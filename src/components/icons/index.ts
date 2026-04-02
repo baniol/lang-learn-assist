@@ -47,7 +47,14 @@ export {
 } from "./Icons";
 
 // Media Icons
-export { MicrophoneIcon, MicrophoneOutlineIcon, VolumeUpIcon, VolumeOffIcon } from "./Icons";
+export {
+  MicrophoneIcon,
+  MicrophoneOutlineIcon,
+  VolumeUpIcon,
+  VolumeOffIcon,
+  EyeIcon,
+  EyeOffIcon,
+} from "./Icons";
 
 // Category Icons
 export { TagIcon } from "./Icons";

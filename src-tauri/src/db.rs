@@ -406,6 +406,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             date TEXT NOT NULL,
             phrases_completed INTEGER NOT NULL DEFAULT 0,
             phrases_total INTEGER NOT NULL DEFAULT 0,
+            target_language TEXT NOT NULL DEFAULT 'de',
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )",
         [],
@@ -414,6 +415,27 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_exercise_sessions_date ON exercise_sessions(date)",
         [],
     )?;
+
+    // Migration: Add target_language to exercise_sessions if missing
+    let es_columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(exercise_sessions)")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    if !es_columns.contains(&"target_language".to_string()) {
+        log_migration_result(
+            "add target_language to exercise_sessions",
+            conn.execute(
+                "ALTER TABLE exercise_sessions ADD COLUMN target_language TEXT NOT NULL DEFAULT 'de'",
+                [],
+            ),
+        );
+    }
 
     Ok(())
 }

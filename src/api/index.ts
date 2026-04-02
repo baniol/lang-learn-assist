@@ -50,6 +50,8 @@ export {
   checkExerciseAnswer,
   saveExerciseSession,
   getExerciseCalendar,
+  getExerciseDayDetails,
+  getAllExerciseSessions,
 } from "../lib/exercise";
 
 export {

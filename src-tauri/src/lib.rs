@@ -98,6 +98,8 @@ pub fn run() {
             exercise::check_exercise_answer,
             exercise::save_exercise_session,
             exercise::get_exercise_calendar,
+            exercise::get_exercise_day_details,
+            exercise::get_all_exercise_sessions,
             // Tags
             tags::get_tags,
             tags::create_tag,
