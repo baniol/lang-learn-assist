@@ -245,6 +245,22 @@ pub fn get_all_exercise_sessions() -> Result<Vec<ExerciseSession>, String> {
     Ok(sessions)
 }
 
+#[tauri::command]
+#[allow(non_snake_case)]
+pub fn delete_exercise_session(sessionId: i64) -> Result<(), String> {
+    let conn = get_conn()?;
+    let affected = conn
+        .execute(
+            "DELETE FROM exercise_sessions WHERE id = ?1",
+            params![sessionId],
+        )
+        .map_err(|e| format!("Failed to delete exercise session: {}", e))?;
+    if affected == 0 {
+        return Err(format!("Session {} not found", sessionId));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

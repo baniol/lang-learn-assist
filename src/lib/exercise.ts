@@ -35,3 +35,7 @@ export async function getExerciseDayDetails(date: string): Promise<ExerciseSessi
 export async function getAllExerciseSessions(): Promise<ExerciseSession[]> {
   return invoke<ExerciseSession[]>("get_all_exercise_sessions");
 }
+
+export async function deleteExerciseSession(sessionId: number): Promise<void> {
+  return invoke("delete_exercise_session", { sessionId });
+}

@@ -1,7 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getExerciseCalendar, getExerciseDayDetails, getAllExerciseSessions } from "../api";
+import {
+  getExerciseCalendar,
+  getExerciseDayDetails,
+  getAllExerciseSessions,
+  deleteExerciseSession,
+} from "../api";
 import { Spinner } from "../components/ui";
-import { CloseIcon, CalendarIcon, ChartIcon } from "../components/icons";
+import {
+  CloseIcon,
+  CalendarIcon,
+  ChartIcon,
+  CheckCircleIcon,
+  TrashIcon,
+} from "../components/icons";
 import { cn } from "../lib/utils";
 import { LANGUAGE_OPTIONS } from "../types";
 import type { ExerciseSession } from "../types";
@@ -134,9 +145,10 @@ interface DayDetailsProps {
   date: string;
   sessions: ExerciseSession[];
   onClose: () => void;
+  onDeleteSession: (sessionId: number) => void;
 }
 
-function DayDetails({ date, sessions, onClose }: DayDetailsProps) {
+function DayDetails({ date, sessions, onClose, onDeleteSession }: DayDetailsProps) {
   const totalCompleted = sessions.reduce((s, e) => s + e.phrasesCompleted, 0);
   const totalPhrases = sessions.reduce((s, e) => s + e.phrasesTotal, 0);
 
@@ -221,18 +233,40 @@ function DayDetails({ date, sessions, onClose }: DayDetailsProps) {
           {sessions.map((s) => {
             const rate =
               s.phrasesTotal > 0 ? Math.round((s.phrasesCompleted / s.phrasesTotal) * 100) : 0;
+            const isCompleted = s.phrasesCompleted === s.phrasesTotal && s.phrasesTotal > 0;
             return (
               <div
                 key={s.id}
                 className="p-3 border border-slate-100 dark:border-slate-700 rounded-lg"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {formatTime(s.createdAt)}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                    {languageName(s.targetLanguage)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {formatTime(s.createdAt)}
+                    </span>
+                    {isCompleted ? (
+                      <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium">
+                        <CheckCircleIcon size="sm" />
+                        Completed
+                      </span>
+                    ) : (
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        Incomplete
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                      {languageName(s.targetLanguage)}
+                    </span>
+                    <button
+                      onClick={() => onDeleteSession(s.id)}
+                      className="p-1 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors"
+                      title="Delete session"
+                    >
+                      <TrashIcon size="sm" />
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2">
@@ -452,6 +486,31 @@ export function ExerciseStatsView() {
     setDaySessions([]);
   }, []);
 
+  const handleDeleteSession = useCallback(
+    async (sessionId: number) => {
+      try {
+        await deleteExerciseSession(sessionId);
+        setDaySessions((prev) => prev.filter((s) => s.id !== sessionId));
+        setAllSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        // If no sessions left for this day, update calendar and go back
+        setDaySessions((current) => {
+          if (current.length === 0 && selectedDate) {
+            setActiveDates((dates) => {
+              const next = new Set(dates);
+              next.delete(selectedDate);
+              return next;
+            });
+            setSelectedDate(null);
+          }
+          return current;
+        });
+      } catch (err) {
+        console.error("Failed to delete session:", err);
+      }
+    },
+    [selectedDate]
+  );
+
   const today = new Date();
   const months: { year: number; month: number }[] = [];
   for (let i = 5; i >= 0; i--) {
@@ -518,7 +577,12 @@ export function ExerciseStatsView() {
               <Spinner size="md" />
             </div>
           ) : (
-            <DayDetails date={selectedDate} sessions={daySessions} onClose={handleBack} />
+            <DayDetails
+              date={selectedDate}
+              sessions={daySessions}
+              onClose={handleBack}
+              onDeleteSession={handleDeleteSession}
+            />
           )
         ) : tab === "calendar" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">

@@ -100,6 +100,7 @@ pub fn run() {
             exercise::get_exercise_calendar,
             exercise::get_exercise_day_details,
             exercise::get_all_exercise_sessions,
+            exercise::delete_exercise_session,
             // Tags
             tags::get_tags,
             tags::create_tag,
