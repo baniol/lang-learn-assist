@@ -2,7 +2,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
 import { useTTS } from "../hooks/useTTS";
-import { getPhrases, getTags, checkExerciseAnswer, saveExerciseSession } from "../api";
+import {
+  getPhrases,
+  getTags,
+  checkExerciseAnswer,
+  saveExerciseSession,
+  toggleStarred,
+} from "../api";
 import { VoiceButton } from "../components/VoiceButton";
 import { Button, Spinner } from "../components/ui";
 import {
@@ -158,6 +164,23 @@ export function PhraseExerciseView() {
     // since there's no text input to conflict with
     disableSpaceKey: false,
   });
+
+  // Toggle starred on current phrase
+  const handleToggleStar = useCallback(async () => {
+    if (!currentPhrase) return;
+    try {
+      const newStarred = await toggleStarred(currentPhrase.phrase.id);
+      setSessionPhrases((prev) =>
+        prev.map((sp) =>
+          sp.phrase.id === currentPhrase.phrase.id
+            ? { ...sp, phrase: { ...sp.phrase, starred: newStarred } }
+            : sp
+        )
+      );
+    } catch (err) {
+      console.error("Failed to toggle starred:", err);
+    }
+  }, [currentPhrase]);
 
   // Load tags on mount
   useEffect(() => {
@@ -616,8 +639,20 @@ export function PhraseExerciseView() {
             </div>
           )}
 
-          {/* Prompt */}
+          {/* Star + Prompt */}
           <div className="text-center mb-8">
+            <button
+              onClick={handleToggleStar}
+              className={cn(
+                "mb-2 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors",
+                currentPhrase.phrase.starred
+                  ? "text-yellow-500"
+                  : "text-slate-300 dark:text-slate-600"
+              )}
+              title={currentPhrase.phrase.starred ? "Unstar phrase" : "Star phrase"}
+            >
+              <StarIcon size="md" filled={currentPhrase.phrase.starred} />
+            </button>
             {inputMode === "repeat" ? (
               <>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
