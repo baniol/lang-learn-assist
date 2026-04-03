@@ -78,11 +78,19 @@ interface CalendarMonthProps {
   year: number;
   month: number;
   activeDates: Set<string>;
+  sessionCountByDate: Map<string, number>;
   selectedDate: string | null;
   onDayClick: (date: string) => void;
 }
 
-function CalendarMonth({ year, month, activeDates, selectedDate, onDayClick }: CalendarMonthProps) {
+function CalendarMonth({
+  year,
+  month,
+  activeDates,
+  sessionCountByDate,
+  selectedDate,
+  onDayClick,
+}: CalendarMonthProps) {
   const days = daysInMonth(year, month);
   const firstDow = dayOfWeek(year, month, 1);
   const today = isoToday();
@@ -113,13 +121,14 @@ function CalendarMonth({ year, month, activeDates, selectedDate, onDayClick }: C
           const isActive = activeDates.has(iso);
           const isToday = iso === today;
           const isSelected = iso === selectedDate;
+          const sessionCount = sessionCountByDate.get(iso) ?? 0;
           return (
             <button
               key={i}
               onClick={() => isActive && onDayClick(iso)}
               disabled={!isActive}
               className={cn(
-                "aspect-square flex items-center justify-center rounded text-xs font-medium transition-colors",
+                "relative aspect-square flex items-center justify-center rounded text-xs font-medium transition-colors",
                 isSelected
                   ? "bg-blue-600 text-white ring-2 ring-blue-400"
                   : isActive
@@ -130,6 +139,11 @@ function CalendarMonth({ year, month, activeDates, selectedDate, onDayClick }: C
               )}
             >
               {day}
+              {isActive && sessionCount > 1 && (
+                <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+                  {sessionCount}
+                </span>
+              )}
             </button>
           );
         })}
@@ -149,13 +163,24 @@ interface DayDetailsProps {
   onDeleteSession: (sessionId: number) => void;
 }
 
-function SessionPhrasesList({ sessionId }: { sessionId: number }) {
+function SessionPhrasesList({
+  sessionId,
+  onFailedCount,
+}: {
+  sessionId: number;
+  onFailedCount?: (count: number) => void;
+}) {
   const [phrases, setPhrases] = useState<SessionPhraseRecord[]>([]);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    getSessionPhrases(sessionId).then(setPhrases).catch(console.error);
-  }, [sessionId]);
+    getSessionPhrases(sessionId)
+      .then((p) => {
+        setPhrases(p);
+        onFailedCount?.(p.filter((x) => x.attempts > 1).length);
+      })
+      .catch(console.error);
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const failedPhrases = phrases.filter((p) => p.attempts > 1);
 
@@ -192,6 +217,90 @@ function SessionPhrasesList({ sessionId }: { sessionId: number }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function SessionCard({
+  session: s,
+  onDeleteSession,
+}: {
+  session: ExerciseSession;
+  onDeleteSession: (id: number) => void;
+}) {
+  const [failedCount, setFailedCount] = useState(0);
+  const isCompleted = s.phrasesCompleted === s.phrasesTotal && s.phrasesTotal > 0;
+  const hasFailed = failedCount > 0;
+  const rate =
+    s.phrasesTotal > 0
+      ? Math.round(((s.phrasesCompleted - failedCount) / s.phrasesTotal) * 100)
+      : 0;
+  const barColor = !isCompleted
+    ? rate >= 50
+      ? "bg-blue-500"
+      : "bg-amber-500"
+    : hasFailed
+      ? "bg-amber-500"
+      : "bg-green-500";
+  const rateColor = !isCompleted
+    ? rate >= 50
+      ? "text-blue-600 dark:text-blue-400"
+      : "text-amber-600 dark:text-amber-400"
+    : hasFailed
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-green-600 dark:text-green-400";
+
+  return (
+    <div className="p-3 border border-slate-100 dark:border-slate-700 rounded-lg">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            {formatTime(s.createdAt)}
+          </span>
+          {isCompleted ? (
+            <span
+              className={cn(
+                "flex items-center gap-1 text-xs font-medium",
+                hasFailed
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-green-600 dark:text-green-400"
+              )}
+            >
+              <CheckCircleIcon size="sm" />
+              {hasFailed ? "Completed with errors" : "Completed"}
+            </span>
+          ) : (
+            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+              Incomplete
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+            {languageName(s.targetLanguage)}
+          </span>
+          <button
+            onClick={() => onDeleteSession(s.id)}
+            className="p-1 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors"
+            title="Delete session"
+          >
+            <TrashIcon size="sm" />
+          </button>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2">
+          <div
+            className={cn("h-2 rounded-full transition-all", barColor)}
+            style={{ width: `${rate}%` }}
+          />
+        </div>
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
+          {s.phrasesCompleted - failedCount}/{s.phrasesTotal}
+        </span>
+        <span className={cn("text-sm font-bold whitespace-nowrap", rateColor)}>{rate}%</span>
+      </div>
+      <SessionPhrasesList sessionId={s.id} onFailedCount={setFailedCount} />
     </div>
   );
 }
@@ -278,74 +387,9 @@ function DayDetails({ date, sessions, onClose, onDeleteSession }: DayDetailsProp
           Sessions
         </h4>
         <div className="space-y-3">
-          {sessions.map((s) => {
-            const rate =
-              s.phrasesTotal > 0 ? Math.round((s.phrasesCompleted / s.phrasesTotal) * 100) : 0;
-            const isCompleted = s.phrasesCompleted === s.phrasesTotal && s.phrasesTotal > 0;
-            return (
-              <div
-                key={s.id}
-                className="p-3 border border-slate-100 dark:border-slate-700 rounded-lg"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {formatTime(s.createdAt)}
-                    </span>
-                    {isCompleted ? (
-                      <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium">
-                        <CheckCircleIcon size="sm" />
-                        Completed
-                      </span>
-                    ) : (
-                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                        Incomplete
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                      {languageName(s.targetLanguage)}
-                    </span>
-                    <button
-                      onClick={() => onDeleteSession(s.id)}
-                      className="p-1 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors"
-                      title="Delete session"
-                    >
-                      <TrashIcon size="sm" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2">
-                    <div
-                      className={cn(
-                        "h-2 rounded-full transition-all",
-                        rate === 100 ? "bg-green-500" : rate >= 50 ? "bg-blue-500" : "bg-amber-500"
-                      )}
-                      style={{ width: `${rate}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                    {s.phrasesCompleted}/{s.phrasesTotal}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-sm font-bold whitespace-nowrap",
-                      rate === 100
-                        ? "text-green-600 dark:text-green-400"
-                        : rate >= 50
-                          ? "text-blue-600 dark:text-blue-400"
-                          : "text-amber-600 dark:text-amber-400"
-                    )}
-                  >
-                    {rate}%
-                  </span>
-                </div>
-                <SessionPhrasesList sessionId={s.id} />
-              </div>
-            );
-          })}
+          {sessions.map((s) => (
+            <SessionCard key={s.id} session={s} onDeleteSession={onDeleteSession} />
+          ))}
         </div>
       </div>
     </div>
@@ -560,6 +604,14 @@ export function ExerciseStatsView() {
     [selectedDate]
   );
 
+  const sessionCountByDate = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of allSessions) {
+      map.set(s.date, (map.get(s.date) ?? 0) + 1);
+    }
+    return map;
+  }, [allSessions]);
+
   const today = new Date();
   const months: { year: number; month: number }[] = [];
   for (let i = 5; i >= 0; i--) {
@@ -641,6 +693,7 @@ export function ExerciseStatsView() {
                 year={year}
                 month={month}
                 activeDates={activeDates}
+                sessionCountByDate={sessionCountByDate}
                 selectedDate={selectedDate}
                 onDayClick={handleDayClick}
               />
