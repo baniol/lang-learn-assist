@@ -784,6 +784,11 @@ export function PhraseExerciseView() {
                       Matched alternative: {lastResult.matchedAlternative}
                     </p>
                   )}
+                  {inputMode === "repeat" && currentPhrase.phrase.prompt && (
+                    <p className="text-sm mt-2 text-slate-500 dark:text-slate-400">
+                      <span className="italic">{currentPhrase.phrase.prompt}</span>
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={handlePlayAnswer}
