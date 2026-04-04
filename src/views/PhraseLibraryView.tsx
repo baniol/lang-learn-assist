@@ -63,20 +63,7 @@ export function PhraseLibraryView() {
     };
   }, [searchQuery]);
 
-  // Load phrases when filters change
-  useEffect(() => {
-    loadPhrases();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    filterStatus,
-    debouncedSearch,
-    languageFilter,
-    settings?.targetLanguage,
-    selectedTagId,
-    starredOnly,
-  ]);
-
-  const loadPhrases = async () => {
+  const loadPhrases = useCallback(async () => {
     setIsLoading(true);
     try {
       let targetLang: string | undefined;
@@ -107,7 +94,12 @@ export function PhraseLibraryView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [debouncedSearch, languageFilter, settings?.targetLanguage, selectedTagId, starredOnly]);
+
+  // Load phrases when filters change
+  useEffect(() => {
+    loadPhrases();
+  }, [loadPhrases]);
 
   const handleToggleStar = async (id: number) => {
     try {

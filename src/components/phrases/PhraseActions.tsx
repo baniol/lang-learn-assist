@@ -3,7 +3,6 @@ import { Spinner } from "../ui";
 import { PlayIcon, PauseIcon, LightbulbIcon, CloseIcon } from "../icons";
 
 interface PhraseActionsProps {
-  phraseId: number;
   isPlaying: boolean;
   isLoading: boolean;
   isRefined?: boolean;

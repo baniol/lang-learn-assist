@@ -4,27 +4,11 @@ use crate::models::{
     TextSegment, UpdateMaterialRequest,
 };
 use crate::state::AppState;
+use crate::utils::db::{row_to_material, row_to_material_thread, MATERIAL_COLUMNS};
 use crate::utils::lock::SafeRwLock;
 use crate::utils::regex::TIMESTAMP_REGEX;
 use rusqlite::params;
 use tauri::State;
-
-fn row_to_material(row: &rusqlite::Row) -> Result<Material, rusqlite::Error> {
-    Ok(Material {
-        id: row.get(0)?,
-        title: row.get(1)?,
-        material_type: row.get(2)?,
-        source_url: row.get(3)?,
-        original_text: row.get(4)?,
-        segments_json: row.get(5)?,
-        target_language: row.get(6)?,
-        native_language: row.get(7)?,
-        status: row.get(8)?,
-        bookmark_index: row.get(9)?,
-        created_at: row.get(10)?,
-        updated_at: row.get(11)?,
-    })
-}
 
 #[tauri::command]
 pub fn create_material(
@@ -60,9 +44,7 @@ pub fn create_material(
     let id = conn.last_insert_rowid();
 
     conn.query_row(
-        "SELECT id, title, material_type, source_url, original_text, segments_json,
-                target_language, native_language, status, bookmark_index, created_at, updated_at
-         FROM materials WHERE id = ?1",
+        &format!("SELECT {MATERIAL_COLUMNS} FROM materials WHERE id = ?1"),
         params![id],
         row_to_material,
     )
@@ -97,10 +79,7 @@ pub fn get_materials(
     };
 
     let query = format!(
-        "SELECT id, title, material_type, source_url, original_text, segments_json,
-                target_language, native_language, status, bookmark_index, created_at, updated_at
-         FROM materials{}
-         ORDER BY created_at DESC",
+        "SELECT {MATERIAL_COLUMNS} FROM materials{} ORDER BY created_at DESC",
         where_clause
     );
 
@@ -183,9 +162,7 @@ pub fn get_material(id: i64) -> Result<Material, String> {
 
     let mut material = conn
         .query_row(
-            "SELECT id, title, material_type, source_url, original_text, segments_json,
-                target_language, native_language, status, bookmark_index, created_at, updated_at
-         FROM materials WHERE id = ?1",
+            &format!("SELECT {MATERIAL_COLUMNS} FROM materials WHERE id = ?1"),
             params![id],
             row_to_material,
         )
@@ -232,9 +209,7 @@ pub fn update_material(id: i64, request: UpdateMaterialRequest) -> Result<Materi
     }
 
     conn.query_row(
-        "SELECT id, title, material_type, source_url, original_text, segments_json,
-                target_language, native_language, status, bookmark_index, created_at, updated_at
-         FROM materials WHERE id = ?1",
+        &format!("SELECT {MATERIAL_COLUMNS} FROM materials WHERE id = ?1"),
         params![id],
         row_to_material,
     )
@@ -288,25 +263,6 @@ pub fn update_material_bookmark(id: i64, bookmarkIndex: Option<i32>) -> Result<(
 }
 
 // Material Threads
-
-fn row_to_material_thread(row: &rusqlite::Row) -> Result<MaterialThread, rusqlite::Error> {
-    let messages_json: String = row.get(3)?;
-    let messages: Vec<MaterialThreadMessage> =
-        serde_json::from_str(&messages_json).unwrap_or_default();
-    let suggested_phrases_json: Option<String> = row.get(4)?;
-    let suggested_phrases: Option<Vec<SuggestedPhrase>> =
-        suggested_phrases_json.and_then(|j| serde_json::from_str(&j).ok());
-
-    Ok(MaterialThread {
-        id: row.get(0)?,
-        material_id: row.get(1)?,
-        segment_index: row.get(2)?,
-        messages,
-        suggested_phrases,
-        created_at: row.get(5)?,
-        updated_at: row.get(6)?,
-    })
-}
 
 #[tauri::command]
 #[allow(non_snake_case)]

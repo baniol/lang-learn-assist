@@ -1,14 +1,7 @@
 use crate::db::get_conn;
 use crate::models::Tag;
+use crate::utils::db::row_to_tag;
 use rusqlite::params;
-
-fn row_to_tag(row: &rusqlite::Row) -> Result<Tag, rusqlite::Error> {
-    Ok(Tag {
-        id: row.get(0)?,
-        name: row.get(1)?,
-        created_at: row.get(2)?,
-    })
-}
 
 #[tauri::command]
 pub fn get_tags() -> Result<Vec<Tag>, String> {

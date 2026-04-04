@@ -158,7 +158,6 @@ export function PhraseListItem({
 
       {/* Actions */}
       <PhraseActions
-        phraseId={phrase.id}
         isPlaying={isPlaying}
         isLoading={isLoading}
         isRefined={phrase.refined}

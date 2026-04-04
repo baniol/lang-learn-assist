@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type {
   Material,
   TextSegment,
@@ -37,11 +37,7 @@ export function SentenceThreadDialog({
   const [pendingPhrases, setPendingPhrases] = useState<SuggestedPhrase[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadThread();
-  }, [material.id, segmentIndex]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadThread = async () => {
+  const loadThread = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -57,7 +53,11 @@ export function SentenceThreadDialog({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [material.id, segmentIndex]);
+
+  useEffect(() => {
+    loadThread();
+  }, [loadThread]);
 
   const handleSend = async () => {
     if (!inputValue.trim() || isSending) return;

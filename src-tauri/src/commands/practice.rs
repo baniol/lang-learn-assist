@@ -246,8 +246,10 @@ pub async fn practice_send_message(
             let json_str = &response.content[start..=end];
             match serde_json::from_str::<PracticeResponse>(json_str) {
                 Ok(parsed) => Ok(parsed),
-                Err(_) => {
-                    // Fallback: treat whole content as reply
+                Err(e) => {
+                    // Fallback: treat whole content as reply.
+                    // Log the parse error so debugging is possible.
+                    eprintln!("Failed to parse practice response JSON: {}", e);
                     Ok(PracticeResponse {
                         reply: response.content,
                         phrases: vec![],

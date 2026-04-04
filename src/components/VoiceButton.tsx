@@ -1,3 +1,4 @@
+import { cn } from "../lib/utils";
 import type { RecordingStatus } from "../hooks/useVoiceRecording";
 import { MicrophoneIcon, RefreshIcon, WarningIcon, type IconProps } from "./icons";
 
@@ -68,12 +69,11 @@ export function VoiceButton({
       onMouseLeave={isAvailable && status === "recording" ? onRelease : undefined}
       onTouchStart={isAvailable && status === "idle" ? onPress : undefined}
       onTouchEnd={isAvailable && status === "recording" ? onRelease : undefined}
-      className={`
-        ${sizeClasses[size]}
-        rounded-full flex items-center justify-center
-        transition-all duration-200
-        ${getStatusStyles()}
-      `}
+      className={cn(
+        sizeClasses[size],
+        "rounded-full flex items-center justify-center transition-all duration-200",
+        getStatusStyles()
+      )}
     >
       {getIcon()}
     </button>

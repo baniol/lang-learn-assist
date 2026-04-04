@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { generateTts, getAudioBase64, getVoiceForLanguage } from "../lib/tts";
+import { generateTts, fetchAudioWithFallback, getVoiceForLanguage } from "../lib/tts";
 
 /** Chat message type for audio playback */
 interface ChatMessage {
@@ -145,15 +145,15 @@ export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudi
 
         if (stopRequestedRef.current) return;
 
-        // Get audio as base64 data URL
-        let audioUrl: string;
-        try {
-          audioUrl = await getAudioBase64(audioPath);
-        } catch {
-          // Cached file doesn't exist, regenerate
-          audioPath = await generateTts(text, undefined, voiceId);
+        const { audioPath: resolvedPath, audioUrl } = await fetchAudioWithFallback(
+          text,
+          audioPath,
+          undefined,
+          voiceId
+        );
+        if (resolvedPath !== audioPath) {
+          audioPath = resolvedPath;
           audioCache.current.set(cacheKey, audioPath);
-          audioUrl = await getAudioBase64(audioPath);
         }
 
         if (stopRequestedRef.current) return;

@@ -86,7 +86,7 @@ fn levenshtein(a: &str, b: &str) -> usize {
 
 /// Compute similarity ratio (0.0 = completely different, 1.0 = identical).
 fn similarity(a: &str, b: &str) -> f64 {
-    let max_len = a.len().max(b.len());
+    let max_len = a.chars().count().max(b.chars().count());
     if max_len == 0 {
         return 1.0;
     }
@@ -95,6 +95,8 @@ fn similarity(a: &str, b: &str) -> f64 {
 }
 
 const FUZZY_THRESHOLD: f64 = 0.85;
+const MAX_ANSWER_LENGTH: usize = 1000;
+const MAX_ACCEPTED_COUNT: usize = 50;
 
 #[tauri::command]
 #[allow(non_snake_case)]
@@ -104,6 +106,24 @@ pub fn check_exercise_answer(
     accepted: Vec<String>,
     fuzzy: bool,
 ) -> Result<CheckAnswerResult, String> {
+    if userAnswer.len() > MAX_ANSWER_LENGTH {
+        return Err(format!(
+            "Answer too long (max {} characters)",
+            MAX_ANSWER_LENGTH
+        ));
+    }
+    if expectedAnswer.len() > MAX_ANSWER_LENGTH {
+        return Err(format!(
+            "Expected answer too long (max {} characters)",
+            MAX_ANSWER_LENGTH
+        ));
+    }
+    if accepted.len() > MAX_ACCEPTED_COUNT {
+        return Err(format!(
+            "Too many accepted alternatives (max {})",
+            MAX_ACCEPTED_COUNT
+        ));
+    }
     let normalized_user = normalize(&userAnswer);
     let normalized_expected = normalize(&expectedAnswer);
 
@@ -427,5 +447,34 @@ mod tests {
         )
         .unwrap();
         assert!(result.correct);
+    }
+
+    #[test]
+    fn test_fuzzy_multibyte_chars() {
+        // "schöner" vs "schoner" — ö is multibyte (2 bytes), 1 edit in 7 chars = 0.857 similarity
+        // Before the fix, a.len() counted bytes so max_len was 8 instead of 7,
+        // giving 1.0 - 1/8 = 0.875 — accidentally still correct here.
+        // This test mainly verifies no panic and reasonable similarity for multibyte input.
+        let result =
+            check_exercise_answer("schoner".to_string(), "schöner".to_string(), vec![], true)
+                .unwrap();
+        assert!(result.correct);
+        assert!(result.similarity >= FUZZY_THRESHOLD);
+    }
+
+    #[test]
+    fn test_similarity_multibyte_normalization() {
+        // Verify similarity() uses char count, not byte count.
+        // "öffnen" = 6 chars but 7 bytes (ö = 2 bytes).
+        // "offnen" vs "öffnen" — 1 char diff in 6 chars = 0.833 similarity by chars.
+        // With byte count: max_len = 7, giving 1 - 1/7 ≈ 0.857 — different result.
+        let sim = similarity("offnen", "öffnen");
+        // With correct char count: 1 - 1/6 ≈ 0.833
+        // With byte count: 1 - 1/7 ≈ 0.857
+        let expected = 1.0 - 1.0 / 6.0;
+        assert!(
+            (sim - expected).abs() < 0.001,
+            "similarity was {sim}, expected {expected}"
+        );
     }
 }

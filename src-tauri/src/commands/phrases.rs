@@ -3,7 +3,7 @@ use crate::models::{
     CreatePhraseRequest, Phrase, PhraseThread, PhraseThreadMessage, UpdatePhraseRequest,
 };
 use crate::state::AppState;
-use crate::utils::db::row_to_phrase;
+use crate::utils::db::{row_to_phrase, row_to_phrase_thread, PHRASE_COLUMNS};
 use crate::utils::lock::SafeRwLock;
 use rusqlite::params;
 use tauri::State;
@@ -56,10 +56,7 @@ pub fn get_phrases(
     };
 
     let query = format!(
-        "SELECT p.id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at, p.material_id, p.refined
-         FROM phrases p{}{}
-         ORDER BY p.created_at DESC",
+        "SELECT {PHRASE_COLUMNS} FROM phrases p{}{} ORDER BY p.created_at DESC",
         joins, where_clause
     );
 
@@ -82,10 +79,7 @@ pub fn get_phrase(id: i64) -> Result<Phrase, String> {
     let conn = get_conn()?;
 
     conn.query_row(
-        "SELECT p.id, p.prompt, p.answer, p.accepted_json,
-                p.target_language, p.native_language, p.audio_path, p.notes, p.starred, p.created_at, p.material_id, p.refined
-         FROM phrases p
-         WHERE p.id = ?1",
+        &format!("SELECT {PHRASE_COLUMNS} FROM phrases p WHERE p.id = ?1"),
         params![id],
         row_to_phrase,
     )
@@ -192,19 +186,28 @@ pub fn create_phrases_batch(
         created_ids.push(tx.last_insert_rowid());
     }
 
-    // Fetch all created phrases before committing
-    let mut created = Vec::new();
-    for id in &created_ids {
-        let phrase = tx
-            .query_row(
-                "SELECT id, prompt, answer, accepted_json, target_language, native_language, audio_path, notes, starred, created_at, material_id, refined
-                 FROM phrases WHERE id = ?1",
-                params![id],
-                row_to_phrase,
-            )
-            .map_err(|e| format!("Failed to retrieve created phrase: {}", e))?;
-        created.push(phrase);
-    }
+    // Fetch all created phrases in a single query before committing.
+    let placeholders = (1..=created_ids.len())
+        .map(|i| format!("?{i}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let query = format!(
+        "SELECT {PHRASE_COLUMNS} FROM phrases p WHERE p.id IN ({placeholders}) ORDER BY p.id ASC"
+    );
+    let params: Vec<Box<dyn rusqlite::ToSql>> = created_ids
+        .iter()
+        .map(|id| Box::new(*id) as Box<dyn rusqlite::ToSql>)
+        .collect();
+    let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+    let mut stmt = tx
+        .prepare(&query)
+        .map_err(|e| format!("Failed to prepare batch fetch query: {}", e))?;
+    let created = stmt
+        .query_map(param_refs.as_slice(), row_to_phrase)
+        .map_err(|e| format!("Failed to query created phrases: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect created phrases: {}", e))?;
+    drop(stmt);
 
     tx.commit()
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
@@ -333,27 +336,6 @@ pub fn delete_all_phrases() -> Result<i64, String> {
         .map_err(|e| format!("Failed to delete phrases: {}", e))?;
 
     Ok(count)
-}
-
-fn row_to_phrase_thread(row: &rusqlite::Row) -> Result<PhraseThread, rusqlite::Error> {
-    let messages_json: String = row.get(2)?;
-    let messages: Vec<PhraseThreadMessage> =
-        serde_json::from_str(&messages_json).unwrap_or_default();
-    let suggested_accepted_json: Option<String> = row.get(5)?;
-    let suggested_accepted: Option<Vec<String>> =
-        suggested_accepted_json.and_then(|j| serde_json::from_str(&j).ok());
-
-    Ok(PhraseThread {
-        id: row.get(0)?,
-        phrase_id: row.get(1)?,
-        messages,
-        suggested_prompt: row.get(3)?,
-        suggested_answer: row.get(4)?,
-        suggested_accepted,
-        status: row.get(6)?,
-        created_at: row.get(7)?,
-        updated_at: row.get(8)?,
-    })
 }
 
 #[tauri::command]

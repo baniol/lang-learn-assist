@@ -14,13 +14,14 @@ vi.mock("../lib/tts", () => ({
   generateTts: vi.fn(),
   getAudioBase64: vi.fn(),
   getVoiceForLanguage: vi.fn(),
+  fetchAudioWithFallback: vi.fn(),
 }));
 
-import { generateTts, getAudioBase64, getVoiceForLanguage } from "../lib/tts";
+import { generateTts, getVoiceForLanguage, fetchAudioWithFallback } from "../lib/tts";
 
 const mockGenerateTts = vi.mocked(generateTts);
-const mockGetAudioBase64 = vi.mocked(getAudioBase64);
 const mockGetVoiceForLanguage = vi.mocked(getVoiceForLanguage);
+const mockFetchAudioWithFallback = vi.mocked(fetchAudioWithFallback);
 
 describe("useAudioPlayback", () => {
   // Track Audio instances
@@ -52,7 +53,10 @@ describe("useAudioPlayback", () => {
 
     // Default mock implementations
     mockGenerateTts.mockResolvedValue("/path/to/audio.mp3");
-    mockGetAudioBase64.mockResolvedValue("data:audio/mp3;base64,test");
+    mockFetchAudioWithFallback.mockResolvedValue({
+      audioPath: "/path/to/audio.mp3",
+      audioUrl: "data:audio/mp3;base64,test",
+    });
     mockGetVoiceForLanguage.mockResolvedValue("");
   });
 
@@ -81,7 +85,12 @@ describe("useAudioPlayback", () => {
         expect(mockGenerateTts).toHaveBeenCalledWith("Hello world", undefined, undefined);
       });
 
-      expect(mockGetAudioBase64).toHaveBeenCalled();
+      expect(mockFetchAudioWithFallback).toHaveBeenCalledWith(
+        "Hello world",
+        "/path/to/audio.mp3",
+        undefined,
+        undefined
+      );
     });
 
     it("should update currentlyPlayingId when playback starts", async () => {

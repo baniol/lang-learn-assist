@@ -46,7 +46,8 @@ fn load_settings_from_db(conn: &Connection) -> AppSettings {
                 settings.fuzzy_matching = value == "true";
             }
             "exercise_repetitions_required" => {
-                settings.exercise_repetitions_required = value.parse().unwrap_or(1);
+                settings.exercise_repetitions_required =
+                    value.parse::<i32>().unwrap_or(1).clamp(1, 10);
             }
             _ => {}
         }

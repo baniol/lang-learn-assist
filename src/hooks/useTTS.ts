@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { generateTts, getAudioBase64 } from "../lib/tts";
+import { generateTts, fetchAudioWithFallback } from "../lib/tts";
 
 interface UseTTSOptions {
   enabled: boolean;
@@ -47,16 +47,15 @@ export function useTTS({ enabled, onError, onAudioGenerated }: UseTTSOptions): U
           wasGenerated = true;
         }
 
-        // Get audio as base64 data URL
-        let audioUrl: string;
-        try {
-          audioUrl = await getAudioBase64(audioPath);
-        } catch {
-          // Cached file doesn't exist, regenerate
-          audioPath = await generateTts(text, phraseId, undefined, language);
-          audioUrl = await getAudioBase64(audioPath);
-          wasGenerated = true;
-        }
+        const { audioPath: resolvedPath, audioUrl } = await fetchAudioWithFallback(
+          text,
+          audioPath,
+          phraseId,
+          undefined,
+          language
+        );
+        if (resolvedPath !== audioPath) wasGenerated = true;
+        audioPath = resolvedPath;
 
         // Notify that audio was generated so it can be cached
         if (wasGenerated && phraseId && onAudioGenerated) {

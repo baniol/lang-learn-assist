@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { Phrase, PhraseThread, PhraseThreadMessage, RefinePhraseSuggestion } from "../types";
 import {
   getPhraseThread,
@@ -53,24 +53,7 @@ export function PhraseRefinementDialog({
   const [editedAnswer, setEditedAnswer] = useState(phrase.answer);
   const [editedAccepted, setEditedAccepted] = useState(phrase.accepted.join(", "));
 
-  useEffect(() => {
-    if (mode === "ai") {
-      loadOrCreateThread();
-    }
-  }, [phrase.id, mode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (initialMessage && thread && !initialMessageSent && !isLoading && mode === "ai") {
-      setInitialMessageSent(true);
-      setUserInput(initialMessage);
-      setTimeout(() => {
-        handleSendMessage(initialMessage);
-      }, 100);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMessage, thread, initialMessageSent, isLoading, mode]);
-
-  const loadOrCreateThread = async () => {
+  const loadOrCreateThread = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -84,7 +67,27 @@ export function PhraseRefinementDialog({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [phrase.id]);
+
+  useEffect(() => {
+    if (mode === "ai") {
+      loadOrCreateThread();
+    }
+  }, [phrase.id, mode, loadOrCreateThread]);
+
+  useEffect(() => {
+    if (initialMessage && thread && !initialMessageSent && !isLoading && mode === "ai") {
+      setInitialMessageSent(true);
+      setUserInput(initialMessage);
+      setTimeout(() => {
+        handleSendMessage(initialMessage);
+      }, 100);
+    }
+    // handleSendMessage intentionally omitted: this effect fires at most once (guarded by
+    // initialMessageSent) and handleSendMessage is called with an explicit argument,
+    // so stale closure risk is negligible.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage, thread, initialMessageSent, isLoading, mode]);
 
   const handleSendMessage = async (messageText?: string) => {
     const text = messageText || userInput.trim();
