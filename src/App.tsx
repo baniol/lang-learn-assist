@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { ErrorBoundary } from "./components/shared";
@@ -10,7 +11,7 @@ import { MaterialReviewView } from "./views/MaterialReviewView";
 import { MaterialPracticeView } from "./views/MaterialPracticeView";
 import { PhraseExerciseView } from "./views/PhraseExerciseView";
 import { ExerciseStatsView } from "./views/ExerciseStatsView";
-import { PageSpinner } from "./components/ui";
+import { PageSpinner, ConfirmDialog } from "./components/ui";
 import { useNavigation } from "./hooks";
 import { isMaterialReviewView, isMaterialPracticeView } from "./types/navigation";
 
@@ -21,19 +22,35 @@ import { isMaterialReviewView, isMaterialPracticeView } from "./types/navigation
 function AppContent() {
   const { isLoading } = useSettings();
   const { viewState, currentView, navigate } = useNavigation();
+  const [exerciseActive, setExerciseActive] = useState(false);
+  const [pendingNav, setPendingNav] = useState<{ view: string; data?: unknown } | null>(null);
+
+  const doNavigate = useCallback(
+    (view: string, data?: unknown) => {
+      if (data && typeof data === "object") {
+        (navigate as (v: string, d: Record<string, unknown>) => void)(
+          view,
+          data as Record<string, unknown>
+        );
+      } else {
+        (navigate as (v: string) => void)(view);
+      }
+    },
+    [navigate]
+  );
 
   // Legacy-compatible navigate wrapper for views that haven't been updated yet
   // TODO: Remove once all views use the type-safe NavigateFn
-  const legacyNavigate = (view: string, data?: unknown) => {
-    if (data && typeof data === "object") {
-      (navigate as (v: string, d: Record<string, unknown>) => void)(
-        view,
-        data as Record<string, unknown>
-      );
-    } else {
-      (navigate as (v: string) => void)(view);
-    }
-  };
+  const legacyNavigate = useCallback(
+    (view: string, data?: unknown) => {
+      if (exerciseActive && view !== "phrase-exercise") {
+        setPendingNav({ view, data });
+        return;
+      }
+      doNavigate(view, data);
+    },
+    [exerciseActive, doNavigate]
+  );
 
   // Show loading spinner while settings are being fetched
   if (isLoading) {
@@ -59,7 +76,7 @@ function AppContent() {
       case "phrase-library":
         return <PhraseLibraryView />;
       case "phrase-exercise":
-        return <PhraseExerciseView />;
+        return <PhraseExerciseView onExerciseActive={setExerciseActive} />;
       case "exercise-stats":
         return <ExerciseStatsView />;
       case "settings":
@@ -83,6 +100,21 @@ function AppContent() {
           {renderView()}
         </ErrorBoundary>
       </Layout>
+      <ConfirmDialog
+        isOpen={pendingNav !== null}
+        onClose={() => setPendingNav(null)}
+        onConfirm={() => {
+          if (pendingNav) {
+            doNavigate(pendingNav.view, pendingNav.data);
+          }
+          setPendingNav(null);
+        }}
+        title="Leave exercise?"
+        message="The current session is incomplete and won't be saved to statistics."
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        variant="danger"
+      />
     </>
   );
 }

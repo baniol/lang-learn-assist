@@ -10,7 +10,7 @@ import {
   toggleStarred,
 } from "../api";
 import { VoiceButton } from "../components/VoiceButton";
-import { Button, Spinner } from "../components/ui";
+import { Button, Spinner, ConfirmDialog } from "../components/ui";
 import {
   PlayIcon,
   CheckIcon,
@@ -39,7 +39,11 @@ function shuffleArray<T>(arr: T[]): T[] {
   return shuffled;
 }
 
-export function PhraseExerciseView() {
+interface PhraseExerciseViewProps {
+  onExerciseActive?: (active: boolean) => void;
+}
+
+export function PhraseExerciseView({ onExerciseActive }: PhraseExerciseViewProps) {
   const { settings } = useSettings();
   const [phase, setPhase] = useState<ExercisePhase>("setup");
   const [inputMode, setInputMode] = useState<InputMode>("voice");
@@ -62,6 +66,8 @@ export function PhraseExerciseView() {
   const [autoPlayAudio, setAutoPlayAudio] = useState(true);
   const [showSentence, setShowSentence] = useState(true);
 
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
 
@@ -69,6 +75,20 @@ export function PhraseExerciseView() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+    };
+  }, []);
+
+  const onExerciseActiveRef = useRef(onExerciseActive);
+  onExerciseActiveRef.current = onExerciseActive;
+
+  useEffect(() => {
+    onExerciseActiveRef.current?.(phase === "exercise");
+  }, [phase]);
+
+  // Reset on unmount (e.g. navigated away via confirm dialog)
+  useEffect(() => {
+    return () => {
+      onExerciseActiveRef.current?.(false);
     };
   }, []);
 
@@ -240,21 +260,23 @@ export function PhraseExerciseView() {
     }
   }, [targetLanguage, selectedTagId, starredOnly, inputMode]);
 
-  // Save session and transition to results
+  // Save session and transition to results — only saves if all phrases completed
   const handleFinish = useCallback(
     (phrases: typeof sessionPhrases) => {
       const completed = phrases.filter((sp) => sp.completed).length;
       const total = phrases.length;
-      const date = new Date().toISOString().split("T")[0];
-      const phraseDetails = phrases.map((sp) => ({
-        prompt: sp.phrase.prompt,
-        answer: sp.phrase.answer,
-        attempts: sp.attempts,
-        completed: sp.completed,
-      }));
-      saveExerciseSession(date, completed, total, targetLanguage, phraseDetails).catch(
-        console.error
-      );
+      if (completed === total && total > 0) {
+        const date = new Date().toISOString().split("T")[0];
+        const phraseDetails = phrases.map((sp) => ({
+          prompt: sp.phrase.prompt,
+          answer: sp.phrase.answer,
+          attempts: sp.attempts,
+          completed: sp.completed,
+        }));
+        saveExerciseSession(date, completed, total, targetLanguage, phraseDetails).catch(
+          console.error
+        );
+      }
       setPhase("results");
     },
     [targetLanguage]
@@ -541,335 +563,356 @@ export function PhraseExerciseView() {
     const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
     return (
-      <div className="flex flex-col h-full">
-        {/* Header with progress */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-bold text-slate-800 dark:text-white">Exercise</h2>
-              {/* Input mode indicator */}
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                {inputMode === "voice" ? (
+      <>
+        <div className="flex flex-col h-full">
+          {/* Header with progress */}
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-bold text-slate-800 dark:text-white">Exercise</h2>
+                {/* Input mode indicator */}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                  {inputMode === "voice" ? (
+                    <>
+                      <MicrophoneIcon size="xs" /> Voice
+                    </>
+                  ) : inputMode === "repeat" ? (
+                    <>
+                      <RefreshIcon size="xs" /> Repeat
+                    </>
+                  ) : (
+                    <>
+                      <EditIcon size="xs" /> Typing
+                    </>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  {completedCount}/{totalCount} completed
+                </span>
+                {inputMode === "repeat" && (
                   <>
-                    <MicrophoneIcon size="xs" /> Voice
-                  </>
-                ) : inputMode === "repeat" ? (
-                  <>
-                    <RefreshIcon size="xs" /> Repeat
-                  </>
-                ) : (
-                  <>
-                    <EditIcon size="xs" /> Typing
-                  </>
-                )}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-slate-500 dark:text-slate-400">
-                {completedCount}/{totalCount} completed
-              </span>
-              {inputMode === "repeat" && (
-                <>
-                  <button
-                    onClick={() => {
-                      setShowSentence((v) => {
-                        if (v) setAutoPlayAudio(true);
-                        return !v;
-                      });
-                    }}
-                    className={cn(
-                      "p-1.5 rounded transition-colors",
-                      showSentence
-                        ? "text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                        : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                    )}
-                    title={showSentence ? "Text visible" : "Text hidden (audio only)"}
-                  >
-                    {showSentence ? <EyeIcon size="sm" /> : <EyeOffIcon size="sm" />}
-                  </button>
-                  <button
-                    onClick={() => setAutoPlayAudio((v) => !v)}
-                    disabled={!showSentence}
-                    className={cn(
-                      "p-1.5 rounded transition-colors",
-                      !showSentence
-                        ? "text-blue-600/50 dark:text-blue-400/50 cursor-not-allowed"
-                        : autoPlayAudio
+                    <button
+                      onClick={() => {
+                        setShowSentence((v) => {
+                          if (v) setAutoPlayAudio(true);
+                          return !v;
+                        });
+                      }}
+                      className={cn(
+                        "p-1.5 rounded transition-colors",
+                        showSentence
                           ? "text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                           : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                    )}
-                    title={
-                      !showSentence
-                        ? "Auto-play required when text is hidden"
-                        : autoPlayAudio
-                          ? "Auto-play on"
-                          : "Auto-play off"
-                    }
-                  >
-                    {autoPlayAudio || !showSentence ? (
-                      <VolumeUpIcon size="sm" />
-                    ) : (
-                      <VolumeOffIcon size="sm" />
-                    )}
-                  </button>
-                </>
-              )}
-              <Button variant="ghost" size="sm" onClick={() => handleFinish(sessionPhrases)}>
-                End
-              </Button>
-            </div>
-          </div>
-          {/* Progress bar */}
-          <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-            <div
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Main exercise area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8">
-          {/* Streak indicator */}
-          {repetitionsRequired > 1 && (
-            <div className="flex items-center gap-1 mb-4">
-              {Array.from({ length: repetitionsRequired }).map((_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "w-3 h-3 rounded-full transition-colors",
-                    i < currentPhrase.correctStreak
-                      ? "bg-green-500"
-                      : "bg-slate-300 dark:bg-slate-600"
-                  )}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Star + Prompt */}
-          <div className="text-center mb-8">
-            <button
-              onClick={handleToggleStar}
-              className={cn(
-                "mb-2 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors",
-                currentPhrase.phrase.starred
-                  ? "text-yellow-500"
-                  : "text-slate-300 dark:text-slate-600"
-              )}
-              title={currentPhrase.phrase.starred ? "Unstar phrase" : "Star phrase"}
-            >
-              <StarIcon size="md" filled={currentPhrase.phrase.starred} />
-            </button>
-            {inputMode === "repeat" ? (
-              <>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-                  {showSentence ? "Repeat:" : "Listen and repeat:"}
-                </p>
-                {showSentence && (
-                  <p className="text-2xl font-bold text-slate-800 dark:text-white">
-                    {currentPhrase.phrase.answer}
-                  </p>
-                )}
-                {!lastResult && (
-                  <button
-                    onClick={handlePlayAnswer}
-                    className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-blue-500 transition-colors"
-                    title="Listen (P)"
-                  >
-                    <VolumeUpIcon size="sm" />
-                    Listen
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Translate:</p>
-                <p className="text-2xl font-bold text-slate-800 dark:text-white">
-                  {currentPhrase.phrase.prompt}
-                </p>
-
-                {/* Peek answer */}
-                {!lastResult &&
-                  (showingAnswer ? (
-                    <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                      <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                        {currentPhrase.phrase.answer}
-                      </p>
-                      <button
-                        onClick={handlePlayAnswer}
-                        className="p-1 text-amber-600 hover:text-amber-800 dark:hover:text-amber-200 transition-colors rounded"
-                        title="Listen"
-                      >
-                        <VolumeUpIcon size="sm" />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handlePeekAnswer}
-                      className="mt-3 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline underline-offset-2"
+                      )}
+                      title={showSentence ? "Text visible" : "Text hidden (audio only)"}
                     >
-                      Show answer
+                      {showSentence ? <EyeIcon size="sm" /> : <EyeOffIcon size="sm" />}
                     </button>
-                  ))}
-              </>
-            )}
+                    <button
+                      onClick={() => setAutoPlayAudio((v) => !v)}
+                      disabled={!showSentence}
+                      className={cn(
+                        "p-1.5 rounded transition-colors",
+                        !showSentence
+                          ? "text-blue-600/50 dark:text-blue-400/50 cursor-not-allowed"
+                          : autoPlayAudio
+                            ? "text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                            : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                      )}
+                      title={
+                        !showSentence
+                          ? "Auto-play required when text is hidden"
+                          : autoPlayAudio
+                            ? "Auto-play on"
+                            : "Auto-play off"
+                      }
+                    >
+                      {autoPlayAudio || !showSentence ? (
+                        <VolumeUpIcon size="sm" />
+                      ) : (
+                        <VolumeOffIcon size="sm" />
+                      )}
+                    </button>
+                  </>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setShowEndConfirm(true)}>
+                  End
+                </Button>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+              <div
+                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
           </div>
 
-          {/* Answer feedback */}
-          {lastResult && (
-            <div
-              className={cn(
-                "w-full max-w-md mb-6 p-4 rounded-lg border",
-                lastResult.correct
-                  ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-                  : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
-              )}
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className={cn(
-                    "mt-0.5 flex-shrink-0",
-                    lastResult.correct ? "text-green-600" : "text-red-600"
-                  )}
-                >
-                  {lastResult.correct ? <CheckIcon size="md" /> : <CloseIcon size="md" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p
+          {/* Main exercise area */}
+          <div className="flex-1 flex flex-col items-center justify-center p-8">
+            {/* Streak indicator */}
+            {repetitionsRequired > 1 && (
+              <div className="flex items-center gap-1 mb-4">
+                {Array.from({ length: repetitionsRequired }).map((_, i) => (
+                  <div
+                    key={i}
                     className={cn(
-                      "font-medium",
-                      lastResult.correct
-                        ? "text-green-800 dark:text-green-300"
-                        : "text-red-800 dark:text-red-300"
+                      "w-3 h-3 rounded-full transition-colors",
+                      i < currentPhrase.correctStreak
+                        ? "bg-green-500"
+                        : "bg-slate-300 dark:bg-slate-600"
                     )}
-                  >
-                    {lastResult.correct
-                      ? currentPhrase.completed
-                        ? "Correct! Phrase completed."
-                        : `Correct! Repeat to confirm (${currentPhrase.correctStreak}/${repetitionsRequired})`
-                      : "Incorrect — try again"}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Star + Prompt */}
+            <div className="text-center mb-8">
+              <button
+                onClick={handleToggleStar}
+                className={cn(
+                  "mb-2 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors",
+                  currentPhrase.phrase.starred
+                    ? "text-yellow-500"
+                    : "text-slate-300 dark:text-slate-600"
+                )}
+                title={currentPhrase.phrase.starred ? "Unstar phrase" : "Star phrase"}
+              >
+                <StarIcon size="md" filled={currentPhrase.phrase.starred} />
+              </button>
+              {inputMode === "repeat" ? (
+                <>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                    {showSentence ? "Repeat:" : "Listen and repeat:"}
                   </p>
-                  {lastResult.correct && (
-                    <p className="text-sm mt-1 text-slate-700 dark:text-slate-300">
-                      Answer: <span className="font-medium">{lastResult.expectedAnswer}</span>
+                  {showSentence && (
+                    <p className="text-2xl font-bold text-slate-800 dark:text-white">
+                      {currentPhrase.phrase.answer}
                     </p>
                   )}
-                  {lastResult.correct &&
-                    inputValue &&
-                    inputValue.trim().toLowerCase() !==
-                      lastResult.expectedAnswer.trim().toLowerCase() && (
+                  {!lastResult && (
+                    <button
+                      onClick={handlePlayAnswer}
+                      className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-blue-500 transition-colors"
+                      title="Listen (P)"
+                    >
+                      <VolumeUpIcon size="sm" />
+                      Listen
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Translate:</p>
+                  <p className="text-2xl font-bold text-slate-800 dark:text-white">
+                    {currentPhrase.phrase.prompt}
+                  </p>
+
+                  {/* Peek answer */}
+                  {!lastResult &&
+                    (showingAnswer ? (
+                      <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                        <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                          {currentPhrase.phrase.answer}
+                        </p>
+                        <button
+                          onClick={handlePlayAnswer}
+                          className="p-1 text-amber-600 hover:text-amber-800 dark:hover:text-amber-200 transition-colors rounded"
+                          title="Listen"
+                        >
+                          <VolumeUpIcon size="sm" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handlePeekAnswer}
+                        className="mt-3 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline underline-offset-2"
+                      >
+                        Show answer
+                      </button>
+                    ))}
+                </>
+              )}
+            </div>
+
+            {/* Answer feedback */}
+            {lastResult && (
+              <div
+                className={cn(
+                  "w-full max-w-md mb-6 p-4 rounded-lg border",
+                  lastResult.correct
+                    ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                    : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={cn(
+                      "mt-0.5 flex-shrink-0",
+                      lastResult.correct ? "text-green-600" : "text-red-600"
+                    )}
+                  >
+                    {lastResult.correct ? <CheckIcon size="md" /> : <CloseIcon size="md" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={cn(
+                        "font-medium",
+                        lastResult.correct
+                          ? "text-green-800 dark:text-green-300"
+                          : "text-red-800 dark:text-red-300"
+                      )}
+                    >
+                      {lastResult.correct
+                        ? currentPhrase.completed
+                          ? "Correct! Phrase completed."
+                          : `Correct! Repeat to confirm (${currentPhrase.correctStreak}/${repetitionsRequired})`
+                        : "Incorrect — try again"}
+                    </p>
+                    {lastResult.correct && (
+                      <p className="text-sm mt-1 text-slate-700 dark:text-slate-300">
+                        Answer: <span className="font-medium">{lastResult.expectedAnswer}</span>
+                      </p>
+                    )}
+                    {lastResult.correct &&
+                      inputValue &&
+                      inputValue.trim().toLowerCase() !==
+                        lastResult.expectedAnswer.trim().toLowerCase() && (
+                        <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
+                          Recognized: <span className="italic">&ldquo;{inputValue}&rdquo;</span>
+                          {lastResult.similarity < 1.0 && (
+                            <span className="ml-1">
+                              ({Math.round(lastResult.similarity * 100)}%)
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    {!lastResult.correct && (
+                      <p className="text-sm mt-1 text-slate-700 dark:text-slate-300">
+                        Expected: <span className="font-medium">{lastResult.expectedAnswer}</span>
+                      </p>
+                    )}
+                    {!lastResult.correct && inputValue && (
                       <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
                         Recognized: <span className="italic">&ldquo;{inputValue}&rdquo;</span>
-                        {lastResult.similarity < 1.0 && (
+                        {lastResult.similarity > 0 && (
                           <span className="ml-1">({Math.round(lastResult.similarity * 100)}%)</span>
                         )}
                       </p>
                     )}
-                  {!lastResult.correct && (
-                    <p className="text-sm mt-1 text-slate-700 dark:text-slate-300">
-                      Expected: <span className="font-medium">{lastResult.expectedAnswer}</span>
-                    </p>
-                  )}
-                  {!lastResult.correct && inputValue && (
-                    <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
-                      Recognized: <span className="italic">&ldquo;{inputValue}&rdquo;</span>
-                      {lastResult.similarity > 0 && (
-                        <span className="ml-1">({Math.round(lastResult.similarity * 100)}%)</span>
-                      )}
-                    </p>
-                  )}
-                  {lastResult.matchedAlternative && (
-                    <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
-                      Matched alternative: {lastResult.matchedAlternative}
-                    </p>
-                  )}
-                  {inputMode === "repeat" && currentPhrase.phrase.prompt && (
-                    <p className="text-sm mt-2 text-slate-500 dark:text-slate-400">
-                      <span className="italic">{currentPhrase.phrase.prompt}</span>
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={handlePlayAnswer}
-                  className="flex-shrink-0 p-1.5 text-slate-500 hover:text-blue-600 transition-colors rounded"
-                  title="Listen to answer (P)"
-                >
-                  <VolumeUpIcon size="sm" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Input area */}
-          <div className="w-full max-w-md">
-            {!lastResult ? (
-              inputMode === "voice" || inputMode === "repeat" ? (
-                /* VOICE/REPEAT MODE: large central mic button, Space press-and-hold */
-                <div className="flex flex-col items-center gap-4">
-                  <VoiceButton
-                    status={voiceStatus}
-                    isAvailable={voiceAvailable}
-                    onPress={startRecording}
-                    onRelease={stopRecording}
-                    size="lg"
-                  />
-                  <p className="text-sm text-slate-400 dark:text-slate-500">
-                    {voiceStatus === "recording"
-                      ? "Listening... release to stop"
-                      : voiceStatus === "transcribing"
-                        ? "Transcribing..."
-                        : "Hold Space or press the mic button"}
-                  </p>
-                  {inputValue && (
-                    <p className="text-sm text-slate-600 dark:text-slate-300 italic">
-                      &ldquo;{inputValue}&rdquo;
-                    </p>
-                  )}
-                </div>
-              ) : (
-                /* TYPING MODE: text input with submit button */
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your answer..."
-                    disabled={isChecking}
-                    className="flex-1 px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
-                    autoFocus
-                  />
-                  <Button
-                    onClick={() => submitAnswer()}
-                    disabled={!inputValue.trim() || isChecking}
-                    isLoading={isChecking}
+                    {lastResult.matchedAlternative && (
+                      <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
+                        Matched alternative: {lastResult.matchedAlternative}
+                      </p>
+                    )}
+                    {inputMode === "repeat" && currentPhrase.phrase.prompt && (
+                      <p className="text-sm mt-2 text-slate-500 dark:text-slate-400">
+                        <span className="italic">{currentPhrase.phrase.prompt}</span>
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={handlePlayAnswer}
+                    className="flex-shrink-0 p-1.5 text-slate-500 hover:text-blue-600 transition-colors rounded"
+                    title="Listen to answer (P)"
                   >
-                    Check
-                  </Button>
+                    <VolumeUpIcon size="sm" />
+                  </button>
                 </div>
-              )
-            ) : (
-              <div className="flex flex-col items-center gap-2">
-                <Button onClick={handleNext} className="w-full" size="lg">
-                  {currentPhrase.completed
-                    ? completedCount === totalCount
-                      ? "See Results"
-                      : "Next Phrase"
-                    : "Try Again"}
-                  <ChevronRightIcon size="sm" />
-                </Button>
-                {(inputMode === "voice" || inputMode === "repeat") && (
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
-                    Press Space to continue
-                  </p>
-                )}
               </div>
             )}
+
+            {/* Input area */}
+            <div className="w-full max-w-md">
+              {!lastResult ? (
+                inputMode === "voice" || inputMode === "repeat" ? (
+                  /* VOICE/REPEAT MODE: large central mic button, Space press-and-hold */
+                  <div className="flex flex-col items-center gap-4">
+                    <VoiceButton
+                      status={voiceStatus}
+                      isAvailable={voiceAvailable}
+                      onPress={startRecording}
+                      onRelease={stopRecording}
+                      size="lg"
+                    />
+                    <p className="text-sm text-slate-400 dark:text-slate-500">
+                      {voiceStatus === "recording"
+                        ? "Listening... release to stop"
+                        : voiceStatus === "transcribing"
+                          ? "Transcribing..."
+                          : "Hold Space or press the mic button"}
+                    </p>
+                    {inputValue && (
+                      <p className="text-sm text-slate-600 dark:text-slate-300 italic">
+                        &ldquo;{inputValue}&rdquo;
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  /* TYPING MODE: text input with submit button */
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type your answer..."
+                      disabled={isChecking}
+                      className="flex-1 px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+                      autoFocus
+                    />
+                    <Button
+                      onClick={() => submitAnswer()}
+                      disabled={!inputValue.trim() || isChecking}
+                      isLoading={isChecking}
+                    >
+                      Check
+                    </Button>
+                  </div>
+                )
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <Button onClick={handleNext} className="w-full" size="lg">
+                    {currentPhrase.completed
+                      ? completedCount === totalCount
+                        ? "See Results"
+                        : "Next Phrase"
+                      : "Try Again"}
+                    <ChevronRightIcon size="sm" />
+                  </Button>
+                  {(inputMode === "voice" || inputMode === "repeat") && (
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                      Press Space to continue
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+
+        <ConfirmDialog
+          isOpen={showEndConfirm}
+          onClose={() => setShowEndConfirm(false)}
+          onConfirm={() => {
+            setShowEndConfirm(false);
+            setPhase("setup");
+            setSessionPhrases([]);
+            setLastResult(null);
+            setInputValue("");
+          }}
+          title="End exercise?"
+          message="The current session is incomplete and won't be saved to statistics."
+          confirmLabel="End session"
+          cancelLabel="Continue"
+          variant="danger"
+        />
+      </>
     );
   }
 
