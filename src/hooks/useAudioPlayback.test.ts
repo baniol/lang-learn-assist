@@ -228,26 +228,31 @@ describe("useAudioPlayback", () => {
   });
 
   describe("voice options", () => {
-    it("should load per-language voices when language is provided", async () => {
+    it("should load per-language voice when language is provided", async () => {
       mockGetVoiceForLanguage.mockResolvedValue("lang-voice");
 
       renderHook(() => useAudioPlayback({ language: "de" }));
 
       await waitFor(() => {
-        expect(mockGetVoiceForLanguage).toHaveBeenCalledWith("de", "voiceA");
-        expect(mockGetVoiceForLanguage).toHaveBeenCalledWith("de", "voiceB");
+        expect(mockGetVoiceForLanguage).toHaveBeenCalledWith("de");
       });
     });
 
-    it("should use explicit voice when provided", async () => {
-      const { result } = renderHook(() => useAudioPlayback({ voiceA: "explicit-voice" }));
+    it("should use the per-language voice when playing", async () => {
+      mockGetVoiceForLanguage.mockResolvedValue("lang-voice");
+
+      const { result } = renderHook(() => useAudioPlayback({ language: "de" }));
+
+      await waitFor(() => {
+        expect(mockGetVoiceForLanguage).toHaveBeenCalledWith("de");
+      });
 
       act(() => {
-        result.current.playMessage("Hello", "msg-1", 0);
+        result.current.playMessage("Hello", "msg-1");
       });
 
       await waitFor(() => {
-        expect(mockGenerateTts).toHaveBeenCalledWith("Hello", undefined, "explicit-voice");
+        expect(mockGenerateTts).toHaveBeenCalledWith("Hello", undefined, "lang-voice");
       });
     });
   });

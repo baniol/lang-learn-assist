@@ -38,13 +38,11 @@ pub struct Phrase {
     pub created_at: String,
 }
 
-/// Voice settings for a specific language (default voice + conversation voices A/B)
+/// Voice settings for a specific language
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LanguageVoiceSettings {
     pub default: String,
-    pub voice_a: String,
-    pub voice_b: String,
 }
 
 /// User-defined custom language
@@ -69,10 +67,8 @@ pub struct AppSettings {
     // TTS settings
     pub tts_provider: String,
     pub tts_api_key: String,
-    // Legacy voice settings (kept for migration, may be empty)
+    // Legacy voice setting (kept for migration, may be empty)
     pub tts_voice_id: String,
-    pub tts_voice_id_a: String,
-    pub tts_voice_id_b: String,
     // Per-language voice settings
     pub tts_voices_per_language: HashMap<String, LanguageVoiceSettings>,
 
@@ -99,8 +95,6 @@ impl AppSettings {
             tts_provider: "none".to_string(),
             tts_api_key: String::new(),
             tts_voice_id: String::new(),
-            tts_voice_id_a: String::new(),
-            tts_voice_id_b: String::new(),
             tts_voices_per_language: HashMap::new(),
             target_language: "de".to_string(),
             native_language: "pl".to_string(),

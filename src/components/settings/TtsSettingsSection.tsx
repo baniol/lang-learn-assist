@@ -36,17 +36,8 @@ export function TtsSettingsSection({
 }: TtsSettingsSectionProps) {
   const [selectedLanguage, setSelectedLanguage] = useState("de");
 
-  const updateLanguageVoice = (
-    langCode: string,
-    field: keyof LanguageVoiceSettings,
-    value: string
-  ) => {
-    const current = voicesPerLanguage[langCode] || {
-      default: "",
-      voiceA: "",
-      voiceB: "",
-    };
-    const updated: LanguageVoiceSettings = { ...current, [field]: value };
+  const updateLanguageVoice = (langCode: string, value: string) => {
+    const updated: LanguageVoiceSettings = { default: value };
     onVoicesPerLanguageChange({ ...voicesPerLanguage, [langCode]: updated });
   };
 
@@ -132,19 +123,16 @@ export function TtsSettingsSection({
                   {/* Voice settings for selected language */}
                   <div className="space-y-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4">
                     <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      {allLanguages.find((l) => l.code === selectedLanguage)?.name} Voices
+                      {allLanguages.find((l) => l.code === selectedLanguage)?.name} Voice
                     </h4>
 
-                    {/* Default Voice */}
                     <div>
                       <label className="block text-sm text-slate-600 dark:text-slate-400 mb-1">
-                        Default Voice (Practice)
+                        Voice
                       </label>
                       <select
                         value={voicesPerLanguage[selectedLanguage]?.default || ""}
-                        onChange={(e) =>
-                          updateLanguageVoice(selectedLanguage, "default", e.target.value)
-                        }
+                        onChange={(e) => updateLanguageVoice(selectedLanguage, e.target.value)}
                         className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
                       >
                         <option value="">Select a voice...</option>
@@ -154,56 +142,6 @@ export function TtsSettingsSection({
                           </option>
                         ))}
                       </select>
-                    </div>
-
-                    {/* Conversation Voices */}
-                    <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                        Conversation Voices (alternating)
-                      </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
-                            Voice A
-                          </label>
-                          <select
-                            value={voicesPerLanguage[selectedLanguage]?.voiceA || ""}
-                            onChange={(e) =>
-                              updateLanguageVoice(selectedLanguage, "voiceA", e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm"
-                          >
-                            <option value="">Use default</option>
-                            {voices.map((voice) => (
-                              <option key={voice.voiceId} value={voice.voiceId}>
-                                {voice.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1">
-                            Voice B
-                          </label>
-                          <select
-                            value={voicesPerLanguage[selectedLanguage]?.voiceB || ""}
-                            onChange={(e) =>
-                              updateLanguageVoice(selectedLanguage, "voiceB", e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm"
-                          >
-                            <option value="">Use default</option>
-                            {voices.map((voice) => (
-                              <option key={voice.voiceId} value={voice.voiceId}>
-                                {voice.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                        Alternate between Voice A and Voice B when playing conversation messages
-                      </p>
                     </div>
                   </div>
                 </div>

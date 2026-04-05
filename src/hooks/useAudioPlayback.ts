@@ -12,11 +12,7 @@ interface ChatMessage {
 const MAX_AUDIO_CACHE_SIZE = 50;
 
 interface UseAudioPlaybackOptions {
-  /** Explicit voice A ID (legacy) */
-  voiceA?: string;
-  /** Explicit voice B ID (legacy) */
-  voiceB?: string;
-  /** Language code to look up per-language voices (takes precedence) */
+  /** Language code to look up the per-language voice */
   language?: string;
 }
 
@@ -25,71 +21,47 @@ interface UseAudioPlaybackResult {
   isLoading: boolean;
   currentlyPlayingId: string | null;
   error: string | null;
-  playMessage: (text: string, messageId: string, voiceIndex?: number) => Promise<void>;
+  playMessage: (text: string, messageId: string) => Promise<void>;
   playAll: (messages: ChatMessage[]) => Promise<void>;
   stop: () => void;
 }
 
 export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudioPlaybackResult {
-  const { voiceA: explicitVoiceA, voiceB: explicitVoiceB, language } = options;
+  const { language } = options;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Per-language voices (loaded when language is provided)
-  const [languageVoiceA, setLanguageVoiceA] = useState<string | undefined>(undefined);
-  const [languageVoiceB, setLanguageVoiceB] = useState<string | undefined>(undefined);
+  // Per-language voice (loaded when language is provided)
+  const [languageVoice, setLanguageVoice] = useState<string | undefined>(undefined);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Cache key includes voice ID to handle different voices for same text
   const audioCache = useRef<Map<string, string>>(new Map());
   const stopRequestedRef = useRef(false);
 
-  // Load per-language voices when language changes
+  // Load per-language voice when language changes
   useEffect(() => {
     let mounted = true;
 
     if (language) {
-      Promise.all([
-        getVoiceForLanguage(language, "voiceA"),
-        getVoiceForLanguage(language, "voiceB"),
-      ])
-        .then(([a, b]) => {
-          if (mounted) {
-            setLanguageVoiceA(a || undefined);
-            setLanguageVoiceB(b || undefined);
-          }
+      getVoiceForLanguage(language)
+        .then((voice) => {
+          if (mounted) setLanguageVoice(voice || undefined);
         })
         .catch((err) => {
-          if (mounted) {
-            console.error("Failed to load per-language voices:", err);
-          }
+          if (mounted) console.error("Failed to load per-language voice:", err);
         });
     } else {
-      setLanguageVoiceA(undefined);
-      setLanguageVoiceB(undefined);
+      setLanguageVoice(undefined);
     }
 
     return () => {
       mounted = false;
     };
   }, [language]);
-
-  // Use per-language voices if language is set, otherwise fall back to explicit options
-  const voiceA = language ? languageVoiceA : explicitVoiceA;
-  const voiceB = language ? languageVoiceB : explicitVoiceB;
-
-  const getVoiceForIndex = useCallback(
-    (index: number): string | undefined => {
-      // If neither voice is set, use default (undefined)
-      if (!voiceA && !voiceB) return undefined;
-      // Alternate between voiceA and voiceB
-      return index % 2 === 0 ? voiceA || voiceB : voiceB || voiceA;
-    },
-    [voiceA, voiceB]
-  );
 
   const stop = useCallback(() => {
     stopRequestedRef.current = true;
@@ -104,7 +76,7 @@ export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudi
   }, []);
 
   const playMessage = useCallback(
-    async (text: string, messageId: string, voiceIndex?: number): Promise<void> => {
+    async (text: string, messageId: string): Promise<void> => {
       // If same message is playing, stop it
       if (currentlyPlayingId === messageId && isPlaying) {
         stop();
@@ -124,8 +96,7 @@ export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudi
       setIsLoading(true);
 
       try {
-        // Determine voice to use
-        const voiceId = voiceIndex !== undefined ? getVoiceForIndex(voiceIndex) : undefined;
+        const voiceId = languageVoice;
 
         // Cache key includes voice to differentiate
         const cacheKey = voiceId ? `${text}::${voiceId}` : text;
@@ -191,7 +162,7 @@ export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudi
         throw err;
       }
     },
-    [currentlyPlayingId, isPlaying, stop, getVoiceForIndex]
+    [currentlyPlayingId, isPlaying, stop, languageVoice]
   );
 
   const playAll = useCallback(
@@ -207,7 +178,7 @@ export function useAudioPlayback(options: UseAudioPlaybackOptions = {}): UseAudi
 
         const msg = assistantMessages[i];
         try {
-          await playMessage(msg.content, msg.id, i);
+          await playMessage(msg.content, msg.id);
         } catch {
           // Continue with next message even if one fails
           if (stopRequestedRef.current) break;

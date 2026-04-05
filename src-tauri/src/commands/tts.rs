@@ -149,38 +149,22 @@ pub async fn generate_tts(
     }
 }
 
-/// Get voice ID for a specific language and voice type (default, voiceA, or voiceB)
-/// Used by conversation playback to get per-language voices A/B
+/// Get the configured voice ID for a specific language
 #[tauri::command]
 pub fn get_voice_for_language(
     state: State<'_, AppState>,
     language: String,
-    voice_type: String,
 ) -> Result<String, String> {
     let settings = state.settings.safe_read()?;
 
-    // Get per-language settings if available
     if let Some(lang_settings) = settings.tts_voices_per_language.get(&language) {
-        let voice = match voice_type.as_str() {
-            "default" => &lang_settings.default,
-            "voiceA" => &lang_settings.voice_a,
-            "voiceB" => &lang_settings.voice_b,
-            _ => &lang_settings.default,
-        };
-        if !voice.is_empty() {
-            return Ok(voice.clone());
+        if !lang_settings.default.is_empty() {
+            return Ok(lang_settings.default.clone());
         }
     }
 
-    // Fall back to legacy global voices
-    let fallback = match voice_type.as_str() {
-        "default" => &settings.tts_voice_id,
-        "voiceA" => &settings.tts_voice_id_a,
-        "voiceB" => &settings.tts_voice_id_b,
-        _ => &settings.tts_voice_id,
-    };
-
-    Ok(fallback.clone())
+    // Fall back to legacy global voice
+    Ok(settings.tts_voice_id.clone())
 }
 
 async fn generate_elevenlabs_tts(

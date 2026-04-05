@@ -49,8 +49,6 @@ export interface CustomLanguage {
 
 export interface LanguageVoiceSettings {
   default: string;
-  voiceA: string;
-  voiceB: string;
 }
 
 export interface AppSettings {
@@ -60,10 +58,8 @@ export interface AppSettings {
   activeWhisperModel: string;
   ttsProvider: TtsProvider;
   ttsApiKey: string;
-  // Legacy voice settings (kept for migration)
+  // Legacy voice setting (kept for migration)
   ttsVoiceId: string;
-  ttsVoiceIdA: string;
-  ttsVoiceIdB: string;
   // Per-language voice settings
   ttsVoicesPerLanguage: Record<string, LanguageVoiceSettings>;
   targetLanguage: string;
