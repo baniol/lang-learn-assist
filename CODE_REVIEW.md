@@ -35,7 +35,7 @@
 ## Średni priorytet — Modularność
 
 - [x] **PhraseExerciseView.tsx (~1024 linie)** — split na Setup/Exercise/Results
-- [ ] **data_export.rs (766 linii)** — split export/import/duplicates
+- [x] **data_export.rs (766 linii)** — split export/import/duplicates
 - [ ] **phrases.rs (473 linie)** — wydzielić phrase_threads
 - [ ] **SettingsView.tsx** — wydzielić sekcje do osobnych komponentów
 
