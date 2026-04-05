@@ -202,10 +202,11 @@ export function PhraseExerciseView({ onExerciseActive }: PhraseExerciseViewProps
     }
   }, [currentPhrase]);
 
-  // Load tags on mount
+  // Load tags when target language is set
   useEffect(() => {
-    getTags().then(setTags).catch(console.error);
-  }, []);
+    if (!settings?.targetLanguage) return;
+    getTags(settings.targetLanguage).then(setTags).catch(console.error);
+  }, [settings?.targetLanguage]);
 
   // Load phrase count when filter changes
   useEffect(() => {

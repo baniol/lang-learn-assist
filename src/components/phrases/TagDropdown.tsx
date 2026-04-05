@@ -7,9 +7,10 @@ import type { Tag } from "../../types";
 interface TagDropdownProps {
   selectedTagId: number | null;
   onTagSelect: (tagId: number | null) => void;
+  targetLanguage: string;
 }
 
-export function TagDropdown({ selectedTagId, onTagSelect }: TagDropdownProps) {
+export function TagDropdown({ selectedTagId, onTagSelect, targetLanguage }: TagDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
   const [newTagName, setNewTagName] = useState("");
@@ -19,12 +20,12 @@ export function TagDropdown({ selectedTagId, onTagSelect }: TagDropdownProps) {
 
   const loadTags = useCallback(async () => {
     try {
-      const data = await getTags();
+      const data = await getTags(targetLanguage);
       setTags(data);
     } catch (err) {
       console.error("Failed to load tags:", err);
     }
-  }, []);
+  }, [targetLanguage]);
 
   useEffect(() => {
     loadTags();
@@ -48,7 +49,7 @@ export function TagDropdown({ selectedTagId, onTagSelect }: TagDropdownProps) {
     const trimmed = newTagName.trim();
     if (!trimmed) return;
     try {
-      await createTag(trimmed);
+      await createTag(trimmed, targetLanguage);
       setNewTagName("");
       await loadTags();
     } catch (err) {

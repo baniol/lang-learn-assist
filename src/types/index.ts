@@ -20,6 +20,7 @@ export {
 export interface Tag {
   id: number;
   name: string;
+  targetLanguage: string;
   createdAt: string;
 }
 

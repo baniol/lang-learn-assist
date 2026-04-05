@@ -49,12 +49,13 @@ pub fn row_to_phrase(row: &Row) -> Result<Phrase, rusqlite::Error> {
 
 /// Convert a database row to a Tag model.
 ///
-/// Expects columns: 0: id, 1: name, 2: created_at
+/// Expects columns: 0: id, 1: name, 2: target_language, 3: created_at
 pub fn row_to_tag(row: &Row) -> Result<Tag, rusqlite::Error> {
     Ok(Tag {
         id: row.get(0)?,
         name: row.get(1)?,
-        created_at: row.get(2)?,
+        target_language: row.get(2)?,
+        created_at: row.get(3)?,
     })
 }
 

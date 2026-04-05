@@ -4,12 +4,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Tag } from "../types";
 
-export async function getTags(): Promise<Tag[]> {
-  return invoke<Tag[]>("get_tags");
+export async function getTags(targetLanguage: string): Promise<Tag[]> {
+  return invoke<Tag[]>("get_tags", { targetLanguage });
 }
 
-export async function createTag(name: string): Promise<Tag> {
-  return invoke<Tag>("create_tag", { name });
+export async function createTag(name: string, targetLanguage: string): Promise<Tag> {
+  return invoke<Tag>("create_tag", { name, targetLanguage });
 }
 
 export async function deleteTag(id: number): Promise<void> {

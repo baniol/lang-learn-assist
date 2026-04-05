@@ -34,7 +34,11 @@ export function PhraseFilters({
   return (
     <div className="flex flex-wrap items-center gap-4 mb-6">
       {/* Tag filter */}
-      <TagDropdown selectedTagId={selectedTagId} onTagSelect={onTagSelect} />
+      <TagDropdown
+        selectedTagId={selectedTagId}
+        onTagSelect={onTagSelect}
+        targetLanguage={currentLanguage ?? ""}
+      />
 
       {/* Starred filter */}
       <button

@@ -375,12 +375,14 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         conn.execute("DROP INDEX IF EXISTS idx_phrase_progress_srs_pool", []),
     );
 
-    // Tags table
+    // Tags table (per language)
     conn.execute(
         "CREATE TABLE IF NOT EXISTS tags (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            name TEXT NOT NULL,
+            target_language TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(name, target_language)
         )",
         [],
     )?;
@@ -398,6 +400,35 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_phrase_tags_tag ON phrase_tags(tag_id)",
         [],
     )?;
+
+    // Migration: recreate tags table with target_language column if missing
+    let tag_columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(tags)")
+        .ok()
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| row.get::<_, String>(1))
+                .ok()
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        })
+        .unwrap_or_default();
+
+    if !tag_columns.contains(&"target_language".to_string()) {
+        conn.execute_batch(
+            "PRAGMA foreign_keys=OFF;
+             CREATE TABLE tags_new (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 name TEXT NOT NULL,
+                 target_language TEXT NOT NULL DEFAULT '',
+                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                 UNIQUE(name, target_language)
+             );
+             INSERT OR IGNORE INTO tags_new SELECT id, name, '', created_at FROM tags;
+             DROP TABLE tags;
+             ALTER TABLE tags_new RENAME TO tags;
+             PRAGMA foreign_keys=ON;",
+        )?;
+        println!("[migration] recreated tags table with target_language column");
+    }
 
     // Exercise sessions table (for calendar/stats)
     conn.execute(

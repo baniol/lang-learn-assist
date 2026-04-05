@@ -401,6 +401,7 @@ pub struct PracticeResponse {
 pub struct Tag {
     pub id: i64,
     pub name: String,
+    pub target_language: String,
     pub created_at: String,
 }
 

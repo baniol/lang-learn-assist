@@ -35,13 +35,13 @@ export function PhraseListItem({
 
   const openTagMenu = useCallback(async () => {
     try {
-      const tags = await getTags();
+      const tags = await getTags(phrase.targetLanguage);
       setAllTags(tags);
       setShowTagMenu(true);
     } catch (err) {
       console.error("Failed to load tags:", err);
     }
-  }, []);
+  }, [phrase.targetLanguage]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
