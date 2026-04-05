@@ -83,6 +83,7 @@ export interface TtsVoice {
   name: string;
   language: string;
   provider: string;
+  previewUrl?: string;
 }
 
 export interface SuggestedPhrase {

@@ -1,7 +1,19 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { cn } from "../../lib/utils";
 import { SettingsSection } from "./SettingsSection";
+import { generateTts, getAudioBase64 } from "../../lib/tts";
 import type { TtsProvider, TtsVoice, LanguageVoiceSettings } from "../../types";
+
+const TEST_PHRASES: Record<string, string> = {
+  de: "Hallo, wie geht es Ihnen heute?",
+  en: "Hello, how are you today?",
+  fr: "Bonjour, comment allez-vous aujourd'hui?",
+  es: "Hola, ¿cómo está usted hoy?",
+  it: "Ciao, come sta oggi?",
+  pt: "Olá, como está você hoje?",
+  cs: "Dobrý den, jak se dnes máte?",
+  uk: "Привіт, як ви сьогодні?",
+};
 
 interface TtsSettingsSectionProps {
   provider: TtsProvider;
@@ -35,10 +47,28 @@ export function TtsSettingsSection({
   onTest,
 }: TtsSettingsSectionProps) {
   const [selectedLanguage, setSelectedLanguage] = useState("de");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const updateLanguageVoice = (langCode: string, value: string) => {
     const updated: LanguageVoiceSettings = { default: value };
     onVoicesPerLanguageChange({ ...voicesPerLanguage, [langCode]: updated });
+  };
+
+  const playVoicePreview = async (voiceId: string, langCode: string) => {
+    const phrase = TEST_PHRASES[langCode] ?? TEST_PHRASES["en"];
+    setPreviewLoading(true);
+    try {
+      const audioPath = await generateTts(phrase, undefined, voiceId, langCode, true);
+      const audioUrl = await getAudioBase64(audioPath);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      audioRef.current = new Audio(audioUrl);
+      audioRef.current.play();
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   return (
@@ -130,18 +160,35 @@ export function TtsSettingsSection({
                       <label className="block text-sm text-slate-600 dark:text-slate-400 mb-1">
                         Voice
                       </label>
-                      <select
-                        value={voicesPerLanguage[selectedLanguage]?.default || ""}
-                        onChange={(e) => updateLanguageVoice(selectedLanguage, e.target.value)}
-                        className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
-                      >
-                        <option value="">Select a voice...</option>
-                        {voices.map((voice) => (
-                          <option key={voice.voiceId} value={voice.voiceId}>
-                            {voice.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex gap-2">
+                        <select
+                          value={voicesPerLanguage[selectedLanguage]?.default || ""}
+                          onChange={(e) => updateLanguageVoice(selectedLanguage, e.target.value)}
+                          className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
+                        >
+                          <option value="">Select a voice...</option>
+                          {voices.map((voice) => (
+                            <option key={voice.voiceId} value={voice.voiceId}>
+                              {voice.name}
+                            </option>
+                          ))}
+                        </select>
+                        {voicesPerLanguage[selectedLanguage]?.default && (
+                          <button
+                            onClick={() =>
+                              playVoicePreview(
+                                voicesPerLanguage[selectedLanguage].default,
+                                selectedLanguage
+                              )
+                            }
+                            disabled={previewLoading}
+                            title="Preview voice in target language"
+                            className="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors text-sm disabled:opacity-50"
+                          >
+                            {previewLoading ? "..." : "▶"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

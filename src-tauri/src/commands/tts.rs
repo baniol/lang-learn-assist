@@ -15,12 +15,14 @@ pub struct TtsVoice {
     pub name: String,
     pub language: String,
     pub provider: String,
+    pub preview_url: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct ElevenLabsVoice {
     voice_id: String,
     name: String,
+    preview_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -84,6 +86,7 @@ async fn get_elevenlabs_voices(api_key: &str) -> Result<Vec<TtsVoice>, String> {
             name: v.name,
             language: "multilingual".to_string(),
             provider: "elevenlabs".to_string(),
+            preview_url: v.preview_url,
         })
         .collect())
 }
