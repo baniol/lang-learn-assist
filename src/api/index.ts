@@ -43,6 +43,7 @@ export {
   getSettings,
   saveSettings,
   testLlmConnection,
+  deleteLanguage,
 } from "./settings";
 
 export {

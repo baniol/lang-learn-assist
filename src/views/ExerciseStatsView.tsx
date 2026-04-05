@@ -15,7 +15,7 @@ import {
   TrashIcon,
 } from "../components/icons";
 import { cn } from "../lib/utils";
-import { LANGUAGE_OPTIONS } from "../types";
+import { useAllLanguages } from "../contexts/SettingsContext";
 import type { ExerciseSession, SessionPhraseRecord } from "../types";
 
 // ============================================================================
@@ -51,8 +51,8 @@ function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
-function languageName(code: string): string {
-  return LANGUAGE_OPTIONS.find((l) => l.code === code)?.name ?? code;
+function languageName(code: string, languages: Array<{ code: string; name: string }>): string {
+  return languages.find((l) => l.code === code)?.name ?? code;
 }
 
 function formatTime(isoString: string): string {
@@ -228,6 +228,8 @@ function SessionCard({
   session: ExerciseSession;
   onDeleteSession: (id: number) => void;
 }) {
+  const allLanguages = useAllLanguages();
+  const getLangName = (code: string) => languageName(code, allLanguages);
   const [failedCount, setFailedCount] = useState(0);
   const isCompleted = s.phrasesCompleted === s.phrasesTotal && s.phrasesTotal > 0;
   const hasFailed = failedCount > 0;
@@ -277,7 +279,7 @@ function SessionCard({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-            {languageName(s.targetLanguage)}
+            {getLangName(s.targetLanguage)}
           </span>
           <button
             onClick={() => onDeleteSession(s.id)}
@@ -306,6 +308,8 @@ function SessionCard({
 }
 
 function DayDetails({ date, sessions, onClose, onDeleteSession }: DayDetailsProps) {
+  const allLanguages = useAllLanguages();
+  const getLangName = (code: string) => languageName(code, allLanguages);
   const totalCompleted = sessions.reduce((s, e) => s + e.phrasesCompleted, 0);
   const totalPhrases = sessions.reduce((s, e) => s + e.phrasesTotal, 0);
 
@@ -369,7 +373,7 @@ function DayDetails({ date, sessions, onClose, onDeleteSession }: DayDetailsProp
                 className="flex items-center justify-between py-1.5 px-3 bg-slate-50 dark:bg-slate-700/50 rounded"
               >
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {languageName(lang)}
+                  {getLangName(lang)}
                 </span>
                 <span className="text-sm text-slate-500 dark:text-slate-400">
                   {stats.sessions} {stats.sessions === 1 ? "session" : "sessions"} &middot;{" "}
@@ -440,6 +444,9 @@ function computePeriodStats(sessions: ExerciseSession[], fromDate: string): Peri
 }
 
 function PeriodCard({ label, stats }: { label: string; stats: PeriodStats }) {
+  const allLanguages = useAllLanguages();
+  const getLangName = (code: string) => languageName(code, allLanguages);
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-5">
       <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-4">
@@ -503,7 +510,7 @@ function PeriodCard({ label, stats }: { label: string; stats: PeriodStats }) {
                       className="flex items-center justify-between py-1.5 px-3 bg-slate-50 dark:bg-slate-700/50 rounded"
                     >
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                        {languageName(lang)}
+                        {getLangName(lang)}
                       </span>
                       <span className="text-sm text-slate-500 dark:text-slate-400">
                         {langStats.sessions} sess &middot; {langStats.completed}/{langStats.total}{" "}

@@ -15,3 +15,7 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
 export async function testLlmConnection(): Promise<string> {
   return invoke<string>("test_llm_connection");
 }
+
+export async function deleteLanguage(languageCode: string): Promise<{ phrasesDeleted: number }> {
+  return invoke("delete_language", { languageCode });
+}

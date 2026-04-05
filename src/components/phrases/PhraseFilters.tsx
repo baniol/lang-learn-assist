@@ -1,4 +1,4 @@
-import { LANGUAGE_OPTIONS } from "../../types";
+import { useAllLanguages } from "../../contexts/SettingsContext";
 import { TagDropdown } from "./TagDropdown";
 import { StarIcon } from "../icons";
 import { cn } from "../../lib/utils";
@@ -31,6 +31,8 @@ export function PhraseFilters({
   starredOnly,
   onStarredOnlyChange,
 }: PhraseFiltersProps) {
+  const allLanguages = useAllLanguages();
+
   return (
     <div className="flex flex-wrap items-center gap-4 mb-6">
       {/* Tag filter */}
@@ -62,10 +64,10 @@ export function PhraseFilters({
           className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
         >
           <option value="current">
-            {LANGUAGE_OPTIONS.find((l) => l.code === currentLanguage)?.name || "Current"} only
+            {allLanguages.find((l) => l.code === currentLanguage)?.name || "Current"} only
           </option>
           <option value="all">All languages</option>
-          {LANGUAGE_OPTIONS.map((lang) => (
+          {allLanguages.map((lang) => (
             <option key={lang.code} value={lang.code}>
               {lang.name}
             </option>

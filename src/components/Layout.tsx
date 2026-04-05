@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useSettings } from "../contexts/SettingsContext";
+import { useSettings, useAllLanguages } from "../contexts/SettingsContext";
 import { cn } from "../lib/utils";
 import {
   BookIcon,
@@ -11,7 +11,6 @@ import {
   ChartIcon,
 } from "./icons";
 import type { ViewType } from "../types";
-import { LANGUAGE_OPTIONS } from "../types";
 
 // Flag emoji for each language
 const LANGUAGE_FLAGS: Record<string, string> = {
@@ -49,6 +48,7 @@ const settingsNavItem: NavItem = {
 
 export function Layout({ currentView, onNavigate, children }: LayoutProps) {
   const { settings, updateSetting } = useSettings();
+  const allLanguages = useAllLanguages();
   const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -77,7 +77,7 @@ export function Layout({ currentView, onNavigate, children }: LayoutProps) {
   };
 
   const currentLang = settings?.targetLanguage || "de";
-  const currentLangOption = LANGUAGE_OPTIONS.find((l) => l.code === currentLang);
+  const currentLangOption = allLanguages.find((l) => l.code === currentLang);
   const currentFlag = LANGUAGE_FLAGS[currentLang] || "🌐";
 
   return (
@@ -111,7 +111,7 @@ export function Layout({ currentView, onNavigate, children }: LayoutProps) {
             {/* Dropdown */}
             {languageDropdownOpen && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-lg z-50 overflow-hidden">
-                {LANGUAGE_OPTIONS.map((lang) => (
+                {allLanguages.map((lang) => (
                   <button
                     key={lang.code}
                     onClick={() => handleLanguageChange(lang.code)}

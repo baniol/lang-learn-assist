@@ -42,6 +42,11 @@ export interface Phrase {
 export type LlmProvider = "openai" | "anthropic" | "none";
 export type TtsProvider = "elevenlabs" | "google" | "azure" | "none";
 
+export interface CustomLanguage {
+  code: string;
+  name: string;
+}
+
 export interface LanguageVoiceSettings {
   default: string;
   voiceA: string;
@@ -63,6 +68,8 @@ export interface AppSettings {
   ttsVoicesPerLanguage: Record<string, LanguageVoiceSettings>;
   targetLanguage: string;
   nativeLanguage: string;
+  customLanguages: CustomLanguage[];
+  hiddenLanguages: string[];
   fuzzyMatching: boolean;
   exerciseRepetitionsRequired: number;
 }

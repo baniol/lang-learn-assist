@@ -1,10 +1,17 @@
 use crate::db::get_db_path;
-use crate::models::{AppSettings, LanguageVoiceSettings};
+use crate::models::{AppSettings, CustomLanguage, LanguageVoiceSettings};
 use crate::state::AppState;
 use crate::utils::lock::SafeRwLock;
 use rusqlite::Connection;
+use serde::Serialize;
 use std::collections::HashMap;
 use tauri::State;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteLanguageResult {
+    pub phrases_deleted: u32,
+}
 
 fn load_settings_from_db(conn: &Connection) -> AppSettings {
     let mut settings = AppSettings::with_defaults();
@@ -42,6 +49,16 @@ fn load_settings_from_db(conn: &Connection) -> AppSettings {
             }
             "target_language" => settings.target_language = value,
             "native_language" => settings.native_language = value,
+            "custom_languages" => {
+                if let Ok(parsed) = serde_json::from_str::<Vec<CustomLanguage>>(&value) {
+                    settings.custom_languages = parsed;
+                }
+            }
+            "hidden_languages" => {
+                if let Ok(parsed) = serde_json::from_str::<Vec<String>>(&value) {
+                    settings.hidden_languages = parsed;
+                }
+            }
             "fuzzy_matching" => {
                 settings.fuzzy_matching = value == "true";
             }
@@ -78,6 +95,10 @@ fn save_settings_to_db(conn: &Connection, settings: &AppSettings) -> Result<(), 
     // Serialize per-language voice settings to JSON
     let voices_json = serde_json::to_string(&settings.tts_voices_per_language)
         .map_err(|e| format!("Failed to serialize voice settings: {}", e))?;
+    let custom_languages_json = serde_json::to_string(&settings.custom_languages)
+        .map_err(|e| format!("Failed to serialize custom languages: {}", e))?;
+    let hidden_languages_json = serde_json::to_string(&settings.hidden_languages)
+        .map_err(|e| format!("Failed to serialize hidden languages: {}", e))?;
 
     let pairs = [
         ("llm_provider", settings.llm_provider.clone()),
@@ -95,6 +116,8 @@ fn save_settings_to_db(conn: &Connection, settings: &AppSettings) -> Result<(), 
         ("tts_voices_per_language", voices_json),
         ("target_language", settings.target_language.clone()),
         ("native_language", settings.native_language.clone()),
+        ("custom_languages", custom_languages_json),
+        ("hidden_languages", hidden_languages_json),
         ("fuzzy_matching", settings.fuzzy_matching.to_string()),
         (
             "exercise_repetitions_required",
@@ -125,6 +148,44 @@ pub fn load_initial_settings() -> AppSettings {
 pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
     let settings = state.settings.safe_read()?;
     Ok(settings.clone())
+}
+
+#[tauri::command]
+pub fn delete_language(
+    state: State<'_, AppState>,
+    #[allow(non_snake_case)] languageCode: String,
+) -> Result<DeleteLanguageResult, String> {
+    let db_path = get_db_path();
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+
+    // Delete all phrases for this language
+    let phrases_deleted = conn
+        .execute(
+            "DELETE FROM phrases WHERE target_language = ?1",
+            rusqlite::params![languageCode],
+        )
+        .map_err(|e| format!("Failed to delete phrases: {}", e))? as u32;
+
+    // Update settings: remove from custom_languages (or hide if predefined),
+    // remove TTS voices for this language
+    let mut settings = state.settings.safe_write()?;
+    let was_custom = settings
+        .custom_languages
+        .iter()
+        .any(|l| l.code == languageCode);
+    settings.custom_languages.retain(|l| l.code != languageCode);
+    if !was_custom && !settings.hidden_languages.contains(&languageCode) {
+        settings.hidden_languages.push(languageCode.clone());
+    }
+    settings.tts_voices_per_language.remove(&languageCode);
+    let updated = settings.clone();
+    drop(settings);
+
+    let conn2 =
+        Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    save_settings_to_db(&conn2, &updated)?;
+
+    Ok(DeleteLanguageResult { phrases_deleted })
 }
 
 #[tauri::command]

@@ -47,6 +47,14 @@ pub struct LanguageVoiceSettings {
     pub voice_b: String,
 }
 
+/// User-defined custom language
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomLanguage {
+    pub code: String,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -71,6 +79,8 @@ pub struct AppSettings {
     // Language settings
     pub target_language: String,
     pub native_language: String,
+    pub custom_languages: Vec<CustomLanguage>,
+    pub hidden_languages: Vec<String>,
 
     // App settings
     pub fuzzy_matching: bool,
@@ -94,6 +104,8 @@ impl AppSettings {
             tts_voices_per_language: HashMap::new(),
             target_language: "de".to_string(),
             native_language: "pl".to_string(),
+            custom_languages: Vec::new(),
+            hidden_languages: Vec::new(),
             fuzzy_matching: true,
             exercise_repetitions_required: 1,
         }

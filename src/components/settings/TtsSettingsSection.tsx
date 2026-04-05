@@ -3,14 +3,6 @@ import { cn } from "../../lib/utils";
 import { SettingsSection } from "./SettingsSection";
 import type { TtsProvider, TtsVoice, LanguageVoiceSettings } from "../../types";
 
-const VOICE_LANGUAGES = [
-  { code: "de", name: "German" },
-  { code: "en", name: "English" },
-  { code: "fr", name: "French" },
-  { code: "es", name: "Spanish" },
-  { code: "it", name: "Italian" },
-];
-
 interface TtsSettingsSectionProps {
   provider: TtsProvider;
   apiKey: string;
@@ -19,6 +11,7 @@ interface TtsSettingsSectionProps {
   voicesLoading: boolean;
   voicesError: string | null;
   testResult?: string;
+  allLanguages: Array<{ code: string; name: string }>;
   onProviderChange: (provider: TtsProvider) => void;
   onApiKeyChange: (key: string) => void;
   onVoicesPerLanguageChange: (voices: Record<string, LanguageVoiceSettings>) => void;
@@ -34,6 +27,7 @@ export function TtsSettingsSection({
   voicesLoading,
   voicesError,
   testResult,
+  allLanguages,
   onProviderChange,
   onApiKeyChange,
   onVoicesPerLanguageChange,
@@ -113,7 +107,7 @@ export function TtsSettingsSection({
                 <div className="space-y-4">
                   {/* Language tabs */}
                   <div className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-700 pb-2">
-                    {VOICE_LANGUAGES.map((lang) => (
+                    {allLanguages.map((lang) => (
                       <button
                         key={lang.code}
                         onClick={() => setSelectedLanguage(lang.code)}
@@ -138,7 +132,7 @@ export function TtsSettingsSection({
                   {/* Voice settings for selected language */}
                   <div className="space-y-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4">
                     <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      {VOICE_LANGUAGES.find((l) => l.code === selectedLanguage)?.name} Voices
+                      {allLanguages.find((l) => l.code === selectedLanguage)?.name} Voices
                     </h4>
 
                     {/* Default Voice */}

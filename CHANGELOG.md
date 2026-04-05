@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Custom language support: add/remove languages in settings, available across all menus and TTS voice tabs
+- Settings view split into tabs: AI, Speech, Languages, Data
+- Delete any language (predefined or custom) with confirmation dialog — cascades to all phrases in that language
+
 ## [0.1.1] - 2026-04-03
 
 ### Added

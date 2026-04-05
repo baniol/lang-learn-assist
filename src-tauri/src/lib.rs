@@ -34,6 +34,7 @@ pub fn run() {
             // Settings
             settings::get_settings,
             settings::save_settings,
+            settings::delete_language,
             // Phrases
             phrases::get_phrases,
             phrases::get_phrase,

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { getSettings, saveSettings } from "../api";
-import type { AppSettings } from "../types";
+import { LANGUAGE_OPTIONS } from "../types";
+import type { AppSettings, CustomLanguage } from "../types";
 
 interface SettingsContextValue {
   /** Current settings or null if not yet loaded */
@@ -134,4 +135,15 @@ export function useTargetLanguage(): string {
 export function useNativeLanguage(): string {
   const { settings } = useSettings();
   return settings?.nativeLanguage ?? "pl";
+}
+
+/**
+ * Hook to get all languages (predefined + custom).
+ * Used wherever language lists are displayed.
+ */
+export function useAllLanguages(): Array<CustomLanguage> {
+  const { settings } = useSettings();
+  const custom = settings?.customLanguages ?? [];
+  const hidden = new Set(settings?.hiddenLanguages ?? []);
+  return [...LANGUAGE_OPTIONS, ...custom].filter((l) => !hidden.has(l.code));
 }
