@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Settings header (title, save button, tabs) is now sticky — scrolls only the tab content
+
 ## [0.2.0] - 2026-04-05
 
 ### Added
