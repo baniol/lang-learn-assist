@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { useQuery } from "../hooks/useQuery";
 import { useSettings, useAllLanguages } from "../contexts/SettingsContext";
 import { cn } from "../lib/utils";
 import {
@@ -50,6 +52,7 @@ export function Layout({ currentView, onNavigate, children }: LayoutProps) {
   const { settings, updateSetting } = useSettings();
   const allLanguages = useAllLanguages();
   const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
+  const { data: appVersion } = useQuery(getVersion, [], { initialData: "" });
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Build nav items based on settings
@@ -162,7 +165,7 @@ export function Layout({ currentView, onNavigate, children }: LayoutProps) {
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
           <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
-            Press Space to record
+            v{appVersion ?? ""}
           </p>
         </div>
       </aside>

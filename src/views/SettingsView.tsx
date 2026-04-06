@@ -295,117 +295,123 @@ export function SettingsView() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Settings</h1>
-        <Button onClick={handleSave} disabled={isSaving} isLoading={isSaving}>
-          <CheckIcon size="sm" />
-          Save Settings
-        </Button>
+    <div>
+      <div className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 px-6 pt-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Settings</h1>
+            <Button onClick={handleSave} disabled={isSaving} isLoading={isSaving}>
+              <CheckIcon size="sm" />
+              Save Settings
+            </Button>
+          </div>
+
+          {/* Tab bar */}
+          <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
+            {SETTINGS_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-t-lg transition-colors",
+                  activeTab === tab.id
+                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-b-2 border-blue-500"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700 mb-6">
-        {SETTINGS_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "px-4 py-2 text-sm font-medium rounded-t-lg transition-colors",
-              activeTab === tab.id
-                ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-b-2 border-blue-500"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="px-6 py-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+          {activeTab === "ai" && (
+            <>
+              <LlmSettingsSection
+                provider={settings.llmProvider}
+                apiKey={settings.llmApiKey}
+                model={settings.llmModel}
+                testResult={testResults.llm}
+                onProviderChange={(p) => updateSetting("llmProvider", p)}
+                onApiKeyChange={(k) => updateSetting("llmApiKey", k)}
+                onModelChange={(m) => updateSetting("llmModel", m)}
+                onTest={handleTestLlm}
+              />
+              <ExerciseSettingsSection
+                repetitionsRequired={settings.exerciseRepetitionsRequired}
+                onRepetitionsChange={(v) => updateSetting("exerciseRepetitionsRequired", v)}
+              />
+            </>
+          )}
+
+          {activeTab === "speech" && (
+            <>
+              <WhisperSettingsSection
+                models={whisperModels}
+                activeModel={settings.activeWhisperModel}
+                downloadingModel={downloadingModel}
+                downloadProgress={downloadProgress}
+                onSelectModel={handleSelectActiveModel}
+                onDownloadModel={handleDownloadModel}
+                onDeleteModel={setDeletingModel}
+              />
+              <TtsSettingsSection
+                provider={settings.ttsProvider}
+                apiKey={settings.ttsApiKey}
+                voicesPerLanguage={settings.ttsVoicesPerLanguage}
+                voices={ttsVoices}
+                voicesLoading={voicesLoading}
+                voicesError={voicesError}
+                testResult={testResults.tts}
+                allLanguages={allLanguages}
+                onProviderChange={(p) => updateSetting("ttsProvider", p)}
+                onApiKeyChange={(k) => updateSetting("ttsApiKey", k)}
+                onVoicesPerLanguageChange={(v) => updateSetting("ttsVoicesPerLanguage", v)}
+                onRefreshVoices={loadTtsVoices}
+                onTest={handleTestTts}
+              />
+            </>
+          )}
+
+          {activeTab === "languages" && (
+            <LanguageSettingsSection
+              targetLanguage={settings.targetLanguage}
+              nativeLanguage={settings.nativeLanguage}
+              customLanguages={settings.customLanguages}
+              hiddenLanguages={settings.hiddenLanguages}
+              onTargetLanguageChange={(l) => updateSetting("targetLanguage", l)}
+              onNativeLanguageChange={(l) => updateSetting("nativeLanguage", l)}
+              onCustomLanguagesChange={(langs) => updateSetting("customLanguages", langs)}
+              onDeleteLanguage={handleDeleteLanguage}
+            />
+          )}
+
+          {activeTab === "data" && (
+            <DataManagementSection
+              importMode={importMode}
+              isExporting={isExporting}
+              isImporting={isImporting}
+              operationResult={dataOperationResult}
+              onImportModeChange={setImportMode}
+              onExport={handleExport}
+              onImport={handleImport}
+            />
+          )}
+        </div>
+
+        <ConfirmDialog
+          isOpen={deletingModel !== null}
+          onClose={() => setDeletingModel(null)}
+          onConfirm={confirmDeleteModel}
+          title="Delete Model?"
+          message={`Are you sure you want to delete the model "${whisperModels.find((m) => m.fileName === deletingModel)?.name}"? You will need to download it again if you want to use it.`}
+          confirmLabel="Delete"
+          variant="danger"
+        />
       </div>
-
-      <div className="space-y-6">
-        {activeTab === "ai" && (
-          <>
-            <LlmSettingsSection
-              provider={settings.llmProvider}
-              apiKey={settings.llmApiKey}
-              model={settings.llmModel}
-              testResult={testResults.llm}
-              onProviderChange={(p) => updateSetting("llmProvider", p)}
-              onApiKeyChange={(k) => updateSetting("llmApiKey", k)}
-              onModelChange={(m) => updateSetting("llmModel", m)}
-              onTest={handleTestLlm}
-            />
-            <ExerciseSettingsSection
-              repetitionsRequired={settings.exerciseRepetitionsRequired}
-              onRepetitionsChange={(v) => updateSetting("exerciseRepetitionsRequired", v)}
-            />
-          </>
-        )}
-
-        {activeTab === "speech" && (
-          <>
-            <WhisperSettingsSection
-              models={whisperModels}
-              activeModel={settings.activeWhisperModel}
-              downloadingModel={downloadingModel}
-              downloadProgress={downloadProgress}
-              onSelectModel={handleSelectActiveModel}
-              onDownloadModel={handleDownloadModel}
-              onDeleteModel={setDeletingModel}
-            />
-            <TtsSettingsSection
-              provider={settings.ttsProvider}
-              apiKey={settings.ttsApiKey}
-              voicesPerLanguage={settings.ttsVoicesPerLanguage}
-              voices={ttsVoices}
-              voicesLoading={voicesLoading}
-              voicesError={voicesError}
-              testResult={testResults.tts}
-              allLanguages={allLanguages}
-              onProviderChange={(p) => updateSetting("ttsProvider", p)}
-              onApiKeyChange={(k) => updateSetting("ttsApiKey", k)}
-              onVoicesPerLanguageChange={(v) => updateSetting("ttsVoicesPerLanguage", v)}
-              onRefreshVoices={loadTtsVoices}
-              onTest={handleTestTts}
-            />
-          </>
-        )}
-
-        {activeTab === "languages" && (
-          <LanguageSettingsSection
-            targetLanguage={settings.targetLanguage}
-            nativeLanguage={settings.nativeLanguage}
-            customLanguages={settings.customLanguages}
-            hiddenLanguages={settings.hiddenLanguages}
-            onTargetLanguageChange={(l) => updateSetting("targetLanguage", l)}
-            onNativeLanguageChange={(l) => updateSetting("nativeLanguage", l)}
-            onCustomLanguagesChange={(langs) => updateSetting("customLanguages", langs)}
-            onDeleteLanguage={handleDeleteLanguage}
-          />
-        )}
-
-        {activeTab === "data" && (
-          <DataManagementSection
-            importMode={importMode}
-            isExporting={isExporting}
-            isImporting={isImporting}
-            operationResult={dataOperationResult}
-            onImportModeChange={setImportMode}
-            onExport={handleExport}
-            onImport={handleImport}
-          />
-        )}
-      </div>
-
-      <ConfirmDialog
-        isOpen={deletingModel !== null}
-        onClose={() => setDeletingModel(null)}
-        onConfirm={confirmDeleteModel}
-        title="Delete Model?"
-        message={`Are you sure you want to delete the model "${whisperModels.find((m) => m.fileName === deletingModel)?.name}"? You will need to download it again if you want to use it.`}
-        confirmLabel="Delete"
-        variant="danger"
-      />
     </div>
   );
 }
