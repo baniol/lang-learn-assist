@@ -6,13 +6,34 @@ import type { CustomLanguage } from "../../types";
 import { ELEVENLABS_LANGUAGES } from "../../lib/tts";
 
 const LANGUAGE_FLAGS: Record<string, string> = {
-  de: "🇩🇪",
-  en: "🇬🇧",
-  fr: "🇫🇷",
-  es: "🇪🇸",
-  it: "🇮🇹",
-  pt: "🇵🇹",
+  ar: "🇸🇦",
+  bg: "🇧🇬",
+  zh: "🇨🇳",
+  hr: "🇭🇷",
   cs: "🇨🇿",
+  da: "🇩🇰",
+  nl: "🇳🇱",
+  en: "🇬🇧",
+  fil: "🇵🇭",
+  fi: "🇫🇮",
+  fr: "🇫🇷",
+  de: "🇩🇪",
+  el: "🇬🇷",
+  hi: "🇮🇳",
+  id: "🇮🇩",
+  it: "🇮🇹",
+  ja: "🇯🇵",
+  ko: "🇰🇷",
+  ms: "🇲🇾",
+  pl: "🇵🇱",
+  pt: "🇵🇹",
+  ro: "🇷🇴",
+  ru: "🇷🇺",
+  sk: "🇸🇰",
+  es: "🇪🇸",
+  sv: "🇸🇪",
+  ta: "🇱🇰",
+  tr: "🇹🇷",
   uk: "🇺🇦",
 };
 
@@ -103,7 +124,7 @@ export function LanguageSettingsSection({
           >
             {allTargetOptions.map((lang) => (
               <option key={lang.code} value={lang.code}>
-                {lang.name}
+                {LANGUAGE_FLAGS[lang.code] ?? "🌐"} {lang.name}
               </option>
             ))}
           </select>
@@ -119,7 +140,7 @@ export function LanguageSettingsSection({
           >
             {allNativeOptions.map((lang) => (
               <option key={lang.code} value={lang.code}>
-                {lang.name}
+                {LANGUAGE_FLAGS[lang.code] ?? "🌐"} {lang.name}
               </option>
             ))}
           </select>
@@ -178,7 +199,7 @@ export function LanguageSettingsSection({
               (l) => !allTargetOptions.some((existing) => existing.code === l.languageId)
             ).map((l) => (
               <option key={l.languageId} value={l.languageId}>
-                {l.name} ({l.languageId})
+                {LANGUAGE_FLAGS[l.languageId] ?? "🌐"} {l.name}
               </option>
             ))}
           </select>
