@@ -78,6 +78,11 @@ export interface WhisperModel {
   description: string;
 }
 
+export interface ElevenLabsLanguage {
+  languageId: string;
+  name: string;
+}
+
 export interface TtsVoice {
   voiceId: string;
   name: string;

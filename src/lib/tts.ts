@@ -1,9 +1,42 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { TtsVoice } from "../types";
+import type { ElevenLabsLanguage, TtsVoice } from "../types";
 
 export async function getAvailableVoices(): Promise<TtsVoice[]> {
   return invoke<TtsVoice[]>("get_available_voices");
 }
+
+// Languages supported by eleven_multilingual_v2, sorted alphabetically by name
+export const ELEVENLABS_LANGUAGES: ElevenLabsLanguage[] = [
+  { languageId: "ar", name: "Arabic" },
+  { languageId: "bg", name: "Bulgarian" },
+  { languageId: "zh", name: "Chinese" },
+  { languageId: "hr", name: "Croatian" },
+  { languageId: "cs", name: "Czech" },
+  { languageId: "da", name: "Danish" },
+  { languageId: "nl", name: "Dutch" },
+  { languageId: "en", name: "English" },
+  { languageId: "fil", name: "Filipino" },
+  { languageId: "fi", name: "Finnish" },
+  { languageId: "fr", name: "French" },
+  { languageId: "de", name: "German" },
+  { languageId: "el", name: "Greek" },
+  { languageId: "hi", name: "Hindi" },
+  { languageId: "id", name: "Indonesian" },
+  { languageId: "it", name: "Italian" },
+  { languageId: "ja", name: "Japanese" },
+  { languageId: "ko", name: "Korean" },
+  { languageId: "ms", name: "Malay" },
+  { languageId: "pl", name: "Polish" },
+  { languageId: "pt", name: "Portuguese" },
+  { languageId: "ro", name: "Romanian" },
+  { languageId: "ru", name: "Russian" },
+  { languageId: "sk", name: "Slovak" },
+  { languageId: "es", name: "Spanish" },
+  { languageId: "sv", name: "Swedish" },
+  { languageId: "ta", name: "Tamil" },
+  { languageId: "tr", name: "Turkish" },
+  { languageId: "uk", name: "Ukrainian" },
+];
 
 export async function generateTts(
   text: string,

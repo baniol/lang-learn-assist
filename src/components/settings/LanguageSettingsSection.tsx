@@ -3,6 +3,7 @@ import { SettingsSection } from "./SettingsSection";
 import { ConfirmDialog } from "../ui";
 import { LANGUAGE_OPTIONS, NATIVE_LANGUAGE_OPTIONS } from "../../types";
 import type { CustomLanguage } from "../../types";
+import { ELEVENLABS_LANGUAGES } from "../../lib/tts";
 
 const LANGUAGE_FLAGS: Record<string, string> = {
   de: "🇩🇪",
@@ -36,12 +37,11 @@ export function LanguageSettingsSection({
   onCustomLanguagesChange,
   onDeleteLanguage,
 }: LanguageSettingsSectionProps) {
-  const [newCode, setNewCode] = useState("");
-  const [newName, setNewName] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ code: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [selectedElevenLabsLang, setSelectedElevenLabsLang] = useState("");
 
   const hidden = new Set(hiddenLanguages);
   const allTargetOptions = [...LANGUAGE_OPTIONS, ...customLanguages].filter(
@@ -52,19 +52,18 @@ export function LanguageSettingsSection({
   );
 
   const handleAddLanguage = () => {
-    const code = newCode.trim().toLowerCase();
-    const name = newName.trim();
-    if (!code || !name) {
-      setAddError("Both code and name are required");
+    if (!selectedElevenLabsLang) {
+      setAddError("Select a language");
       return;
     }
-    if (allTargetOptions.some((l) => l.code === code)) {
-      setAddError(`Language code "${code}" already exists`);
+    const found = ELEVENLABS_LANGUAGES.find((l) => l.languageId === selectedElevenLabsLang);
+    if (!found) return;
+    if (allTargetOptions.some((l) => l.code === found.languageId)) {
+      setAddError(`Language "${found.name}" already exists`);
       return;
     }
-    onCustomLanguagesChange([...customLanguages, { code, name }]);
-    setNewCode("");
-    setNewName("");
+    onCustomLanguagesChange([...customLanguages, { code: found.languageId, name: found.name }]);
+    setSelectedElevenLabsLang("");
     setAddError(null);
   };
 
@@ -166,28 +165,23 @@ export function LanguageSettingsSection({
           Add Custom Language
         </h4>
         <div className="flex gap-2 items-start">
-          <input
-            type="text"
-            value={newCode}
+          <select
+            value={selectedElevenLabsLang}
             onChange={(e) => {
-              setNewCode(e.target.value);
+              setSelectedElevenLabsLang(e.target.value);
               setAddError(null);
             }}
-            placeholder="Code (e.g. nl)"
-            maxLength={10}
-            className="w-28 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-sm"
-          />
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => {
-              setNewName(e.target.value);
-              setAddError(null);
-            }}
-            placeholder="Name (e.g. Dutch)"
-            maxLength={40}
-            className="w-40 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-sm"
-          />
+            className="flex-1 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-sm"
+          >
+            <option value="">Select language…</option>
+            {ELEVENLABS_LANGUAGES.filter(
+              (l) => !allTargetOptions.some((existing) => existing.code === l.languageId)
+            ).map((l) => (
+              <option key={l.languageId} value={l.languageId}>
+                {l.name} ({l.languageId})
+              </option>
+            ))}
+          </select>
           <button
             onClick={handleAddLanguage}
             className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
