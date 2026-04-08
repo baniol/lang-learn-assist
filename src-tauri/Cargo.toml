@@ -1,6 +1,6 @@
 [package]
 name = "lang-learn-assist"
-version = "0.3.1"
+version = "0.3.2"
 description = "Language Learning Assistant with LLM conversation practice"
 authors = ["Marcin Baniowski"]
 edition = "2021"
