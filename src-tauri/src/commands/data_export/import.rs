@@ -1,7 +1,8 @@
 use crate::db::get_conn;
 use crate::models::{
-    ExportData, ExportMaterial, ExportMaterialThread, ExportPhrase, ExportPhraseThread,
-    ExportSetting, ImportMode, ImportResult, ImportStats,
+    ExportData, ExportExerciseSession, ExportExerciseSessionPhrase, ExportMaterial,
+    ExportMaterialThread, ExportPhrase, ExportPhraseThread, ExportPracticeSession, ExportSetting,
+    ExportTag, ImportMode, ImportResult, ImportStats,
 };
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
@@ -18,7 +19,7 @@ pub fn import_data_with_conn(
     data: ExportData,
     mode: ImportMode,
 ) -> Result<ImportResult, String> {
-    if data.version > 4 {
+    if data.version > 5 {
         return Err(format!(
             "Export version {} is not supported. Please update the application.",
             data.version
@@ -34,6 +35,11 @@ pub fn import_data_with_conn(
     match mode {
         ImportMode::Overwrite => {
             for table in &[
+                "phrase_tags",
+                "tags",
+                "exercise_session_phrases",
+                "exercise_sessions",
+                "practice_sessions",
                 "phrase_threads",
                 "material_threads",
                 "phrases",
@@ -63,6 +69,29 @@ pub fn import_data_with_conn(
             for thread in &data.material_threads {
                 insert_material_thread(&tx, thread, true, thread.material_id)?;
                 stats.material_threads_imported += 1;
+            }
+            for session in &data.practice_sessions {
+                insert_practice_session(&tx, session, true, session.material_id)?;
+                stats.practice_sessions_imported += 1;
+            }
+            for tag in &data.tags {
+                insert_tag(&tx, tag, true)?;
+                stats.tags_imported += 1;
+            }
+            for pt in &data.phrase_tags {
+                tx.execute(
+                    "INSERT OR IGNORE INTO phrase_tags (phrase_id, tag_id) VALUES (?1, ?2)",
+                    params![pt.phrase_id, pt.tag_id],
+                )
+                .map_err(|e| format!("Failed to import phrase_tag: {}", e))?;
+                stats.phrase_tags_imported += 1;
+            }
+            for session in &data.exercise_sessions {
+                insert_exercise_session(&tx, session, true)?;
+                stats.exercise_sessions_imported += 1;
+            }
+            for esp in &data.exercise_session_phrases {
+                insert_exercise_session_phrase(&tx, esp, true, esp.session_id)?;
             }
         }
         ImportMode::Merge => {
@@ -118,6 +147,94 @@ pub fn import_data_with_conn(
                 if let Some(&new_phrase_id) = phrase_id_map.get(&thread.phrase_id) {
                     insert_phrase_thread(&tx, thread, false, new_phrase_id)?;
                     stats.phrase_threads_imported += 1;
+                }
+            }
+
+            // Practice sessions: dedup by (material_id, created_at)
+            for session in &data.practice_sessions {
+                if let Some(&new_material_id) = material_id_map.get(&session.material_id) {
+                    let existing: Option<i64> = tx
+                        .query_row(
+                            "SELECT id FROM practice_sessions WHERE material_id = ?1 AND created_at = ?2",
+                            params![new_material_id, session.created_at],
+                            |row| row.get(0),
+                        )
+                        .ok();
+                    if existing.is_none() {
+                        insert_practice_session(&tx, session, false, new_material_id)?;
+                        stats.practice_sessions_imported += 1;
+                    }
+                }
+            }
+
+            // Tags: dedup by (name, target_language). Build id map.
+            let mut tag_id_map: HashMap<i64, i64> = HashMap::new();
+            for tag in &data.tags {
+                let existing: Option<i64> = tx
+                    .query_row(
+                        "SELECT id FROM tags WHERE name = ?1 AND target_language = ?2",
+                        params![tag.name, tag.target_language],
+                        |row| row.get(0),
+                    )
+                    .ok();
+                if let Some(existing_id) = existing {
+                    tag_id_map.insert(tag.id, existing_id);
+                } else {
+                    let new_id = insert_tag(&tx, tag, false)?;
+                    tag_id_map.insert(tag.id, new_id);
+                    stats.tags_imported += 1;
+                }
+            }
+
+            // Phrase-tag associations using both id maps
+            for pt in &data.phrase_tags {
+                if let (Some(&new_phrase_id), Some(&new_tag_id)) =
+                    (phrase_id_map.get(&pt.phrase_id), tag_id_map.get(&pt.tag_id))
+                {
+                    let res = tx.execute(
+                        "INSERT OR IGNORE INTO phrase_tags (phrase_id, tag_id) VALUES (?1, ?2)",
+                        params![new_phrase_id, new_tag_id],
+                    );
+                    if let Ok(rows) = res {
+                        if rows > 0 {
+                            stats.phrase_tags_imported += 1;
+                        }
+                    }
+                }
+            }
+
+            // Exercise sessions: dedup by (date, target_language, created_at). Map ids.
+            let mut session_id_map: HashMap<i64, i64> = HashMap::new();
+            for session in &data.exercise_sessions {
+                let existing: Option<i64> = tx
+                    .query_row(
+                        "SELECT id FROM exercise_sessions
+                         WHERE date = ?1 AND target_language = ?2 AND created_at = ?3",
+                        params![session.date, session.target_language, session.created_at],
+                        |row| row.get(0),
+                    )
+                    .ok();
+                if let Some(existing_id) = existing {
+                    session_id_map.insert(session.id, existing_id);
+                } else {
+                    let new_id = insert_exercise_session(&tx, session, false)?;
+                    session_id_map.insert(session.id, new_id);
+                    stats.exercise_sessions_imported += 1;
+                }
+            }
+            for esp in &data.exercise_session_phrases {
+                if let Some(&new_session_id) = session_id_map.get(&esp.session_id) {
+                    // Skip if there are already phrases for this session (avoid duplicates on re-import)
+                    let count: i64 = tx
+                        .query_row(
+                            "SELECT COUNT(*) FROM exercise_session_phrases WHERE session_id = ?1",
+                            params![new_session_id],
+                            |row| row.get(0),
+                        )
+                        .unwrap_or(0);
+                    if count == 0 {
+                        insert_exercise_session_phrase(&tx, esp, false, new_session_id)?;
+                    }
                 }
             }
 
@@ -322,6 +439,140 @@ fn insert_phrase_thread(
             ],
         )
         .map_err(|e| format!("Failed to import phrase_thread: {}", e))?;
+    }
+    Ok(())
+}
+
+fn insert_practice_session(
+    tx: &rusqlite::Transaction,
+    session: &ExportPracticeSession,
+    with_id: bool,
+    material_id: i64,
+) -> Result<(), String> {
+    if with_id {
+        tx.execute(
+            "INSERT INTO practice_sessions (id, material_id, mode, messages_json,
+                                           suggested_phrases_json, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                session.id,
+                material_id,
+                session.mode,
+                session.messages_json,
+                session.suggested_phrases_json,
+                session.created_at,
+                session.updated_at
+            ],
+        )
+        .map_err(|e| format!("Failed to import practice_session: {}", e))?;
+    } else {
+        tx.execute(
+            "INSERT INTO practice_sessions (material_id, mode, messages_json,
+                                           suggested_phrases_json, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                material_id,
+                session.mode,
+                session.messages_json,
+                session.suggested_phrases_json,
+                session.created_at,
+                session.updated_at
+            ],
+        )
+        .map_err(|e| format!("Failed to import practice_session: {}", e))?;
+    }
+    Ok(())
+}
+
+fn insert_tag(tx: &rusqlite::Transaction, tag: &ExportTag, with_id: bool) -> Result<i64, String> {
+    if with_id {
+        tx.execute(
+            "INSERT INTO tags (id, name, target_language, created_at) VALUES (?1, ?2, ?3, ?4)",
+            params![tag.id, tag.name, tag.target_language, tag.created_at],
+        )
+        .map_err(|e| format!("Failed to import tag: {}", e))?;
+    } else {
+        tx.execute(
+            "INSERT INTO tags (name, target_language, created_at) VALUES (?1, ?2, ?3)",
+            params![tag.name, tag.target_language, tag.created_at],
+        )
+        .map_err(|e| format!("Failed to import tag: {}", e))?;
+    }
+    Ok(tx.last_insert_rowid())
+}
+
+fn insert_exercise_session(
+    tx: &rusqlite::Transaction,
+    session: &ExportExerciseSession,
+    with_id: bool,
+) -> Result<i64, String> {
+    if with_id {
+        tx.execute(
+            "INSERT INTO exercise_sessions (id, date, phrases_completed, phrases_total,
+                                           target_language, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                session.id,
+                session.date,
+                session.phrases_completed,
+                session.phrases_total,
+                session.target_language,
+                session.created_at
+            ],
+        )
+        .map_err(|e| format!("Failed to import exercise_session: {}", e))?;
+    } else {
+        tx.execute(
+            "INSERT INTO exercise_sessions (date, phrases_completed, phrases_total,
+                                           target_language, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                session.date,
+                session.phrases_completed,
+                session.phrases_total,
+                session.target_language,
+                session.created_at
+            ],
+        )
+        .map_err(|e| format!("Failed to import exercise_session: {}", e))?;
+    }
+    Ok(tx.last_insert_rowid())
+}
+
+fn insert_exercise_session_phrase(
+    tx: &rusqlite::Transaction,
+    esp: &ExportExerciseSessionPhrase,
+    with_id: bool,
+    session_id: i64,
+) -> Result<(), String> {
+    if with_id {
+        tx.execute(
+            "INSERT INTO exercise_session_phrases (id, session_id, prompt, answer,
+                                                   attempts, completed)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                esp.id,
+                session_id,
+                esp.prompt,
+                esp.answer,
+                esp.attempts,
+                esp.completed
+            ],
+        )
+        .map_err(|e| format!("Failed to import exercise_session_phrase: {}", e))?;
+    } else {
+        tx.execute(
+            "INSERT INTO exercise_session_phrases (session_id, prompt, answer, attempts, completed)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                session_id,
+                esp.prompt,
+                esp.answer,
+                esp.attempts,
+                esp.completed
+            ],
+        )
+        .map_err(|e| format!("Failed to import exercise_session_phrase: {}", e))?;
     }
     Ok(())
 }

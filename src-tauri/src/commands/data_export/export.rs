@@ -1,7 +1,8 @@
 use crate::db::get_conn;
 use crate::models::{
-    ExportData, ExportMaterial, ExportMaterialThread, ExportPhrase, ExportPhraseThread,
-    ExportSetting,
+    ExportData, ExportExerciseSession, ExportExerciseSessionPhrase, ExportMaterial,
+    ExportMaterialThread, ExportPhrase, ExportPhraseTag, ExportPhraseThread, ExportPracticeSession,
+    ExportSetting, ExportTag,
 };
 use rusqlite::Connection;
 
@@ -143,8 +144,113 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         .map_err(|e| format!("Failed to collect material_threads: {}", e))?;
     drop(stmt);
 
+    // Export practice sessions
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, material_id, mode, messages_json, suggested_phrases_json,
+                    created_at, updated_at
+             FROM practice_sessions",
+        )
+        .map_err(|e| format!("Failed to prepare practice_sessions query: {}", e))?;
+    let practice_sessions = stmt
+        .query_map([], |row| {
+            Ok(ExportPracticeSession {
+                id: row.get(0)?,
+                material_id: row.get(1)?,
+                mode: row.get(2)?,
+                messages_json: row.get(3)?,
+                suggested_phrases_json: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query practice_sessions: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect practice_sessions: {}", e))?;
+    drop(stmt);
+
+    // Export tags
+    let mut stmt = conn
+        .prepare("SELECT id, name, target_language, created_at FROM tags")
+        .map_err(|e| format!("Failed to prepare tags query: {}", e))?;
+    let tags = stmt
+        .query_map([], |row| {
+            Ok(ExportTag {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                target_language: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query tags: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect tags: {}", e))?;
+    drop(stmt);
+
+    // Export phrase_tags
+    let mut stmt = conn
+        .prepare("SELECT phrase_id, tag_id FROM phrase_tags")
+        .map_err(|e| format!("Failed to prepare phrase_tags query: {}", e))?;
+    let phrase_tags = stmt
+        .query_map([], |row| {
+            Ok(ExportPhraseTag {
+                phrase_id: row.get(0)?,
+                tag_id: row.get(1)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query phrase_tags: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect phrase_tags: {}", e))?;
+    drop(stmt);
+
+    // Export exercise sessions
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, date, phrases_completed, phrases_total, target_language, created_at
+             FROM exercise_sessions",
+        )
+        .map_err(|e| format!("Failed to prepare exercise_sessions query: {}", e))?;
+    let exercise_sessions = stmt
+        .query_map([], |row| {
+            Ok(ExportExerciseSession {
+                id: row.get(0)?,
+                date: row.get(1)?,
+                phrases_completed: row.get(2)?,
+                phrases_total: row.get(3)?,
+                target_language: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query exercise_sessions: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect exercise_sessions: {}", e))?;
+    drop(stmt);
+
+    // Export exercise session phrases
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, session_id, prompt, answer, attempts, completed
+             FROM exercise_session_phrases",
+        )
+        .map_err(|e| format!("Failed to prepare exercise_session_phrases query: {}", e))?;
+    let exercise_session_phrases = stmt
+        .query_map([], |row| {
+            Ok(ExportExerciseSessionPhrase {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                prompt: row.get(2)?,
+                answer: row.get(3)?,
+                attempts: row.get(4)?,
+                completed: row.get(5)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query exercise_session_phrases: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect exercise_session_phrases: {}", e))?;
+    drop(stmt);
+
     Ok(ExportData {
-        version: 4,
+        version: 5,
         exported_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         settings,
         phrases,
@@ -153,8 +259,12 @@ pub fn export_data_with_conn(conn: &Connection) -> Result<ExportData, String> {
         notes: vec![],
         materials,
         material_threads,
+        practice_sessions,
+        tags,
+        phrase_tags,
+        exercise_sessions,
+        exercise_session_phrases,
         phrase_progress: vec![],
-        practice_sessions: vec![],
         decks: vec![],
     })
 }

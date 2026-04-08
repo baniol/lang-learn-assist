@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Data export/import now includes practice sessions, tags, phrase-tag links, and exercise session statistics (export format bumped to v5; older v≤4 files still import)
+
 ## [0.3.0] - 2026-04-06
 
 ### Changed

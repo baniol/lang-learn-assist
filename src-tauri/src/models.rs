@@ -187,13 +187,71 @@ pub struct ExportData {
     pub materials: Vec<ExportMaterial>,
     #[serde(default)]
     pub material_threads: Vec<ExportMaterialThread>,
+    #[serde(default)]
+    pub practice_sessions: Vec<ExportPracticeSession>,
+    #[serde(default)]
+    pub tags: Vec<ExportTag>,
+    #[serde(default)]
+    pub phrase_tags: Vec<ExportPhraseTag>,
+    #[serde(default)]
+    pub exercise_sessions: Vec<ExportExerciseSession>,
+    #[serde(default)]
+    pub exercise_session_phrases: Vec<ExportExerciseSessionPhrase>,
     // Legacy fields - accepted during import but no longer exported
     #[serde(default)]
     pub phrase_progress: Vec<serde_json::Value>,
     #[serde(default)]
-    pub practice_sessions: Vec<serde_json::Value>,
-    #[serde(default)]
     pub decks: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPracticeSession {
+    pub id: i64,
+    pub material_id: i64,
+    pub mode: String,
+    pub messages_json: String,
+    pub suggested_phrases_json: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportTag {
+    pub id: i64,
+    pub name: String,
+    pub target_language: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPhraseTag {
+    pub phrase_id: i64,
+    pub tag_id: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportExerciseSession {
+    pub id: i64,
+    pub date: String,
+    pub phrases_completed: i32,
+    pub phrases_total: i32,
+    pub target_language: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportExerciseSessionPhrase {
+    pub id: i64,
+    pub session_id: i64,
+    pub prompt: String,
+    pub answer: String,
+    pub attempts: i32,
+    pub completed: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -265,6 +323,14 @@ pub struct ImportStats {
     pub phrase_threads_imported: i32,
     pub materials_imported: i32,
     pub material_threads_imported: i32,
+    #[serde(default)]
+    pub practice_sessions_imported: i32,
+    #[serde(default)]
+    pub tags_imported: i32,
+    #[serde(default)]
+    pub phrase_tags_imported: i32,
+    #[serde(default)]
+    pub exercise_sessions_imported: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

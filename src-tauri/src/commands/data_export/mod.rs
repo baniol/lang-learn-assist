@@ -22,7 +22,7 @@ mod tests {
 
     fn create_test_export_data() -> ExportData {
         ExportData {
-            version: 4,
+            version: 5,
             exported_at: "2024-01-01T00:00:00Z".to_string(),
             settings: vec![ExportSetting {
                 key: "test_key".to_string(),
@@ -49,8 +49,12 @@ mod tests {
             notes: vec![],
             materials: vec![],
             material_threads: vec![],
-            phrase_progress: vec![],
             practice_sessions: vec![],
+            tags: vec![],
+            phrase_tags: vec![],
+            exercise_sessions: vec![],
+            exercise_session_phrases: vec![],
+            phrase_progress: vec![],
             decks: vec![],
         }
     }
@@ -62,7 +66,7 @@ mod tests {
         assert!(result.is_ok());
 
         let data = result.unwrap();
-        assert_eq!(data.version, 4);
+        assert_eq!(data.version, 5);
         assert!(data.settings.is_empty());
         assert!(data.phrases.is_empty());
     }

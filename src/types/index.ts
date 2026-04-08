@@ -193,6 +193,51 @@ export interface ExportData {
   phraseThreads: ExportPhraseThread[];
   materials: ExportMaterial[];
   materialThreads: ExportMaterialThread[];
+  practiceSessions?: ExportPracticeSession[];
+  tags?: ExportTag[];
+  phraseTags?: ExportPhraseTag[];
+  exerciseSessions?: ExportExerciseSession[];
+  exerciseSessionPhrases?: ExportExerciseSessionPhrase[];
+}
+
+export interface ExportPracticeSession {
+  id: number;
+  materialId: number;
+  mode: string;
+  messagesJson: string;
+  suggestedPhrasesJson: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportTag {
+  id: number;
+  name: string;
+  targetLanguage: string;
+  createdAt: string;
+}
+
+export interface ExportPhraseTag {
+  phraseId: number;
+  tagId: number;
+}
+
+export interface ExportExerciseSession {
+  id: number;
+  date: string;
+  phrasesCompleted: number;
+  phrasesTotal: number;
+  targetLanguage: string;
+  createdAt: string;
+}
+
+export interface ExportExerciseSessionPhrase {
+  id: number;
+  sessionId: number;
+  prompt: string;
+  answer: string;
+  attempts: number;
+  completed: number;
 }
 
 export interface ExportSetting {
@@ -242,6 +287,10 @@ export interface ImportStats {
   phraseThreadsImported: number;
   materialsImported: number;
   materialThreadsImported: number;
+  practiceSessionsImported?: number;
+  tagsImported?: number;
+  phraseTagsImported?: number;
+  exerciseSessionsImported?: number;
 }
 
 export interface DuplicateInfo {
