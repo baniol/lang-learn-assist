@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Manual phrase entry tab in Add Phrases dialog — type source and target sentence directly without AI
+
 ## [0.3.2] - 2026-04-08
 
 ## [0.3.1] - 2026-04-08

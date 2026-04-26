@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { Dialog, AIChatPanel } from "../ui";
+import { useState, useCallback } from "react";
+import { Dialog, AIChatPanel, Button, Input } from "../ui";
 import type { ChatMessage } from "../ui";
 import { CheckIcon, CloseIcon } from "../icons";
 import { generatePhrases } from "../../lib/phrases";
 import { createPhrase } from "../../api";
 import { useSettings } from "../../contexts/SettingsContext";
 import type { SuggestedPhrase } from "../../types";
+
+type Mode = "ai" | "manual";
 
 interface AddPhraseDialogProps {
   isOpen: boolean;
@@ -15,17 +17,24 @@ interface AddPhraseDialogProps {
 
 export function AddPhraseDialog({ isOpen, onClose, onAdded }: AddPhraseDialogProps) {
   const { settings } = useSettings();
+  const [mode, setMode] = useState<Mode>("ai");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [pendingPhrases, setPendingPhrases] = useState<SuggestedPhrase[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const [manualPrompt, setManualPrompt] = useState("");
+  const [manualAnswer, setManualAnswer] = useState("");
+  const [isSavingManual, setIsSavingManual] = useState(false);
+
   const handleClose = () => {
     setMessages([]);
     setInputValue("");
     setPendingPhrases([]);
     setError(null);
+    setManualPrompt("");
+    setManualAnswer("");
     onClose();
   };
 
@@ -88,11 +97,101 @@ export function AddPhraseDialog({ isOpen, onClose, onAdded }: AddPhraseDialogPro
     setPendingPhrases((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleSaveManual = useCallback(async () => {
+    const prompt = manualPrompt.trim();
+    const answer = manualAnswer.trim();
+    if (!prompt || !answer) return;
+
+    setIsSavingManual(true);
+    setError(null);
+    try {
+      await createPhrase({
+        prompt,
+        answer,
+        targetLanguage: settings?.targetLanguage,
+        nativeLanguage: settings?.nativeLanguage,
+      });
+      setManualPrompt("");
+      setManualAnswer("");
+      onAdded();
+    } catch (err) {
+      setError(`Failed to save phrase: ${err}`);
+    } finally {
+      setIsSavingManual(false);
+    }
+  }, [manualPrompt, manualAnswer, settings, onAdded]);
+
   return (
-    <Dialog isOpen={isOpen} onClose={handleClose} title="Add Phrases with AI">
+    <Dialog isOpen={isOpen} onClose={handleClose} title="Add Phrases">
       <div className="flex flex-col -mx-6 -mb-6" style={{ minHeight: 360 }}>
-        {/* Suggested Phrases */}
-        {pendingPhrases.length > 0 && (
+        {/* Mode tabs */}
+        <div className="flex border-b border-slate-200 dark:border-slate-700 px-6">
+          <button
+            onClick={() => setMode("ai")}
+            className={`py-2 px-4 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              mode === "ai"
+                ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            }`}
+          >
+            AI
+          </button>
+          <button
+            onClick={() => setMode("manual")}
+            className={`py-2 px-4 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              mode === "manual"
+                ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            }`}
+          >
+            Ręcznie
+          </button>
+        </div>
+
+        {/* Manual mode */}
+        {mode === "manual" && (
+          <div className="flex flex-col gap-4 px-6 py-5 flex-1">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+                Zdanie źródłowe ({settings?.nativeLanguage ?? "native"})
+              </label>
+              <Input
+                value={manualPrompt}
+                onChange={(e) => setManualPrompt(e.target.value)}
+                placeholder="np. How do I get to the train station?"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+                Zdanie docelowe ({settings?.targetLanguage ?? "target"})
+              </label>
+              <Input
+                value={manualAnswer}
+                onChange={(e) => setManualAnswer(e.target.value)}
+                placeholder="np. Wie komme ich zum Bahnhof?"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) handleSaveManual();
+                }}
+              />
+            </div>
+            {error && (
+              <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+            )}
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSaveManual}
+                disabled={!manualPrompt.trim() || !manualAnswer.trim() || isSavingManual}
+                variant="primary"
+              >
+                {isSavingManual ? "Zapisywanie..." : "Dodaj frazę"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* AI mode */}
+        {mode === "ai" && pendingPhrases.length > 0 && (
           <div className="px-6 py-3 border-b border-slate-200 dark:border-slate-700 bg-amber-50 dark:bg-amber-900/20">
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
               Suggested Phrases ({pendingPhrases.length})
@@ -134,21 +233,25 @@ export function AddPhraseDialog({ isOpen, onClose, onAdded }: AddPhraseDialogPro
         )}
 
         {/* Chat */}
-        <AIChatPanel
-          messages={messages}
-          inputValue={inputValue}
-          onInputChange={setInputValue}
-          onSend={handleSend}
-          isSending={isSending}
-          placeholder="Describe what you want to say, e.g. 'how to ask for directions'..."
-          variant="blue"
-          className="flex-1"
-        />
+        {mode === "ai" && (
+          <>
+            <AIChatPanel
+              messages={messages}
+              inputValue={inputValue}
+              onInputChange={setInputValue}
+              onSend={handleSend}
+              isSending={isSending}
+              placeholder="Describe what you want to say, e.g. 'how to ask for directions'..."
+              variant="blue"
+              className="flex-1"
+            />
 
-        {error && (
-          <div className="px-6 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
-            {error}
-          </div>
+            {error && (
+              <div className="px-6 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+          </>
         )}
       </div>
     </Dialog>
